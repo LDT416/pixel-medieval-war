@@ -1,5 +1,8 @@
-import {artPath} from './artLoader';
-export function coverArt(img:HTMLImageElement){
-    img.alt='滑铁卢田野上的英法线列步兵与骑兵';img.src=artPath('cover_1815');
-    img.onerror=()=>{img.style.visibility='hidden';};
+import { artPath } from './artLoader';
+
+export function coverArt(img: HTMLImageElement) {
+    img.alt = '拿破仑与威灵顿的骑兵、军旗和线列步兵在滑铁卢田野隔烟相望';
+    img.style.imageRendering = 'pixelated';
+    img.style.objectFit = 'cover';
+    img.src = artPath('px_cover_1815');
 }

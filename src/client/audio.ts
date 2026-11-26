@@ -111,9 +111,9 @@ export class BattleAudio {
             const key = e.type === 'fire' ? e.kind : e.type;
             if (!key || this.voices >= 10)
                 continue;
-            const heavy = key === 'field_cannon' || key === 'howitzer' || key === 'collapse' || key === 'impact';
+            const heavy = key === 'field_cannon' || key === 'collapse' || key === 'impact';
             const music = key === 'drum' || key === 'horn';
-            const gun = ['line_infantry', 'guard_grenadier', 'rifleman', 'dragoon', 'volley_gunner', 'horse_artillery', 'rocket_crew','highlander'].includes(key), metal = key === 'slash' || key === 'block';
+            const gun = ['line_infantry', 'guard_grenadier'].includes(key), metal = key === 'slash' || key === 'block';
             const goreDeath = key === 'death';
             if (!(music || heavy || gun || metal || key === 'hit' || goreDeath))
                 continue;
@@ -153,10 +153,10 @@ export class BattleAudio {
             src.start(startAt);
             src.stop(startAt + time + .01);
             // 重炮破空呼啸声（Incoming Shell Whistle）
-            if ((key === 'howitzer' || key === 'field_cannon' || key === 'rocket_crew' || key === 'horse_artillery') && this.voices < 10) {
+            if (key === 'field_cannon' && this.voices < 10) {
                 const w = a.createOscillator(), wg = a.createGain();
                 w.type = 'sine';
-                w.frequency.setValueAtTime(key === 'howitzer' ? 760 : 540, now + .08);
+                w.frequency.setValueAtTime(540, now + .08);
                 w.frequency.exponentialRampToValueAtTime(160, now + .46);
                 wg.gain.setValueAtTime(.001, now + .08);
                 wg.gain.linearRampToValueAtTime(.09, now + .18);

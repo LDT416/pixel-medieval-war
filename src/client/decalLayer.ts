@@ -14,7 +14,12 @@ export class DecalLayer {
     composite?: CanvasRenderingContext2D;
     marks: Mark[] = [];
     inferno = true;
-    constructor() { this.canvas.width = WIDTH; this.canvas.height = HEIGHT; this.ctx = this.canvas.getContext('2d')!; }
+    constructor() {
+        this.canvas.width = WIDTH;
+        this.canvas.height = HEIGHT;
+        this.ctx = this.canvas.getContext('2d')!;
+        this.ctx.imageSmoothingEnabled = false;
+    }
     clear() { this.marks = []; this.composite = undefined; this.ctx.clearRect(0, 0, WIDTH, HEIGHT); }
     restore(marks: Mark[]) { this.clear(); for (const m of marks)
         this.record(m); }
@@ -75,7 +80,7 @@ export class DecalLayer {
             }
             // 尸体碎肉、白骨、红蓝破衣/银甲与折断武器永久烘焙到地表贴图
             const cloth = e.faction === 1 ? '#9e2022' : '#20478e';
-            const armored = e.kind==='cuirassier' || e.kind==='lancer';
+            const armored = e.kind==='cuirassier';
             const gibs = dense ? 7 : 4;
             for (let i = 0; i < gibs; i++) {
                 const a = this.h(e.x, e.y, 30 + i) * Math.PI * 2;
@@ -108,7 +113,7 @@ export class DecalLayer {
         }
         else if (e.type === 'collapse' && e.structure) {
             const s = e.structure;
-            if (s.type === 'bridge' || s.type === 'pontoon') {
+            if (s.type === 'bridge') {
                 for (const side of [-1, 1]) {
                     this.stamp(s.x + side * (s.w / 2 - 7) - 5, s.y - s.h / 2, 10, '#4c4439', Math.round(s.h));
                     this.stamp(s.x + side * (s.w / 2 - 10), s.y, 10, '#3b3531', 12);

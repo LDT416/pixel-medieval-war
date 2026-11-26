@@ -1,34 +1,33 @@
-import { CELL, COLS, ROWS, water, ford } from './maps';
-import type { MapId, Faction, Structure } from './types';
-export const indexAt = (x: number, y: number) => Math.max(0, Math.min(COLS - 1, Math.floor(x / CELL))) + Math.max(0, Math.min(ROWS - 1, Math.floor(y / CELL))) * COLS;
+import { CELL, COLS, ROWS, WIDTH, HEIGHT, water, onHighGround } from './maps';
+import type { Faction, MapId, Structure } from './types';
+export const indexAt = (x: number, y: number) => Math.min(COLS - 1, Math.max(0, Math.floor(x / CELL))) + COLS * Math.min(ROWS - 1, Math.max(0, Math.floor(y / CELL)));
 export class Grid {
-    readonly terrain = new Uint8Array(COLS * ROWS);
-    readonly nearTree=new Uint8Array(COLS*ROWS);
-    readonly blockers = new Int32Array(COLS * ROWS);
-    readonly pass = [new Uint8Array(COLS * ROWS), new Uint8Array(COLS * ROWS)];
-    readonly shallows = new Uint8Array(COLS * ROWS);
-    constructor(map:MapId = 'twin') { for (let i = 0; i < this.terrain.length; i++)
-        { const x=(i%COLS+.5)*CELL,y=(Math.floor(i/COLS)+.5)*CELL; const wet=water(x,y,map); this.shallows[i]=0; this.terrain[i]=this.shallows[i] || Number(!wet); } }
-    rebuild(structures: Structure[]) {
-        this.blockers.fill(0);this.nearTree.fill(0);
-        for (const p of this.pass)
-            p.set(this.terrain);
-        for (const s of structures) {
-            if (s.hp <= 0)
+    private pass = new Uint8Array(COLS * ROWS);
+    readonly ground = new Int32Array(COLS * ROWS);
+    constructor(map: MapId, sites: Structure[]) {
+        for (let i = 0; i < this.pass.length; i++) {
+            const x = (i % COLS + .5) * CELL, y = (Math.floor(i / COLS) + .5) * CELL;
+            this.pass[i] = Number(!water(x, y, map));
+        }
+        for (const s of sites) {
+            if (s.hp <= 0 || s.type === 'tree' || s.type === 'barracks')
                 continue;
-            const bridge = (s.type === 'bridge' || s.type === 'pontoon')&&!s.needed;
-            const xmin = Math.max(0, Math.ceil((s.x - s.w / 2) / CELL - .5)), xmax = Math.min(COLS - 1, Math.floor((s.x + s.w / 2) / CELL - .5));
-            const ymin = Math.max(0, Math.ceil((s.y - s.h / 2) / CELL - .5)), ymax = Math.min(ROWS - 1, Math.floor((s.y + s.h / 2) / CELL - .5));
-            if(s.type==='tree')for(let row=Math.max(0,ymin-2);row<=Math.min(ROWS-1,ymax+2);row++)
-                this.nearTree.fill(1,row*COLS+Math.max(0,xmin-2),row*COLS+Math.min(COLS,xmax+3));
-            for (let y = ymin; y <= ymax; y++)
-                for (let x = xmin; x <= xmax; x++) {
-                    const i = y * COLS + x;
-                    this.blockers[i] = s.id;
-                    for (const f of [0, 1] as const)
-                        this.pass[f][i] = bridge || ((s.type === 'gate' || s.type === 'palisade') && f === s.faction) ? 1 : 0;
+            for (let row = Math.max(0, Math.floor((s.y - s.h / 2) / CELL)); row < ROWS && row * CELL < s.y + s.h / 2; row++)
+                for (let col = Math.max(0, Math.floor((s.x - s.w / 2) / CELL)); col < COLS && col * CELL < s.x + s.w / 2; col++) {
+                    const i = col + row * COLS, p = { x: (col + .5) * CELL, y: (row + .5) * CELL };
+                    if (s.type === 'bridge')
+                        this.pass[i] = 1;
+                    // Store the candidate site for exact rampart geometry at the feet.
+                    this.ground[i] = s.id;
                 }
         }
     }
-    walk(x: number, y: number, f: Faction) { return this.pass[f][indexAt(x, y)] === 1; }
+    walk(x: number, y: number, _f?: Faction) { return x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && !!this.pass[indexAt(x, y)]; }
+    heightSite(p: {
+        x: number;
+        y: number;
+    }, sites: Map<number, Structure>) {
+        const site = sites.get(this.ground[indexAt(p.x, p.y)]);
+        return site && site.hp > 0 && onHighGround(site, p) ? site.id : 0;
+    }
 }

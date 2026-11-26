@@ -1,118 +1,224 @@
-import type {SimWorld} from './world';
-import type {Faction,Group,Point,Unit} from './types';
-import {UNITS,crews,rankFire,formationSize,shelter,strength,canGarrison} from './config';
-import {slotOffset} from './formation';
-import {distanceTo,attack} from './combat';
-import {roadY} from './maps';
-import {faceToward} from './physics';
-
-export const fieldArmy=(u:Unit)=>u.hp>0&&!u.tower&&!u.gun&&!['peasant','supply_wagon'].includes(u.kind)&&!crews[u.kind];
-export const threshold=(age:number)=>55+30*(age-1);
-export function issueWave(w:SimWorld,f:Faction,charge:boolean){
-    const r=w.realms[f];r.phase=charge?'WAVE_ASSAULT':'RETREAT_REGROUP';r.wave++;
-    r.baseline=w.units.filter(u=>u.faction===f&&fieldArmy(u)).length;
-    for(const u of w.units)if(u.faction===f&&fieldArmy(u)){
-        const g=w.groups.get(u.group)!;g.point=null;g.targetId=0;g.reform=undefined;g.firingLine=undefined;u.manual=false;
-        if(!charge){g.resting=true;g.restTick=undefined;u.enterTower=undefined;}
-    }
-    if(charge){const home=w.keep(f);if(home)w.events.push({type:'horn',x:home.x,y:home.y,faction:f});}
+import { UNITS, rankFire } from './config';
+import { rangeOf, distanceTo, attack } from './combat';
+import { HEIGHT, WIDTH, rampartSlot, roadY, riverX, riverWidth, lanesForMap } from './maps';
+import type { Group, Point, Unit, Structure } from './types';
+import type { SimWorld } from './world';
+function move(p: Point, to: Point, speed: number) {
+    const dx = to.x - p.x, dy = to.y - p.y, dist = Math.hypot(dx, dy);
+    if (dist < .15)
+        return;
+    const fraction = Math.min(1, speed / dist);
+    p.x += dx * fraction;
+    p.y += dy * fraction;
 }
-export function assignSlots(g:Group,troops:Unit[]){
-    g.count=troops.length;g.peak=Math.max(g.peak??0,g.count);
-    const files=Math.ceil(g.count/3);
-    troops.forEach((u,i)=>{u.group=g.id;u.slot=i;u.rankIndex=Math.floor(i/files);u.commandRole=undefined;});
-    if(rankFire(troops[0].kind)&&g.count>=20){
-        troops[Math.floor(g.count/2)].commandRole='flag';troops[Math.floor(g.count/2)+1].commandRole='drum';
-    }
+function crossing(w: SimWorld, p: Point, to: Point, g: Group): Point {
+    const river = riverX(p.y), sign = Math.sign(to.x - p.x), half = riverWidth(p.y, w.map) / 2;
+    if (sign === 0 || Math.sign(p.x - river) === Math.sign(to.x - riverX(to.y)) && Math.abs(p.x - river) > half + 52)
+        return to;
+    const lanes = lanesForMap(w.map);
+    let lane = g.lane;
+    if (g.manual || g.state === 'retreat' || g.state === 'garrison' || g.state === 'hold')
+        lane = lanes.reduce((a, b) => Math.abs(b - p.y) + Math.abs(b - to.y) < Math.abs(a - p.y) + Math.abs(a - to.y) ? b : a);
+    const center = riverX(lane), edge = riverWidth(lane, w.map) / 2 + 85;
+    if (Math.abs(p.x - river) > half + 62 && Math.abs(p.y - lane) > 7)
+        return { x: center - sign * edge, y: lane };
+    if (Math.abs(p.y - lane) > 8)
+        return { x: p.x, y: lane };
+    if ((p.x - center) * sign < edge)
+        return { x: center + sign * edge, y: lane };
+    return to;
 }
-export function restPost(w:SimWorld,f:Faction,p:Point){
-    let best:Point={x:f?3828:972,y:880},dist=Math.hypot(best.x-p.x,best.y-p.y);
-    for(const s of w.structures)if(s.type==='redoubt'&&s.hp>0&&!s.needed&&s.faction===f&&distanceTo(p,s)<dist){
-        best={x:s.x+(f?100:-100),y:s.y};dist=distanceTo(p,s);
+function march(w: SimWorld, u: Unit, dest: Point, speed: number, g: Group) {
+    const next = { x: u.x, y: u.y };
+    move(next, dest, speed);
+    if (!w.grid.walk(next.x, next.y)) {
+        const path = crossing(w, u, dest, g);
+        next.x = u.x;
+        next.y = u.y;
+        move(next, path, speed);
+        if (!w.grid.walk(next.x, next.y)) {
+            if (w.grid.walk(u.x, next.y))
+                next.x = u.x;
+            else if (w.grid.walk(next.x, u.y))
+                next.y = u.y;
+            else
+                return;
+        }
     }
-    return best;
+    u.x = next.x;
+    u.y = next.y;
 }
-export function strategyTick(w:SimWorld){
-    const units=new Map<number,Unit[]>();
-    for(const u of w.units)if(u.hp>0){const a=units.get(u.group);if(a)a.push(u);else units.set(u.group,[u]);}
-    for(const [id,g] of w.groups){
-        const a=units.get(id);if(!a?.length){w.groups.delete(id);continue;}
-        const free=a.filter(u=>!u.tower);if(!free.length)continue;
-        const u=free[0],f=u.faction;
-        g.anchor={x:free.reduce((s,n)=>s+n.x,0)/free.length,y:free.reduce((s,n)=>s+n.y,0)/free.length};
-        if(!fieldArmy(u))continue;
-        const morale=free.reduce((s,n)=>s+(n.morale??75),0)/free.length;
-        if(!g.resting&&(a.length<(g.peak??g.count)*.22||morale<25)){assignSlots(g,a);g.resting=true;g.restTick=undefined;g.firingLine=undefined;g.reform=undefined;g.point=null;g.targetId=0;for(const n of free)n.enterTower=undefined;}
-        if(g.resting){
-            const post=restPost(w,f,g.anchor);g.destination=post;g.volleyStart=undefined;
-            if(Math.hypot(post.x-g.anchor.x,post.y-g.anchor.y)>135){g.restTick=undefined;continue;}
-            g.restTick??=w.tick;
-            if(w.tick-g.restTick<90)continue;
-            for(const n of free){n.morale=85;n.hp=Math.min(UNITS[n.kind].hp,n.hp+1);}
-            const ally=[...units.values()].find(other=>w.groups.has(other[0].group)&&other!==a&&other[0].faction===f&&other[0].kind===u.kind&&!other.some(n=>n.tower)&&!w.groups.get(other[0].group)?.resting&&other.length+free.length<=strength[u.kind]);
-            if(ally){const group=w.groups.get(ally[0].group)!;ally.push(...free);assignSlots(group,ally);if(free.length===a.length)w.groups.delete(id);else assignSlots(g,a.filter(n=>n.tower));}
-            else if(free.length>=Math.min(20,strength[u.kind])||w.realms[f].phase==='RETREAT_REGROUP'){g.resting=false;g.peak=a.length;g.restTick=undefined;}
-            else {const main=w.units.find(n=>n.faction===f&&n.group!==id&&fieldArmy(n)&&(w.groups.get(n.group)?.count??0)>=20&&!w.groups.get(n.group)?.resting);if(main){g.resting=false;g.peak=a.length;g.escortGroup=main.group;}}
+function setRout(w: SimWorld, g: Group) {
+    g.state = 'retreat';
+    g.site = 0;
+    g.point = null;
+    g.manual = false;
+    g.restTick = 0;
+    if (g.faction === w.player)
+        w.news = UNITS[g.kind].short + '连溃退，幸存者正赶回星堡';
+}
+export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
+    for (const g of w.groups.values()) {
+        const troops = members.get(g.id);
+        if (!troops?.length)
+            continue;
+        const first = troops[0], refuge = w.refuge(g);
+        const flags = w.units.some(u => u.hp > 0 && u.faction === g.faction && u.kind === 'bannerman' && !u.routed && distanceTo(u, g.anchor) < 170);
+        const loss = 1 - troops.length / g.peak, threshold = g.kind === 'guard_grenadier' ? .54 : flags ? .45 : .4;
+        const morale = Math.max(0, Math.round((g.kind === 'guard_grenadier' ? 100 : 80) * (1 - loss / (threshold + .02)) + (flags ? 8 : 0)));
+        if (g.state !== 'retreat' && g.state !== 'rest' && (loss > threshold || troops.every(u => u.morale <= 0))) {
+            setRout(w, g);
+            g.anchor = { x: troops.reduce((n, u) => n + u.x, 0) / troops.length, y: troops.reduce((n, u) => n + u.y, 0) / troops.length };
+        }
+        g.count = troops.length;
+        for (const u of troops) {
+            u.routed = g.state === 'retreat';
+            u.morale = morale;
+        }
+        if (g.state === 'retreat' && troops.every(u => distanceTo(u, refuge) < 100)) {
+            g.state = 'rest';
+            g.restTick = w.tick;
+        }
+        if (g.state === 'rest' && w.tick - g.restTick >= 110) {
+            w.refit(g, troops, refuge);
             continue;
         }
-        const escort=g.escortGroup&&w.groups.get(g.escortGroup);
-        const enemy=w.keep(f?0:1);
-        if(!enemy)continue;
-        const dir=f?-1:1, flank=UNITS[u.kind].traits.includes('mount'),lane=flank?(id%2?255:1505):w.map==='twin'?(id%2?520:1240):880;
-        const bridge=w.map==='twin'&&w.structures.filter(s=>['pontoon','bridge'].includes(s.type)&&s.hp>0&&!s.needed).sort((a,b)=>Math.abs(a.y-lane)-Math.abs(b.y-lane))[0];
-        const advance=w.realms[f].phase==='WAVE_ASSAULT';
-        const ahead=Math.min(4600,Math.max(200,g.anchor.x+dir*80));
-        const crossing=bridge&&Math.abs(g.anchor.x-bridge.x)<400;
-        if(g.contactTick!==undefined&&w.tick-g.contactTick>8){g.volleyStart=undefined;g.firingLine=undefined;}
-        if(g.reform&&(w.tick>(g.reformUntil??Infinity)||free.every(n=>{const off=regimentSlot(n,g);return Math.hypot(n.x-g.reform!.x-off.x,n.y-g.reform!.y-off.y)<20;})))g.reform=undefined;
-        const objective=w.byStructure.get(g.targetId);
-        const raid=flank&&advance?w.units.filter(n=>n.faction!==f&&n.hp>0&&!n.tower&&(n.kind==='supply_wagon'||n.gun||n.kind==='peasant')&&distanceTo(g.anchor,n)<(n.kind==='supply_wagon'?800:380)).sort((a,b)=>Number(b.kind==='supply_wagon')-Number(a.kind==='supply_wagon')||distanceTo(g.anchor,a)-distanceTo(g.anchor,b))[0]:undefined;
-
-        g.destination=g.reform??(objective&&objective.hp>0?objective:undefined)??g.point??g.firingLine??raid??(escort?escort.anchor:undefined)??(advance?{x:ahead,y:crossing?bridge.y:roadY(ahead,lane)}:restPost(w,f,g.anchor));
-        if(!u.manual&&advance&&canGarrison(u.kind)&&w.tick%40===0){
-            const site=w.structures.find(s=>['farmhouse','windmill'].includes(s.type)&&s.hp>0&&s.faction===-1&&distanceTo(g.anchor,s)<205);
-            if(site)free.slice(0,60).forEach(n=>n.enterTower=site.id);
+        let enemy: Group | undefined, nearest = Infinity;
+        for (const other of w.groups.values()) {
+            if (other.faction === g.faction || !members.has(other.id))
+                continue;
+            const dist = distanceTo(g.anchor, other.anchor);
+            const score = g.kind === 'cuirassier' && members.get(other.id)!.some(u => u.pose === 'reload') ? dist * .75 : dist;
+            if (score < nearest) {
+                nearest = score;
+                enemy = other;
+            }
+        }
+        g.enemy = enemy?.id ?? 0;
+        const foes = enemy ? members.get(enemy.id) : undefined;
+        if (enemy && g.kind === 'guard_grenadier' && g.state === 'advance' && !g.manual && nearest < 330 &&
+            foes?.some(u => u.pose === 'reload'))
+            g.assaultTarget = enemy.id;
+        const assault = g.state === 'advance' && !g.manual && rankFire(g.kind) &&
+            (first.formation === 'melee' || (enemy !== undefined && g.assaultTarget === enemy.id));
+        const engaging = enemy && distanceTo(g.anchor, enemy.anchor) < (assault ? 15 : rangeOf(first) * .85);
+        const forward = g.faction ? -1 : 1;
+        let goal = g.point ?? g.home, speed = UNITS[g.kind].speed;
+        if (g.state === 'retreat' || g.state === 'rest') {
+            goal = refuge;
+            speed *= 2.1;
+        }
+        else if (g.state === 'garrison') {
+            const site = w.byStructure.get(g.site);
+            if (site)
+                goal = rampartSlot(site, g.seat, g.faction);
+        }
+        else if (g.state === 'advance') {
+            if (g.manual && g.point) {
+                goal = g.point;
+                if (distanceTo(g.anchor, goal) < 2)
+                    g.state = 'hold';
+            }
+            else if (g.kind === 'bannerman') {
+                const leaders = [...w.groups.values()].filter(n => n.faction === g.faction && rankFire(n.kind) && n.state === 'advance');
+                const leader = leaders.sort((a, b) => distanceTo(g.anchor, a.anchor) - distanceTo(g.anchor, b.anchor))[0];
+                goal = leader ? { x: leader.anchor.x - forward * 28, y: leader.anchor.y } : g.home;
+            }
+            else if (enemy && distanceTo(g.anchor, enemy.anchor) < (g.kind === 'cuirassier' ? 640 : 550)) {
+                goal = enemy.anchor;
+            }
+            else {
+                const end = w.keep(g.faction ? 0 : 1)!;
+                const nextX = g.anchor.x + forward * 100;
+                goal = Math.abs(end.x - g.anchor.x) < 140 ? end : { x: nextX, y: roadY(nextX, g.lane) };
+            }
+            if (engaging && !g.manual && g.kind !== 'cuirassier')
+                goal = g.anchor;
+        }
+        if (g.state === 'assemble')
+            goal = g.home;
+        move(g.anchor, crossing(w, g.anchor, goal, g), speed);
+        if (g.kind === 'bannerman' && w.tick % 48 === 0 && g.state !== 'retreat' && troops.some(u => u.slot === 1))
+            w.events.push({ type: 'drum', ...g.anchor, faction: g.faction });
+        if (foes && rankFire(g.kind) && nearest < rangeOf(first) + 210 && w.tick >= g.nextVolley && troops.some(u => u.cooldown === 0)) {
+            if (troops.some(u => foes.some(n => distanceTo(u, n) <= rangeOf(u)))) {
+                g.volleyAt = w.tick;
+                g.nextVolley = w.tick + 125;
+            }
+        }
+        for (const u of troops) {
+            if (u.hp <= 0)
+                continue;
+            const prevX = u.x, prevY = u.y;
+            u.cooldown = Math.max(0, u.cooldown - 1);
+            let target: Unit | Structure | undefined;
+            if (foes && nearest < rangeOf(u) + 320 && g.state !== 'retreat' && g.state !== 'rest' && u.kind !== 'bannerman') {
+                const grenadier = u.kind === 'guard_grenadier' && u.slot % 6 === 0 && (u.grenadeAt ?? 0) <= w.tick;
+                const reach = assault ? (grenadier ? 125 : 28) : rangeOf(u), offset = (u.slot * 7 + Math.floor(w.tick / 125) * 3) % foes.length;
+                for (let i = 0; i < foes.length; i++) {
+                    const n = foes[(offset + i) % foes.length];
+                    if (n.hp > 0 && Math.abs(n.x - u.x) <= reach && distanceTo(u, n) <= reach) {
+                        target = n;
+                        break;
+                    }
+                }
+            }
+            if (!target && g.state === 'advance' && !g.manual && u.kind !== 'bannerman') {
+                const end = w.keep(g.faction ? 0 : 1)!;
+                if (end.hp > 0 && distanceTo(u, end) < rangeOf(u) + 10)
+                    target = end;
+            }
+            const age = w.tick - (u.firedAt ?? -1000);
+            const loading = age > 4 && u.cooldown > 0 && u.firedAt !== undefined && g.state !== 'retreat' && g.state !== 'rest';
+            const site = g.site ? w.byStructure.get(g.site) : undefined;
+            const slot = site ? rampartSlot(site, g.seat + u.slot, g.faction) : undefined;
+            const deploying = slot && distanceTo(u, slot) > 3;
+            const ordered = (g.manual || g.state === 'hold' && w.realms[g.faction].order !== 'auto') && g.point && distanceTo(u, g.point) > 115;
+            const scattered = !u.tower && g.state !== 'retreat' && g.state !== 'rest' && w.tick < (g.scatteredUntil ?? 0);
+            if (scattered) {
+                const fallback = { x: u.x - forward * 10, y: u.y + (u.slot % 2 ? 8 : -8) };
+                march(w, u, fallback, UNITS[u.kind].speed * 1.25, g);
+                u.pose = 'march2';
+                u.target = 0;
+            }
+            else if (target && !deploying && !ordered) {
+                const dist = distanceTo(u, target) || 1;
+                u.aimX = (target.x - u.x) / dist;
+                u.aimY = (target.y - u.y) / dist;
+                if (Math.abs(u.aimX) > .06)
+                    u.face = Math.sign(u.aimX);
+                u.target = target.id;
+                u.pose = w.tick - (u.thrownAt ?? -1000) < 8 ? 'throw' : loading ? 'reload' : dist < 30 ? 'bayonet' : 'aim';
+                const volley = w.tick - g.volleyAt;
+                if (!u.cooldown && (dist < 30 || assault || !rankFire(u.kind) || !('kind' in target) || (volley >= u.slot % 4 && volley < 6)))
+                    attack(w, u, target);
+            }
+            else if (loading) {
+                u.pose = 'reload';
+            }
+            else {
+                const bridge = Math.abs(g.anchor.x - riverX(g.anchor.y)) < riverWidth(g.anchor.y, w.map) / 2 + 80;
+                const center = g.state === 'retreat' ? refuge : g.anchor;
+                const desired = slot ?? { x: center.x + u.offset.x, y: center.y + u.offset.y * (bridge ? .31 : 1) };
+                const waypoint = g.state === 'retreat' ? crossing(w, u, desired, g) : desired;
+                desired.x = Math.min(WIDTH - 4, Math.max(4, desired.x));
+                desired.y = Math.min(HEIGHT - 4, Math.max(4, desired.y));
+                march(w, u, waypoint, g.state === 'retreat' ? speed : speed * 1.15, g);
+                u.pose = Math.floor(u.marchDistance / 6) % 2 ? 'march1' : 'march2';
+                u.target = 0;
+            }
+            u.vx = u.x - prevX;
+            u.vy = u.y - prevY;
+            u.moving = Math.abs(u.vx) + Math.abs(u.vy) > .05;
+            if (u.moving) {
+                const length = Math.hypot(u.vx, u.vy);
+                u.marchDistance += length;
+                u.aimX = u.vx / length;
+                u.aimY = u.vy / length;
+                if (Math.abs(u.aimX) > .1)
+                    u.face = Math.sign(u.vx);
+            }
+            u.tower = w.grid.heightSite(u, w.byStructure);
         }
     }
-    for(const f of [0,1] as const){
-        const army=w.units.filter(u=>u.faction===f&&fieldArmy(u)&&!w.groups.get(u.group)?.resting);
-        const r=w.realms[f],dir=f?-1:1;
-        w.fronts[f]={x:army.length?army.reduce((s,u)=>s+u.x,0)/army.length:f?3828:972,y:880,breached:army.some(u=>(u.x-2400)*dir>0)};
-        if(r.phase==='WAVE_ASSAULT'&&army.length<r.baseline*.22)issueWave(w,f,false);
-        if(r.phase==='RETREAT_REGROUP'&&!w.units.some(u=>u.faction===f&&w.groups.get(u.group)?.resting)){r.phase='PATROL_GATHER';r.cooldownUntil=w.tick+120;}
-        if(r.phase==='PATROL_GATHER'&&w.tick>=(r.cooldownUntil??0)&&army.length>=threshold(r.age))issueWave(w,f,true);
-    }
-}
-export function regimentSlot(u:Unit,g:Group){
-    let off=slotOffset(u.slot,g.count,u.formation,u.faction,formationSize(u.kind));
-    if(u.kind==='rifleman'&&u.formation==='line'){
-        off.x+=Math.sin(u.slot*7.17)*9;off.y+=Math.cos(u.slot*2.13)*5;
-    }
-    if(u.formation==='square'&&u.commandRole)off={x:0,y:u.commandRole==='flag'?-8:8};
-    return off;
-}
-export function moveSlot(w:SimWorld,u:Unit,g:Group){
-    const dest=g.destination??g.anchor,off=regimentSlot(u,g);
-    const x=dest.x+off.x,y=dest.y+off.y;
-    if(Math.hypot(x-u.x,y-u.y)>3)w.approach(u,{x,y},UNITS[u.kind].speed,dest);
-    if(u.squareSide===0||u.squareSide===2)faceToward(u,(u.faction?-1:1)*(u.squareSide===2?-1:1));
-}
-export function artillery(w:SimWorld,u:Unit){
-    if(!u.crew){u.moving=false;return;}
-    const f=u.faction,base=w.keep(f);if(!base)return;
-    const g=w.groups.get(u.group)!;
-    const fort=w.structures.find(s=>s.type==='redoubt'&&s.hp>0&&!s.needed&&s.faction===f);
-    const guns=w.units.filter(n=>n.hp>0&&n.faction===f&&crews[n.kind]);
-    const index=guns.indexOf(u),row=Math.floor(index/4),file=index%4;
-    const position=g.point??(fort?{x:fort.x+(f?1:-1)*(70+row*85),y:fort.y+40+file*78}:{x:base.x+(f?-1:1)*((u.kind==='horse_artillery'?500:350)-row*85),y:1160+file*78});
-    const ordered=w.byStructure.get(g.targetId),target=ordered&&ordered.hp>0?ordered:undefined;
-    u.deployed=!target&&Math.hypot(position.x-u.x,position.y-u.y)<(u.deployed?32:10);
-    u.moving=!target&&!u.deployed;
-    if(u.moving){w.approach(u,position);return;}
-    if(u.cooldown>0)return;
-    const range=UNITS[u.kind].range;
-    const site=target&&target.hp>0?target:w.structures.find(s=>s.faction===1-f&&s.hp>0&&shelter(s.type)&&distanceTo(u,s)<=range&&w.units.some(n=>n.tower===s.id));
-    let foe:Unit|undefined,best=range;
-    for(const n of w.units)if(n.faction!==f&&n.hp>0){const dist=distanceTo(u,n);if(dist<best){best=dist;foe=n;}}
-    const goal=site??foe??w.keep(f?0:1);if(goal&&distanceTo(u,goal)<=range)attack(w,u,goal);
 }

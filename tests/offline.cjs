@@ -1,72 +1,157 @@
 const assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const {build}=require('esbuild'),{pathToFileURL}=require('node:url'),path=require('node:path');
+const fs=require('node:fs');
+const http=require('node:http');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const {build}=require('esbuild');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+
+const prefix='/campaign/1815/', root=path.resolve('dist');
+const expectedAssets=['cover_1815','oak','beech','spruce','bush','hedge','bridge','starfort','barracks','farmhouse','redoubt'].map(k=>'px_'+k+'.png').sort();
+const mime={'.png':'image/png','.webp':'image/webp','.html':'text/html;charset=utf-8','.js':'text/javascript','.css':'text/css'};
+function staticServer(){
+    return http.createServer((req,res)=>{
+        const url=new URL(req.url,'http://localhost');
+        if (!url.pathname.startsWith(prefix)) return res.writeHead(404).end();
+        const name=url.pathname.slice(prefix.length)||'index.html', file=path.resolve(root,name);
+        if (name==='qa.html') return res.writeHead(200,{'content-type':mime['.html']}).end('<!doctype html><title>QA</title>');
+        if (!file.startsWith(root+path.sep)||!fs.existsSync(file)) return res.writeHead(404).end();
+        res.writeHead(200,{'content-type':mime[path.extname(file)]||'application/octet-stream'});
+        fs.createReadStream(file).pipe(res);
+    });
+}
+
+async function gestures(page,ctx) {
+    const cdp=await ctx.newCDPSession(page);
+    const touch=(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y,id])=>({x,y,id}))});
+    const camera=()=>page.locator('#world').getAttribute('data-camera').then(v=>v.split(',').map(Number));
+    const mini=page.locator('#mini');
+    await mini.evaluate(e=>{
+        const r=e.getBoundingClientRect();
+        e.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:r.left+r.width*.5,clientY:r.top+r.height*.5}));
+    });
+    await page.waitForTimeout(260);
+    const first=await camera();
+    await touch('touchStart',[[100,430,1]]);
+    await touch('touchMove',[[125,435,1]]);
+    await touch('touchMove',[[150,440,1]]);
+    await touch('touchEnd',[]);
+    await page.waitForTimeout(220);
+    const pan=await camera();
+    assert.ok(first[0]-pan[0]>50/first[2]+1,'drag keeps moving after finger lifts');
+    await page.waitForTimeout(1200);
+    const before=await camera();
+    await touch('touchStart',[[125,420,1],[205,420,2]]);
+    await touch('touchMove',[[95,435,1],[255,435,2]]);
+    await touch('touchEnd',[]);
+    await page.waitForTimeout(320);
+    const after=await camera();
+    assert.ok(Math.abs(after[2]/before[2]-2)<.035,'two-finger 2x zoom');
+    for(const [a,b,i,origin] of [[165,175,0,195],[420,435,1,422]]) {
+        const drift=before[i]+(a-origin)/before[2]-after[i]-(b-origin)/after[2];
+        assert.ok(Math.abs(drift)<3,'world anchor drift: '+drift);
+    }
+    await cdp.detach();
+}
+
+async function benchmark(page,save) {
+    await page.evaluate(s=>{
+        localStorage.setItem('napoleon-6.0',JSON.stringify({world:s,marks:[],particles:[],side:0}));
+    },save);
+    await page.locator('#restore').evaluate(b=>b.click());
+    await page.locator('#pause').evaluate(b=>b.click());
+    await page.locator('#mini').evaluate(e=>{
+        const r=e.getBoundingClientRect();
+        e.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:r.left+r.width*.5,clientY:r.top+r.height*.5}));
+    });
+    if (await page.locator('#settings').isVisible()) await page.locator('#menu').click();
+    const times=await page.evaluate(()=>new Promise(resolve=>{
+        const intervals=[];
+        let first=0,last=0;
+        function sample(t){
+            if(!first) first=t;
+            if (last && t-first>700) intervals.push(t-last);
+            last=t;
+            if(t-first<5800) requestAnimationFrame(sample); else resolve(intervals);
+        }
+        requestAnimationFrame(sample);
+    }));
+    await page.locator('#save').evaluate(b=>b.click());
+    const s=await page.evaluate(()=>JSON.parse(localStorage.getItem('napoleon-6.0')).world);
+    const alive=s.units.filter(u=>u.hp>0).length;
+    assert.ok(s.tick>100 && alive<300,'battle is actively simulating and taking losses');
+    const fps=times.length*1000/times.reduce((a,b)=>a+b,0);
+    const sorted=[...times].sort((a,b)=>a-b);
+    return {start:300,alive,ticks:s.tick,frames:times.length,fps:+fps.toFixed(1),p95Ms:+sorted[Math.floor(sorted.length*.95)].toFixed(1)};
+}
+
 (async()=>{
- const fs=require('node:fs'),http=require('node:http'),root=path.resolve('dist');
- const prefix='/campaign/1815/';
- const server=http.createServer((req,res)=>{
-    const url=new URL(req.url,'http://localhost');
-    if(!url.pathname.startsWith(prefix)){res.writeHead(404).end();return;}
-    const name=url.pathname.slice(prefix.length)||'index.html',p=path.resolve(root,name);
-    if(!p.startsWith(root+path.sep)||!fs.existsSync(p)){res.writeHead(404).end();return;}
-    res.setHeader('Content-Type',name.endsWith('.webp')?'image/webp':name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html; charset=utf-8');
-    fs.createReadStream(p).pipe(res);
- });
- await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));server.unref();
- const assets=fs.readdirSync(path.resolve('public/art')).filter(f=>f.endsWith('.webp')).sort();
- assert.equal(assets.length,26);assert.deepEqual(fs.readdirSync(path.join(root,'art')).sort(),assets);
- for(const name of assets)assert.ok(fs.readFileSync(path.join(root,'art',name)).equals(fs.readFileSync(path.resolve('public/art',name))));
- const base='http://127.0.0.1:'+server.address().port+prefix;
- const browser=await chromium.launch({headless:true,channel:process.env.BROWSER_CHANNEL||'chrome'});
- try{
- const ctx=await browser.newContext({viewport:{width:1440,height:900},hasTouch:true});
- const page=await ctx.newPage(),errors=[],requests=[];
- page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
- page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
- page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});
- await page.goto(base);
- await page.waitForFunction(()=>document.querySelector('#art')?.naturalWidth===1280);
- if(process.env.COVER_SCREENSHOT)await page.screenshot({path:process.env.COVER_SCREENSHOT});
- for(const [nation,mode,map] of [[1,'lord','darkwood'],[0,'sandbox','gorge'],[0,'lord','twin'],[1,'sandbox','darkwood']]){
-    await page.click('#nation'+nation);await page.selectOption('#maps',map);await page.click('#'+mode);await page.click('#menu');await page.click('#save');
-    const snap=await page.evaluate(()=>JSON.parse(localStorage.getItem('napoleon-5.2')).world);
-    assert.deepEqual([snap.player,snap.mode,snap.map],[nation,mode,map]);
-    if(mode==='sandbox'){await page.click('#codex');assert.equal(await page.locator('#entries img').count(),15);await page.click('#closeBook');
-       await page.click('#cat0');assert.equal(await page.locator('[data-kind]').count(),3);await page.click('[data-kind="line_infantry"]');await page.locator('.unitCard>button:last-child').first().click();
-       await page.click('#group');await page.getByRole('button',{name:'空心方阵',exact:true}).click();await page.click('#save');await page.click('#restore');}
-    await page.click('#back');
- }
- await page.setViewportSize({width:390,height:844});await page.click('#lord');
- const cdp=await ctx.newCDPSession(page);const touch=(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y,id])=>({x,y,id}))});
- const camera=()=>page.locator('#world').getAttribute('data-camera').then(v=>v.split(',').map(Number));
- await page.waitForTimeout(300);const initial=await camera();
- await touch('touchStart',[[80,350,1]]);await touch('touchMove',[[135,385,1]]);await touch('touchEnd',[]);await page.waitForTimeout(220);const pan=await camera();
- assert.notEqual(pan[0],initial[0]);await page.waitForTimeout(950);
- const before=await camera();await touch('touchStart',[[125,370,1],[205,370,2]]);await touch('touchMove',[[95,390,1],[255,390,2]]);await touch('touchEnd',[]);
- await page.waitForTimeout(300);const after=await camera();assert.ok(Math.abs(after[2]/before[2]-2)<.03);
- for(const [a,b,i,o] of [[165,175,0,195],[370,390,1,422]])assert.ok(Math.abs(before[i]+(a-o)/before[2]-after[i]-(b-o)/after[2])<3,'pinch anchor');
- await page.click('#menu');await page.click('#back');await page.selectOption('#maps','twin');await page.click('#sandbox');
- await page.click('#menu');await page.click('#bridge');await page.waitForTimeout(200);await page.click('#menu');await page.click('#save');
- const bridgeSave=await page.evaluate(()=>JSON.parse(localStorage.getItem('napoleon-5.2')).world);
- assert.ok(bridgeSave.structures.some(s=>s.type==='pontoon'&&s.hp>0),'mobile one-tap crossing');
- // Load a late-battle checkpoint through the normal UI and run the last shell to impact.
- await page.evaluate(()=>{
-    const key='napoleon-5.2',save=JSON.parse(localStorage.getItem(key)),s=save.world;
-    const fort=s.structures.find(t=>t.type==='keep'&&t.faction!==s.player);fort.hp=1;
-    s.projectiles.push({id:s.next++,kind:'stone',source:'howitzer',faction:s.player,x:fort.x,y:fort.y,z:1,vx:0,vy:0,vz:-1,gravity:.32,damage:100,remaining:1,bounces:0,target:fort.id,hit:[]});
-    localStorage.setItem(key,JSON.stringify(save));
- });
- await page.click('#restore');await page.click('#pause');await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('征战胜利'));
- await page.click('#back');
- const g=await build({entryPoints:['tests/ground.ts'],bundle:true,write:false,format:'iife',globalName:'GroundQA'});
- const fixture=await ctx.newPage();await fixture.goto(base);await fixture.addScriptTag({content:g.outputFiles[0].text});
- const pixels=await fixture.evaluate(()=>GroundQA.pixelTest());console.log(pixels);
- assert.equal(pixels.spriteCount,32);assert.equal(pixels.portraitCount,16);assert.equal(pixels.panErrors+pixels.zoomErrors+pixels.impactErrors,0);
- assert.deepEqual(errors,[]);assert.equal(new Set(requests.filter(u=>u.endsWith('.webp'))).size,26);assert.ok(requests.every(u=>u.startsWith(base)));
- const local=await browser.newContext({offline:true});const file=await local.newPage();
- file.on('pageerror',e=>errors.push(e.message));file.on('console',e=>{if(e.type()==='error')errors.push(e.text());});
- await file.goto(pathToFileURL(path.resolve('dist/index.html')).href);await file.click('#sandbox');await file.click('#menu');await file.click('#codex');
- assert.equal(await file.locator('#entries img').evaluateAll(imgs=>imgs.filter(i=>i.complete&&i.naturalWidth>0).length),15);
- await local.close();assert.deepEqual(errors,[]);console.log('PASS subpath deployment, 26 decoded images, four starts, all maps, 390x844 drag and anchored pinch, no console errors');
- }finally{await browser.close();server.close();}
+    assert.deepEqual(fs.readdirSync(path.join(root,'art')).filter(n=>/^px_.*\.png$/.test(n)).sort(),expectedAssets);
+    for(const file of expectedAssets) assert.ok(fs.readFileSync(path.join(root,'art',file)).equals(fs.readFileSync(path.join('public/art',file))),file);
+    const server=staticServer();
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve)); server.unref();
+    const base='http://127.0.0.1:'+server.address().port+prefix;
+    const browser=await chromium.launch({headless:true,channel:process.env.BROWSER_CHANNEL||'chrome'});
+    console.log('Browser',browser.version());
+    try {
+        const fixture=await browser.newPage();
+        await fixture.goto(base+'qa.html');
+        const bundle=await build({entryPoints:['tests/ground.ts'],bundle:true,write:false,format:'iife',globalName:'QA'});
+        await fixture.addScriptTag({content:bundle.outputFiles[0].text});
+        console.log('PASS visual poses, artillery recoil and smoke:',await fixture.evaluate(()=>QA.animationFrames()));
+        const save=await fixture.evaluate(()=>QA.battleSave());
+        console.log('PASS permanent, restored pixel-identical stamps:',await fixture.evaluate(()=>QA.persistentMarks()));
+        await fixture.close();
+        const metrics=[];
+        for(const [w,h,mobile] of [[1440,900,false],[390,844,true]]) {
+            const ctx=await browser.newContext({viewport:{width:w,height:h},hasTouch:mobile,isMobile:mobile,deviceScaleFactor:1});
+            const page=await ctx.newPage(),errors=[],requests=new Set();
+            page.on('pageerror',e=>errors.push(e.message));
+            page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+            page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url()); requests.add(new URL(r.url()).pathname.split('/').pop());});
+            page.on('requestfailed',r=>errors.push(r.url()+' '+r.failure()?.errorText));
+            await page.goto(base);
+            await page.waitForFunction(()=>document.querySelector('#art')?.naturalWidth===640);
+            if(process.env.QA_SCREEN_DIR)await page.screenshot({path:path.resolve(process.env.QA_SCREEN_DIR,'cover-'+w+'.png')});
+            for(const [map,mode] of [['darkwood','lord'],['twin','sandbox'],['gorge','sandbox']]) {
+                await page.selectOption('#maps',map); await page.click('#'+mode); await page.locator('#world[data-camera]').waitFor();
+                const cards=page.locator('#cards button[data-kind]');
+                assert.equal(await cards.count(),5);
+                await page.locator('#save').evaluate(b=>b.click());
+                const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('napoleon-6.0')).world);
+                assert.deepEqual([state.map,state.mode],[map,mode]);
+                if(mode==='lord') {
+                    for(const id of ['charge','recall','rampart']) await page.locator('#'+id).evaluate(b=>b.click());
+                    if(mobile) await gestures(page,ctx);
+                }
+                if(mode==='sandbox') {
+                    const before=state.units.filter(u=>u.kind==='line_infantry').length;
+
+                    await page.locator('#cards button[data-kind="line_infantry"]').evaluate(b=>b.click());
+                    await page.locator('#world').click({position:{x:w*.5,y:h*.48}});
+                    await page.waitForTimeout(150);await page.locator('#save').evaluate(b=>b.click());
+                    const n=await page.evaluate(()=>JSON.parse(localStorage.getItem('napoleon-6.0')).world.units.filter(u=>u.kind==='line_infantry').length);
+                    assert.equal(n-before,30,'one free company placed through UI');
+                }
+                if(map==='gorge') {
+                    metrics.push({viewport:w+'×'+h,...await benchmark(page,save)});
+                    console.log('Battle measurement',metrics.at(-1));
+                    if(process.env.QA_SCREEN_DIR)await page.screenshot({path:path.resolve(process.env.QA_SCREEN_DIR,'battle-'+w+'.png')});
+                }
+                await page.locator('#back').evaluate(b=>b.click());
+            }
+            assert.deepEqual(errors,[]);
+            assert.ok(expectedAssets.every(f=>requests.has(f)), 'all 11 PNGs loaded through subpath');
+            await ctx.close();
+        }
+        const offline=await browser.newContext({offline:true}); const file=await offline.newPage();
+        const errors=[];file.on('pageerror',e=>errors.push(e.message));
+        file.on('requestfailed',r=>errors.push(r.url()+' '+r.failure()?.errorText));
+        await file.goto(pathToFileURL(path.resolve('dist/index.html')).href);
+        await file.waitForFunction(()=>document.querySelector('#art')?.naturalWidth===640);
+        await file.click('#sandbox');await file.waitForTimeout(500);assert.deepEqual(errors,[]);
+        await offline.close();
+        console.log('PASS 11 PNGs, modes, placement, offline file launch and 390×844 inertial pan + anchored pinch');
+        for(const m of metrics) assert.ok(m.fps>=55,m.viewport+' averaged '+m.fps+' FPS (target ≥55)');
+    } finally { await browser.close();server.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

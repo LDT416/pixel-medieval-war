@@ -1,4 +1,11 @@
-import {build} from 'esbuild';
-import {createRequire} from 'node:module';
-const bundle=await build({entryPoints:['tests/v52.ts'],platform:'node',format:'cjs',bundle:true,write:false});
-new Function('require',bundle.outputFiles[0].text+'\n//# sourceURL=v52-regressions.cjs')(createRequire(import.meta.url));
+import { build } from 'esbuild';
+import { createRequire } from 'node:module';
+
+const bundle = await build({
+    entryPoints: ['tests/v6.ts'],
+    platform: 'node',
+    format: 'cjs',
+    bundle: true,
+    write: false,
+});
+new Function('require', bundle.outputFiles[0].text)(createRequire(import.meta.url));

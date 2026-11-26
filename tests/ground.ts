@@ -1,69 +1,88 @@
-import {preloaded,artwork} from '../src/client/artLoader';
-import { Renderer, type Overlay } from '../src/client/renderer';
 import { SimWorld } from '../src/sim/world';
-import { KINDS } from '../src/sim/config';
-import { sprite, spritePalette } from '../src/client/spriteBaker';
-import { banner } from '../src/client/banners';
-export async function pixelTest() {
-    await preloaded;
-    const portraits=[...artwork.keys()].filter(k=>k.startsWith("portrait_"));
-    const images = new Set<string>();
-    for (const k of KINDS)
-        for (const f of [0, 1] as const) {
-            for (const frame of ['march1','march2','aim','kneel','bayonet','reload'] as const) {
-                const c = sprite(k, f, frame);
-                if (c.width < 4 || c.height < 4)
-                    throw Error(k);
-            }
-            if(k==='line_infantry'){
-                const poses=['march1','march2','aim','kneel','bayonet','reload'] as const;
-                if(new Set(poses.map(p=>sprite(k,f,p).toDataURL())).size!==6)throw Error('indistinguishable poses');
-            }
-            images.add(sprite(k, f).toDataURL());
-            if (spritePalette(k, f).length < 4)
-                throw Error('精灵色表 ' + k);
+import { preloaded } from '../src/client/artLoader';
+import { DecalLayer } from '../src/client/decalLayer';
+import { VfxPool } from '../src/client/vfxPool';
+import type { Faction, Unit } from '../src/sim/types';
+import { drawUnitSprite } from '../src/client/spriteBaker';
+
+export function battleSave() {
+    const w = new SimWorld();
+    w.reset(4,'gorge','sandbox');
+    w.units=[];
+    w.byUnit.clear();
+    w.groups.clear();
+    for (const f of [0,1] as Faction[]) {
+        for (let lane=0; lane<5; lane++) {
+            const p={x:2800+(f?1:-1)*102, y:850+lane*115};
+            w.spawn(f,'line_infantry',30,p,'line');
         }
-    const wave = new Set(Array.from({ length: 6 }, (_, i) => banner(0, i).toDataURL()));
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:480px;height:280px';
-    document.body.append(canvas);
-    const r = new Renderer(canvas, document.createElement('canvas')), cam = r.camera, w = new SimWorld(4);
-    const overlay: Overlay = { selected: new Set(), box: null, hover: null, build: null, faction: 0, order: null };
-    cam.x = 1460;
-    cam.y = 920;
-    cam.zoom = .75;
-    r.draw(w, overlay, false);
-    const e = { x: 1460, y: 920, faction: 0 as const, kind: 'line_infantry' as const,flag:true, type: 'death' as const };
-    r.vfx.consume([e]);
-    for (let i = 0; i < 16; i++)
-        r.vfx.update(1 / 30);
-    const marks = r.decals.marks.length;
-    if (r.vfx.snapshot().some(p => p.mode === 1 || p.mode === 8) || !r.decals.marks.some(m => m[4] === 'flag'))
-        throw Error('倒旗或落地印章超时');
-    function sample(x = 194) { r.draw(w, overlay, false); return r.c.getImageData(x, 95, 92, 86).data; }
-    const first = sample();
-    let panErrors = 0, zoomErrors = 0, impactErrors = 0;
-    cam.x += 40;
-    const pan = sample(164);
-    for (let i = 0; i < pan.length; i++)
-        if (pan[i] !== first[i])
-            panErrors++;
-    cam.x -= 40;
-    cam.scale(.8);
-    sample();
-    cam.scale(1.25);
-    const back = sample();
-    for (let i = 0; i < back.length; i++)
-        if (back[i] !== first[i])
-            zoomErrors++;
-    r.vfx.consume([{ type: 'impact', x: 300, y: 400, power: 9, kind: 'field_cannon' }]);
-    for (let j = 0; j < 5; j++) {
-        r.vfx.update(1 / 30);
-        const after = sample();
-        for (let i = 0; i < after.length; i++)
-            if (after[i] !== back[i])
-                impactErrors++;
     }
-    canvas.remove();
-    return { portraitCount:portraits.length,spriteCount: images.size, flagFrames: wave.size, marks, panErrors, zoomErrors, impactErrors };
+    return w.snapshot();
+}
+
+export async function persistentMarks() {
+    await preloaded;
+    const layer=new DecalLayer(), vfx=new VfxPool(layer);
+    const ctx=layer.ctx;
+    vfx.consume([{type:'death', x:1900, y:850, dx:1, dy:0, faction:1, kind:'line_infantry',flag:true}]);
+    for (let i=0;i<120;i++) vfx.update(1/30);
+    const area=()=>ctx.getImageData(1825,775,150,150).data;
+    // Chrome may switch from GPU to CPU after repeated readbacks. Settle the readback path first.
+    area(); area();
+    const before=area();
+    if (!before.some(Boolean) || !layer.marks.length) throw Error('death did not leave a mark');
+    for (let i=0;i<90;i++) vfx.update(1/30);
+    const after=area();
+    if (!before.every((n,i)=>n===after[i])) throw Error('settled blood or debris flickers');
+    const saved=structuredClone(layer.marks);
+    layer.restore(saved);
+    const restored=area();
+    if (!before.every((n,i)=>n===restored[i])) throw Error('restored marks differ pixel by pixel');
+    return saved.length;
+}
+
+export function animationFrames() {
+    const w=new SimWorld(),p={x:64,y:75};
+    const canvas=document.createElement('canvas');
+    canvas.width=128;canvas.height=128;
+    const c=canvas.getContext('2d',{willReadFrequently:true})!;
+    c.imageSmoothingEnabled=false;
+    function frame(u:Unit,tick:number,dx=1,dy=0){
+        c.clearRect(0,0,128,128);
+        drawUnitSprite(c,u,tick,dx,dy,false,false,p.x,p.y);
+        return canvas.toDataURL();
+    }
+    const foot=w.spawn(0,'line_infantry',1,p,'line')[0];
+    foot.pose='aim';foot.moving=false;
+    const aim=new Set(Array.from({length:8},(_,i)=>frame(foot,8,Math.cos(i*Math.PI/4),Math.sin(i*Math.PI/4))));
+    if(aim.size!==8)throw Error('missing directional infantry sprites');
+    foot.pose='reload';
+    const ramrod=new Set(Array.from({length:6},(_,i)=>frame(foot,30+i*5)));
+    if(ramrod.size<4)throw Error('missing ramrod stroke');
+    const cavalry=w.spawn(0,'cuirassier',1,p,'line')[0];cavalry.moving=true;
+    const horseFrames=new Set(Array.from({length:4},(_,i)=>{cavalry.marchDistance=i*7;return frame(cavalry,20);}));
+    if(horseFrames.size!==4)throw Error('missing four-frame horse gait');
+    const gun=w.spawn(0,'field_cannon',1,p,'line')[0];
+    gun.moving=false;gun.firedAt=0;gun.cooldown=195;
+    function barrelTip(t:number) {
+        frame(gun,t);
+        const px=c.getImageData(0,0,128,128).data;
+        let right=-1;
+        for(let i=0;i<px.length;i+=4) {
+            if(px[i]===241 && px[i+1]===204 && px[i+2]===127)right=Math.max(right,(i/4)%128);
+        }
+        if(right<0)throw Error('missing bronze reinforcement bands');
+        return right;
+    }
+    const muzzle=[barrelTip(0),barrelTip(2),barrelTip(50)];
+    if(muzzle[0]-muzzle[1]<7 || muzzle[0]-muzzle[1]>10 || muzzle[2]!==muzzle[0])throw Error('recoil distance '+muzzle.join('/'));
+    gun.moving=true;
+    const wheels=new Set(Array.from({length:4},(_,i)=>{gun.marchDistance=i*2.4;return frame(gun,40);}));
+    if(wheels.size<3)throw Error('missing rolling gun wheel frames');
+    const vfx=new VfxPool(new DecalLayer());
+    vfx.consume([{type:'fire',x:0,y:0,kind:'line_infantry',dx:0,dy:1}]);
+    const clouds=vfx.snapshot().filter(p=>p.life>=1.4&&p.life<=2.4&&p.size>=25);
+    const spark=vfx.snapshot().filter(p=>p.size===3&&p.life<.1);
+    if(clouds.length<4||clouds.length>6||spark.length!==1)throw Error('incorrect smoke density, duration or muskets spark size');
+    return {aim:aim.size,ramrod:ramrod.size,horse:horseFrames.size,wheel:wheels.size,recoilPixels:muzzle[0]-muzzle[1],clouds:clouds.length};
 }

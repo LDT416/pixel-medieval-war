@@ -1,4 +1,6 @@
-import { WIDTH, HEIGHT, roadY, bridgeSize, bridgeYs, riverWidth, riverX, water as mapWater, shoreAt, ford } from '../sim/maps';
+import { WIDTH, HEIGHT, lanesForMap, roadY, riverWidth, riverX, water as mapWater, shoreAt } from '../sim/maps';
+import type { MapId } from '../sim/types';
+import { artwork } from './artLoader';
 // World art uses a two-world-pixel brush. Quantized value noise makes contiguous
 // patches of lichen, turf and exposed earth without putting noise over the UI.
 function hash(x: number, y: number, seed = 0) {
@@ -21,13 +23,10 @@ const hex = (c: string) => {
     return (0xff000000 | ((v & 255) << 16) | (v & 0xff00) | (v >>> 16)) >>> 0;
 };
 const swatches = (colors: string) => colors.split(' ').map(hex);
-type XY = [
-    number,
-    number
-];
+type XY = [number, number];
 let cached: HTMLCanvasElement | undefined;
 let cachedMap = '';
-export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvasElement {
+export function bakeTerrain(map:MapId='twin'): HTMLCanvasElement {
     if (cached && cachedMap===map)
         return cached;
     cachedMap=map;
@@ -38,15 +37,22 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
     const g = native.getContext('2d')!;
     g.imageSmoothingEnabled = false;
     const w = native.width, h = native.height, pixels = g.createImageData(w, h), dst = new Uint32Array(pixels.data.buffer);
-    const large = field(16, 11, 12), medium = field(84, 56, 221), small = field(329, 194, 73);
-    const green = swatches('#446635 #4e6e39 #547640 #5c7e44 #658748 #70904e #799751 #829d58 #8da45e');
+    const seed = map === 'darkwood' ? 263 : map === 'gorge' ? 579 : 0;
+    const large = field(16, 11, 12 + seed), medium = field(84, 56, 221 + seed), small = field(329, 194, 73 + seed);
+    const greens = {
+        gorge: '#657746 #75874c #819057 #89995b #93a161 #9ca664 #a8ae69 #b2b16e #bcba79',
+        darkwood: '#3d583e #476447 #4d704a #56794c #61804e #6e8952 #7d9155 #8b9a59 #9aa563',
+        twin: '#4a6844 #557448 #607e4e #6a8754 #768e56 #80975d #8a9d61 #94a76d #a7b578'
+    };
+    const green = swatches(greens[map]);
     const road = swatches('#756143 #846e4c #927958 #9b8362 #a58c68 #b59c74 #bea682');
     const gravel = swatches('#474734 #50523c #56553e #615941 #696047 #756a50');
     const bank = swatches('#5b5841 #686247 #777157 #79705a #67644e #514e3f #423f34 #383a32');
     const river = swatches('#2a5d80 #2f688a #367296 #3c789d #4381a5 #4f8cb0 #5b97b6 #66a0be #79abc2');
     const rMask = new Uint8Array(w * h);
     const woods = new Uint8Array(w * h);
-    for (const [cx, cy] of [[220, 430], [620, 290], [1140, 325], [1660, 260], [2240, 230], [2740, 300], [3370, 350], [3650, 600], [290, 1450], [620, 1850], [1240, 1810], [1700, 1950], [2330, 1880], [2760, 1780], [3360, 1850], [3670, 1450], [1350, 1090], [2480, 1040], [380, 780], [3470, 925]]) {
+    for (const [u, v] of [[.035,.20],[.13,.12],[.24,.16],[.36,.11],[.47,.10],[.57,.14],[.72,.16],[.89,.26],[.06,.70],[.14,.84],[.25,.83],[.36,.89],[.47,.85],[.60,.81],[.71,.84],[.92,.70],[.25,.54],[.73,.49],[.07,.28],[.93,.33]]) {
+        const cx = WIDTH * u, cy = HEIGHT * v;
         for (let y = Math.max(0, (cy - 178) >> 1); y < Math.min(h, (cy + 178) >> 1); y++)
             for (let x = Math.max(0, (cx - 234) >> 1); x < Math.min(w, (cx + 234) >> 1); x++) {
                 const nx = (2 * x - cx) / 234, ny = (2 * y - cy) / 178, v = Math.max(0, 1 - nx * nx - ny * ny);
@@ -74,8 +80,26 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
                 }
         }
     }
-    for(const lane of map==='gorge'?[880]:map==='twin'?bridgeYs:[520,880,1240]){
-        route(Array.from({length:97},(_,i)=>[i*50,roadY(i*50,lane)] as XY),map==='gorge'?46:37);
+    for (const lane of lanesForMap(map)) {
+        const steps = Math.ceil(WIDTH / 40);
+        route(Array.from({length:steps + 1}, (_,i) => {
+            const x = i * WIDTH / steps;
+            return [x, roadY(x, lane)] as XY;
+        }), map==='gorge'?44:38);
+    }
+    for (const direction of [-1, 1]) {
+        const base = direction > 0 ? 650 : WIDTH - 650;
+        for (const side of [-1, 1]) {
+            route([[base, HEIGHT/2 + side*370], [base + direction*240, HEIGHT/2 + side*355],
+                [base + direction*350, HEIGHT/2 + side*270], [base + direction*430, HEIGHT/2 + side*112],
+                [base + direction*505, roadY(base + direction*505, HEIGHT/2)]], 24);
+        }
+    }
+    function parade(x: number, y: number) {
+        const dx = Math.min(Math.abs(x - 650), Math.abs(x - (WIDTH - 650)));
+        const dy = Math.abs(y - HEIGHT / 2);
+        const bx = Math.min(Math.abs(x - 585), Math.abs(x - (WIDTH - 585)));
+        return Math.min(dx*dx/275**2 + dy*dy/252**2, bx*bx/154**2 + (dy-370)**2/115**2);
     }
     const centers = new Float32Array(h), half = new Float32Array(h);
     for (let j = 0; j < h; j++) {
@@ -106,9 +130,9 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             else if (bankEdge < 46 + (n - .5) * 25) {
                 col = gravel[Math.min(5, Math.floor(material * 5) + (detail === 0 ? 1 : 0))];
             }
-            const castle = Math.min(Math.max(Math.abs(x - 610) / 217, Math.abs(y - 880) / 173), Math.max(Math.abs(x - 4190) / 217, Math.abs(y - 880) / 173));
-            if (castle < 1 + (micro - .5) * .15)
-                col = gravel[Math.max(0, Math.min(5, Math.floor(n * 3 + micro * 2 + core)))];
+            const castle = parade(x, y);
+            if (castle < .91 + (micro - .5) * .25 + (n - .5) * .19)
+                col = road[Math.min(5, Math.floor(n * 2 + micro * 1.5 + core))];
             if (shore >= 0 && rMask[id] > 0) {
                 const t = rMask[id] / 255, edge = (micro - .45) * .20 + (n - .5) * .13;
                 if (t > .13 + edge) {
@@ -168,8 +192,8 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             line('#50574e', x + rx * .1, y - ry * .45, x + rx * .32, y + ry * .25);
         }
     }
-    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && Math.min(Math.max(Math.abs(x - 610) / 215, Math.abs(y - 880) / 160), Math.max(Math.abs(x - 4190) / 215, Math.abs(y - 880) / 160)) > 1;
-    let state = 85063;
+    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && parade(x, y) > 1;
+    let state = 85063 + seed;
     const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
     // Thin seams of stratified rock give unoccupied corners a shape at overview zoom.
     for (const [X, Y, length] of [[240, 650, 145], [880, 248, 110], [1220, 570, 140], [1550, 360, 125], [1750, 1130, 85], [200, 1740, 120], [1180, 1960, 120], [2210, 412, 80], [2490, 1640, 135], [2630, 944, 92], [3180, 345, 155], [3540, 1190, 112], [2860, 1920, 115], [3450, 1600, 90]]) {
@@ -201,7 +225,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             rect('#534d3b', x + 1, y + 1, sw);
         }
     }
-    for (let i = 0; i < 7900; i++) {
+    for (let i = 0; i < 15500; i++) {
         const x = random() * WIDTH, y = random() * HEIGHT;
         if (!clear(x, y) || medium(x, y) < .37 || woods[Math.floor(x / 2) + Math.floor(y / 2) * w] > 124)
             continue;
@@ -225,6 +249,11 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             rect(m > .5 ? '#7b7950' : '#606a46', xx - 1, yy - 2);
             rect('#5b6442', xx + 2, yy - 1, 1, 2);
             rect('#71734c', xx + 3, yy - 2);
+            if (i % 11 === 0) {
+                const flowers = ['#e5d59a', '#d1c5cf', '#d1b96c', '#a9bbd3'];
+                rect(flowers[i % 4], xx - 1, yy - 3, 2);
+                rect(flowers[i % 4], xx + 4, yy - 2);
+            }
         }
     }
     for (let i = 0; i < 2300; i++) {
@@ -257,12 +286,27 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             stone(xx, Y, 3 + random() * 4, i, false);
         }
     }
-    const full = document.createElement('canvas');
-    full.width = WIDTH;
-    full.height = HEIGHT;
-    const ctx = full.getContext('2d')!;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(native, 0, 0, WIDTH, HEIGHT);
-    cached = full;
-    return full;
+    cached = native;
+    return native;
+}
+
+// Broken sections leave the bridgeheads, junctions and parade grounds clear.
+// These are visual field boundaries and are sampled just once during the bake.
+export function drawRoadFurniture(ctx: CanvasRenderingContext2D, map: MapId) {
+    const hedge = artwork.get('px_hedge');
+    if (!hedge) return;
+    ctx.imageSmoothingEnabled = false;
+    for (const [index, lane] of lanesForMap(map).entries()) {
+        for (let x = 1220 + index * 84; x < WIDTH - 1220; x += 258) {
+            const side = (hash(x, index) % 2) ? 1 : -1;
+            if (hash(x, lane) % 5 === 0) continue;
+            const count = 1 + hash(index, x) % 3;
+            for (let n = 0; n < count; n++) {
+                const xx = x + n * 58, y = roadY(xx, lane) + side * (62 + n * 2);
+                if (shoreAt(xx, y, map) < 150) continue;
+                if (lanesForMap(map).some(other => other !== lane && Math.abs(roadY(xx, other) - y) < 94)) continue;
+                ctx.drawImage(hedge, Math.round(xx - 30), Math.round(y - 13), 62, 19);
+            }
+        }
+    }
 }
