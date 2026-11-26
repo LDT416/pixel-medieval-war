@@ -3,7 +3,7 @@ import type { Faction, Unit } from './types';
 import { crews, UNITS } from './config';
 import { attack, distanceTo } from './combat';
 export const fieldArmy = (u: Unit) => u.hp > 0 && !u.tower && !u.gun && u.kind !== 'peasant' && !crews[u.kind];
-export const threshold = (age: number) => Math.min(48, 24 + 12 * (age - 1));
+export const threshold = (age: number) => Math.min(180, 55 + 38 * (age - 1));
 export function issueWave(w: SimWorld, f: Faction, charge: boolean) {
     const r = w.realms[f], troops = w.units.filter(u => u.faction === f && fieldArmy(u));
     if (charge && !troops.length)
@@ -11,7 +11,16 @@ export function issueWave(w: SimWorld, f: Faction, charge: boolean) {
     r.phase = charge ? 'WAVE_ASSAULT' : 'RETREAT_REGROUP';
     r.wave++;
     r.baseline = troops.length;
-    troops.forEach((u, i) => { u.marchSlot = i; u.wave = r.wave; u.manual = false; u.target = 0; w.groups.get(u.group)!.point = null; });
+    // 按兵种分类独立分配整齐横列槽位，确保几百人步兵与火枪各自排成笔直宽大军阵！
+    let meleeIdx = 0, gunIdx = 0, cavIdx = 0;
+    for (const u of troops) {
+        const def = UNITS[u.kind];
+        u.marchSlot = def.traits.includes('mount') ? cavIdx++ : def.role === '火枪' ? gunIdx++ : meleeIdx++;
+        u.wave = r.wave;
+        u.manual = false;
+        u.target = 0;
+        w.groups.get(u.group)!.point = null;
+    }
     if (charge) {
         const keep = w.keep(f);
         if (keep)
@@ -21,7 +30,7 @@ export function issueWave(w: SimWorld, f: Faction, charge: boolean) {
 export function strategyTick(w: SimWorld) {
     for (const f of [0, 1] as const) {
         const r = w.realms[f], army = w.units.filter(u => u.faction === f && fieldArmy(u)), active = army.filter(u => u.wave === r.wave);
-        const front = army.filter(u => u.wave === r.wave && !u.escort && !u.manual && u.kind !== 'bannerman' && !UNITS[u.kind].traits.includes('flank'));
+        const front = army.filter(u => u.wave === r.wave && !u.escort && !u.manual && u.kind !== 'bannerman' && !UNITS[u.kind].traits.includes('mount'));
         const sum = { x: 0, y: 0 };
         for (const unit of front) {
             sum.x += unit.x;
@@ -29,13 +38,13 @@ export function strategyTick(w: SimWorld) {
         }
         w.fronts[f] = { x: front.length ? sum.x / front.length : (f ? 3830 : 970), y: front.length ? sum.y / front.length : 880,
             breached: front.length >= 3 && front.filter(u => Math.abs(u.x - (f ? 610 : 4190)) < 1100).length >= Math.ceil(front.length * .65) };
-        if (r.phase === 'WAVE_ASSAULT' && (active.length < r.baseline * .25 || active.length <= 3 && active.length < r.baseline))
+        if (r.phase === 'WAVE_ASSAULT' && (active.length < r.baseline * .22 || active.length <= 4 && active.length < r.baseline))
             issueWave(w, f, false);
-        else if (r.phase === 'RETREAT_REGROUP' && active.every(u => Math.hypot(u.x - (f ? 3828 : 972), u.y - 880) < 205)) {
+        else if (r.phase === 'RETREAT_REGROUP' && active.every(u => Math.hypot(u.x - (f ? 3828 : 972), u.y - 880) < 260)) {
             r.phase = 'PATROL_GATHER';
             r.cooldownUntil = w.tick + 120;
         }
-        else if (r.phase === 'PATROL_GATHER' && w.tick >= (r.cooldownUntil ?? 0) && army.filter(u => Math.abs(u.x - (f ? 4190 : 610)) < 670).length >= threshold(r.age))
+        else if (r.phase === 'PATROL_GATHER' && w.tick >= (r.cooldownUntil ?? 0) && army.filter(u => Math.abs(u.x - (f ? 4190 : 610)) < 760).length >= threshold(r.age))
             issueWave(w, f, true);
     }
 }
@@ -74,42 +83,76 @@ export function strategyMove(w: SimWorld, u: Unit) {
     if (u.manual && r.phase !== 'RETREAT_REGROUP')
         return false;
     const assault = r.phase === 'WAVE_ASSAULT' && u.wave === r.wave;
-    const rank = u.kind === 'bannerman' ? 0 : def.role === '火枪' ? -70 : 90;
-    let x = base + d * (362 + rank + Math.floor(u.id % 24 / 8) * 16);
-    let y = 880 + (u.id % 8 - 3.5) * 23;
+    const slot = u.marchSlot ?? (u.id % 120);
+    // 平时集结演武场：整齐宽正面多排线列（每排24人）
+    const gatherPerRank = 24;
+    const rankX = u.kind === 'bannerman' ? 10 : def.traits.includes('mount') ? -140 : def.role === '火枪' ? -68 : 96;
+    let x = base + d * (370 + rankX - Math.floor(slot / gatherPerRank) * 18);
+    let y = 880 + (slot % gatherPerRank - (gatherPerRank - 1) / 2) * 19;
     if (assault) {
-        const front = w.fronts[f], slot = u.marchSlot ?? u.id;
+        const front = w.fronts[f];
         if (u.kind === 'bannerman') {
-            x = front.x - d * 60;
+            x = front.x - d * 24;
             y = front.y;
         }
         else {
+            // 骑兵刻意绕后偷袭敌方后排火枪手、炮兵与农夫，绝不傻撞正面步兵方阵！
+            if (def.traits.includes('mount')) {
+                const enemyFront = w.fronts[f ? 0 : 1];
+                const flankY = slot % 2 ? 255 : 1505;
+                // 搜寻敌方最诱人的后排目标（优先火枪手、炮兵、农夫）
+                let backTarget: Unit | undefined, bestDist = Infinity;
+                for (const n of w.units) {
+                    if (n.faction === f || n.hp <= 0 || n.tower)
+                        continue;
+                    const backVal = UNITS[n.kind].role === '火枪' || n.gun || n.kind === 'peasant';
+                    if (!backVal)
+                        continue;
+                    const dist = distanceTo(u, n);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        backTarget = n;
+                    }
+                }
+                // 先高速沿南北翼绕过敌军主战线 220px，再折返从侧后方冲散敌方火枪阵！
+                const passedEnemyFront = (u.x - (enemyFront.x + d * 220)) * d >= 0;
+                if (!passedEnemyFront && (!backTarget || bestDist > 260)) {
+                    w.approach(u, { x: enemyFront.x + d * 280, y: flankY }, def.speed);
+                    return true;
+                }
+                if (backTarget && bestDist < 420) {
+                    if (bestDist <= def.range + 10)
+                        return false;
+                    w.approach(u, backTarget, def.speed);
+                    return true;
+                }
+                const raid = w.structures.find(s => (s.type === 'house' || s.type === 'keep') && s.faction !== f && s.hp > 0);
+                if (raid && distanceTo(u, raid) > 65) {
+                    w.approach(u, raid, def.speed);
+                    return true;
+                }
+                return false;
+            }
             let near = false;
-            w.hash.visit(u.x, u.y, def.range + 65, n => { if (n.faction !== f && n.hp > 0 && (!n.tower || def.range > 65))
-                near = true; });
+            w.hash.visit(u.x, u.y, def.role === '火枪' ? def.range * .95 : def.range + 75, n => {
+                if (n.faction !== f && n.hp > 0 && (!n.tower || def.range > 65))
+                    near = true;
+            });
             if (near || Math.abs(u.x - (4800 - base)) < 420)
                 return false;
-            if (def.traits.includes('flank')) {
-                const flankY = slot % 2 ? 520 : 1240;
-                const raid = w.structures.find(s => s.type === 'house' && s.faction !== f && s.hp > 0);
-                const p = Math.abs(u.x - base) < 2200 ? { x: base + d * 2300, y: flankY } : raid;
-                if (!p)
-                    return false;
-                if (raid && distanceTo(u, raid) < 65)
-                    return false;
-                w.approach(u, p);
-                return true;
-            }
-            // March together on a shared lane. A destroyed crossing delegates routing to the flow field.
+            // 几百人宏大整编线列推进：宽正面多排并肩齐步向前！
             const bridge = w.map === 'twin' ? w.structures.find(s => (s.type === 'bridge' || s.type === 'pontoon') && s.hp > 0) : undefined;
             if (w.map === 'twin' && !bridge)
                 return false;
-            const lane = bridge?.y ?? 880, narrow = w.map !== 'gorge' && Math.abs(u.x - 2400) < 1170;
-            const depth = u.kind === 'shieldman' ? 110 : def.role === '火枪' ? 41 : 88;
-            x = front.x + d * (depth - Math.floor(slot % 32 / 8) * 13);
-            y = lane + (slot % 8 - 3.5) * (narrow ? 9 : 23);
-            if ((x - u.x) * d > 0 || Math.abs(y - u.y) > 18)
-                w.approach(u, { x, y }, Math.min(1.85, def.speed));
+            const lane = bridge?.y ?? 880, narrow = w.map !== 'gorge' && Math.abs(u.x - 2400) < 1150;
+            const perRank = narrow ? 10 : def.role === '火枪' ? 32 : 26;
+            const gapY = narrow ? 10 : 18;
+            const depth = u.kind === 'shieldman' ? 115 : def.role === '火枪' ? -18 : 92;
+            const row = Math.floor(slot / perRank);
+            x = front.x + d * (depth - row * 18);
+            y = lane + (slot % perRank - (perRank - 1) / 2) * gapY;
+            if ((x - u.x) * d > -8 || Math.abs(y - u.y) > 14)
+                w.approach(u, { x, y }, Math.min(1.22, def.speed));
             return true;
         }
     }

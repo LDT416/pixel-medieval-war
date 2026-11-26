@@ -39,14 +39,34 @@ export function createMap(map:MapId='twin'): Structure[] {
         const d=f?-1:1,base=f?4190:610;
         place('house',base-d*110,650,66,50,520,f);
         place('wheat',base,640,100,65,400,f);
-        for(let i=0;i<34;i++) place('tree',base-d*(210+rng.int(0,140)),600+i*13,26,25,65);
+        for(let i=0;i<36;i++) place('tree',base-d*(220+rng.int(0,170)),460+i*24,30,28,65);
     }
-    const step=map==='darkwood'?43:map==='twin'?77:170;
-    for(let x=1320;x<3480;x+=step)for(let y=30;y<1740;y+=step){
-        const tx=x+rng.int(-8,8),ty=y+rng.int(-8,8);
-        if([520,880,1240].some(l=>Math.abs(ty-l)<(map==='darkwood'?44:85))||water(tx,ty,map))continue;
-        if(map==='gorge'&&rng.next()>.08||map==='twin'&&Math.abs(tx-2400)>590)continue;
-        place('tree',tx,ty,step===43?45:34,step===43?45:28,75);
+    // 地图上下与左右四面边缘全部环绕茂密森林带（保留南北翼骑兵绕后走廊与宽阔中央线列战场）
+    for (let x = 40; x < WIDTH - 40; x += 48) {
+        for (const band of [42, 92, 144, HEIGHT - 144, HEIGHT - 92, HEIGHT - 42]) {
+            const tx = x + rng.int(-12, 12), ty = band + rng.int(-10, 10);
+            if (water(tx, ty, map) || Math.abs(tx - 610) < 160 && Math.abs(ty - 880) < 260 || Math.abs(tx - 4190) < 160 && Math.abs(ty - 880) < 260)
+                continue;
+            place('tree', tx, ty, 38, 34, 75);
+        }
+    }
+    for (let y = 190; y < HEIGHT - 190; y += 52) {
+        for (const edgeX of [48, 106, 168, WIDTH - 168, WIDTH - 106, WIDTH - 48]) {
+            const tx = edgeX + rng.int(-12, 12), ty = y + rng.int(-12, 12);
+            place('tree', tx, ty, 38, 34, 75);
+        }
+    }
+    // 中央缓冲交战带树木加密（密林古道留窄隘口与绕后通道，大草原保留开阔线列决战地并点缀茂密侧翼林簇）
+    const step = map === 'darkwood' ? 46 : map === 'twin' ? 68 : 112;
+    for(let x=1220;x<3580;x+=step)for(let y=195;y<HEIGHT-195;y+=step){
+        const tx=x+rng.int(-10,10),ty=y+rng.int(-10,10);
+        // 留出中央主战场宽阔线列展开区与南北骑兵绕后走廊
+        if (Math.abs(ty - 245) < 42 || Math.abs(ty - (HEIGHT - 245)) < 42) continue;
+        if (map === 'darkwood' && [520, 880, 1240].some(l => Math.abs(ty - l) < 58)) continue;
+        if (map === 'twin' && ([520, 1240].some(l => Math.abs(ty - l) < 92) || Math.abs(tx - 2400) > 680)) continue;
+        if (map === 'gorge' && (Math.abs(ty - 880) < 340 || rng.next() > .42)) continue;
+        if (water(tx, ty, map)) continue;
+        place('tree',tx,ty,step<=50?42:36,step<=50?40:32,75);
     }
     return result;
 }

@@ -1,6 +1,6 @@
 import { portrait } from './portraits';
 import { banner } from './banners';
-import { KINDS, UNITS } from '../sim/config';
+import { batchSize, KINDS, UNITS } from '../sim/config';
 import type { Faction, Kind } from '../sim/types';
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 export const categories = ['步兵', '火枪', '骑兵', '重炮机械', '仪仗'];
@@ -88,11 +88,12 @@ export function roster(category: string, f: Faction, auto: Set<Kind>, recruit: (
         const label = document.createElement('span');
         label.innerText = UNITS[k].name;
         b.append(label);
+        const qty = batchSize(k), tag = qty > 1 ? '×' + qty + ' · ' : '';
         const cost = document.createElement('small');
-        cost.innerText = auto.has(k) ? '↻ 持续征召' : '粮 ' + UNITS[k].gold + ' · 木 ' + UNITS[k].wood;
+        cost.innerText = auto.has(k) ? '↻ 持续' + (qty > 1 ? '×' + qty : '征召') : tag + '粮 ' + UNITS[k].gold + ' 木 ' + UNITS[k].wood;
         b.append(cost);
         let timer = 0, held = false;
-        b.onpointerdown = e => { b.setPointerCapture(e.pointerId); held = false; timer = window.setTimeout(() => { held = true; repeat(k); cost.innerText = auto.has(k) ? '↻ 持续征召' : '粮 ' + UNITS[k].gold + ' · 木 ' + UNITS[k].wood; }, 480); };
+        b.onpointerdown = e => { b.setPointerCapture(e.pointerId); held = false; timer = window.setTimeout(() => { held = true; repeat(k); cost.innerText = auto.has(k) ? '↻ 持续' + (qty > 1 ? '×' + qty : '征召') : tag + '粮 ' + UNITS[k].gold + ' 木 ' + UNITS[k].wood; }, 480); };
         b.onpointerup = b.onpointercancel = b.onlostpointercapture = () => clearTimeout(timer);
         b.onclick = () => { if (!held)
             recruit(k); held = false; };

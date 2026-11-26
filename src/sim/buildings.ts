@@ -12,7 +12,7 @@ export const BUILDINGS: Record<BuildType, [
     siege_workshop: ['攻城器械厂', 220, 120, 112, 86, 1850], palisade: ['木栅拒马', 35, 0, 38, 85, 550],
     lowwall: ['石砌矮墙', 55, 20, 40, 105, 800], pontoon: ['临时浮桥', 70, 0, 0, 84, 900], outpost: ['前哨箭塔', 130, 40, 55, 52, 1100]
 };
-export const newRealm = (): Realm => ({ phase:"PATROL_GATHER",wave:0,baseline:0,policy:"auto",wood:360,gold:425, age: 1, steel: false, powder: false, farmersKilled: 0, rally: null });
+export const newRealm = (): Realm => ({ phase:"PATROL_GATHER",wave:0,baseline:0,policy:"auto",wood:520,gold:680, age: 1, steel: false, powder: false, farmersKilled: 0, rally: null });
 export function pay(realm: Realm, wood: number, gold: number) {
     if (realm.wood < wood || realm.gold < gold)
         return false;

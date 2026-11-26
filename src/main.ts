@@ -29,7 +29,9 @@ function selectedUnits(ids: number[]) { selected.clear(); for (const id of ids)
     selected.add(id); el('group').textContent = selected.size ? '⚑ ' + selected.size + ' 人' : '⚑ 选团'; }
 function tap(p: Point) {
     if (placement && world.mode === 'sandbox') {
-        send({ type: 'spawn', payload: { ...p, kind: placement, count: 1, formation: 'line' } });
+        const qty = placement === 'peasant' || placement === 'bannerman' || UNITS[placement].role === '重炮机械' ? 1 : 20;
+        const form = UNITS[placement].role === '步兵' ? 'phalanx' : UNITS[placement].role === '火枪' ? 'line' : 'skirmish';
+        send({ type: 'spawn', payload: { ...p, kind: placement, count: qty, formation: form } });
         placement = null;
         return;
     }

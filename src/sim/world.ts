@@ -74,11 +74,14 @@ export class SimWorld {
             if (s.type === 'tower')
                 this.garrison(s, 3);
         for(const f of [0,1] as const){
-            const base=this.keep(f)!,d=f?-1:1,p={x:base.x+350*d,y:880};
-            this.spawn(f,'peasant',4,{x:base.x-120*d,y:738},'line');
+            const base=this.keep(f)!,d=f?-1:1,p={x:base.x+370*d,y:880};
+            this.spawn(f,'peasant',6,{x:base.x-120*d,y:738},'line');
             this.honorGuard(f,p);
-            this.spawn(f,'shieldman',5,{x:p.x+80*d,y:p.y},'phalanx');
-            this.spawn(f,'musketeer',5,{x:p.x-54*d,y:p.y},'line');
+            this.spawn(f,'shieldman',15,{x:p.x+100*d,y:p.y},'phalanx');
+            this.spawn(f,'halberdier',10,{x:p.x+68*d,y:p.y},'phalanx');
+            this.spawn(f,'musketeer',30,{x:p.x-58*d,y:p.y},'line');
+            this.spawn(f,'scout_cavalry',5,{x:p.x-135*d,y:p.y-210},'skirmish');
+            this.spawn(f,'heavy_lancer',5,{x:p.x-135*d,y:p.y+210},'skirmish');
         }
         this.hash.rebuild(this.units);
     }

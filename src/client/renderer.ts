@@ -203,26 +203,12 @@ export class Renderer {
             const first=t.queue?.[0], progress=t.needed?(t.work??0)/t.needed:first?first.progress/first.total:0;
             if(progress||first){c.fillStyle='#201f1b';c.fillRect(t.x-26,t.y-t.h-10,52,6);c.fillStyle='#c5a369';c.fillRect(t.x-25,t.y-t.h-9,Math.round(progress*50),4);}
         }
-        const groups = new Set<number>(), now = performance.now();
+        const now = performance.now();
         for (const u of w.units) {
             if (u.x < top.x - 65 || u.x > top.x + cw + 65 || u.y < top.y - 65 || u.y - u.z > top.y + ch + 65)
                 continue;
             if(!u.hp)continue;
             this.unit(u, w.tick, o.selected.has(u.id), now);
-            if (!u.tower && u.slot === 0 && !groups.has(u.group) && (u.kind === 'halberdier' || u.kind === 'heavy_lancer' || u.kind === 'musketeer')) {
-                groups.add(u.group);
-                const x = Math.round(u.x - 4), y = Math.round(u.y - 51);
-                c.fillStyle = '#302b20';
-                c.fillRect(x - 2, y, 5, 47);
-                c.fillStyle = '#c9b58b';
-                c.fillRect(x, y, 2, 46);
-                c.fillStyle = u.faction === 0 ? '#2d6fb8' : '#b82a2a';
-                c.fillRect(x + 2, y + 2, 17, 15);
-                c.fillRect(x + 2, y + 16, 10, 5);
-                c.fillStyle = u.faction === 0 ? '#c1d2d7' : '#cfac6b';
-                c.fillRect(x + 4, y + 3, 2, 13);
-                c.fillRect(x + 2, y + 3, 16, 2);
-            }
         }
         for (const p of w.projectiles) {
             const y = p.y - p.z;

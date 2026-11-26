@@ -1,5 +1,5 @@
 import {pay,ready} from './buildings';
-import {capacity,crews,UNITS} from './config';
+import {batchSize,capacity,crews,UNITS} from './config';
 import { distanceTo } from './combat';
 import type { SimWorld } from './world';
 import type { Command, Faction, Structure, Unit } from './types';
@@ -29,7 +29,7 @@ export function civicCommand(w: SimWorld, c: Command) {
         if(kind==='peasant'&&w.mode==='lord'&&total>=capacity[realm.age])return refuse('农舍已满，请扩建村落');
         if(w.mode==='lord'&&def.role==='重炮机械'&&!w.structures.some(s=>s.type==='siege_workshop'&&s.faction===f&&ready(s)))return refuse('请先建造军事工坊');
         if(w.mode==='lord'&&!pay(realm,def.wood,def.gold))return refuse('军粮或木材不足');
-        (keep.queue??=[]).push({kind,progress:0,total:w.mode==='sandbox'?1:kind==='peasant'?12:30});return true;
+        (keep.queue??=[]).push({kind,progress:0,total:w.mode==='sandbox'?1:kind==='peasant'?10:18});return true;
     }
     if (c.type === 'research') {
         const key = c.payload.tech;
@@ -67,10 +67,12 @@ export function civicCommand(w: SimWorld, c: Command) {
     return false;
 }
 export function economyTick(w: SimWorld) {
-    if (w.mode === 'lord' && w.tick > 0 && w.tick % 90 === 0)
+    if (w.mode === 'lord' && w.tick > 0 && w.tick % 75 === 0)
         for (const f of [0, 1] as const)
-            if (w.keep(f))
-                w.realms[f].gold += 6;
+            if (w.keep(f)) {
+                w.realms[f].gold += 18;
+                w.realms[f].wood += 8;
+            }
     for (const s of w.structures) {
         const item = s.queue?.[0];
         if (!item || !ready(s) || s.faction === -1)
@@ -78,9 +80,12 @@ export function economyTick(w: SimWorld) {
         if (++item.progress < item.total)
             continue;
         s.queue!.shift();
-        const f = s.faction, p = { x: s.x + (f === 0 ? 1 : -1) * (s.w / 2 + 22), y: s.y }, kind = item.kind;
+        const f = s.faction, p = { x: s.x + (f === 0 ? 1 : -1) * (s.w / 2 + 28), y: s.y }, kind = item.kind;
         if(kind==='peasant'){p.x=s.x-(f?-1:1)*120;p.y=s.y-145;}
-        const troops = kind === 'guard'||kind==='bannerman' ? w.honorGuard(f, p) : w.spawn(f, kind, 1, p, kind === 'halberdier' ? 'phalanx' : kind === 'musketeer' ? 'line' : 'skirmish');
+        const unitKind = kind === 'guard' ? 'bannerman' : kind;
+        const qty = unitKind === 'bannerman' ? 1 : batchSize(unitKind);
+        const form = UNITS[unitKind].role === '步兵' ? 'phalanx' : UNITS[unitKind].role === '火枪' ? 'line' : 'skirmish';
+        const troops = unitKind === 'bannerman' ? w.honorGuard(f, p) : w.spawn(f, unitKind, qty, p, form);
         for (const u of troops) {
             if (u.kind === 'peasant')
                 u.prefer = w.units.filter(n => n.faction === f && n.kind === 'peasant').length % 2 ? 'wood' : 'gold';
