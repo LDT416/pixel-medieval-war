@@ -7,7 +7,7 @@ export class Grid {
     readonly pass = [new Uint8Array(COLS * ROWS), new Uint8Array(COLS * ROWS)];
     readonly shallows = new Uint8Array(COLS * ROWS);
     constructor(map:MapId = 'twin') { for (let i = 0; i < this.terrain.length; i++)
-        { const x=(i%COLS+.5)*CELL,y=(Math.floor(i/COLS)+.5)*CELL; const wet=water(x,y,map); this.shallows[i]=Number(wet && map==='isles' && ford(y)); this.terrain[i]=this.shallows[i] || Number(!wet); } }
+        { const x=(i%COLS+.5)*CELL,y=(Math.floor(i/COLS)+.5)*CELL; const wet=water(x,y,map); this.shallows[i]=0; this.terrain[i]=this.shallows[i] || Number(!wet); } }
     rebuild(structures: Structure[]) {
         this.blockers.fill(0);
         for (const p of this.pass)

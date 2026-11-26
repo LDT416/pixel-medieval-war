@@ -28,7 +28,7 @@ export class Renderer {
     camera = new Camera();
     decals = new DecalLayer();
     vfx = new VfxPool(this.decals);
-    ground = bakeTerrain();
+    ground?: HTMLCanvasElement;
     private landscape = document.createElement('canvas');
     private fixedRevision = -1;
     private fixedWorld?: SimWorld;
@@ -57,6 +57,15 @@ export class Renderer {
         ctx.imageSmoothingEnabled = false;
         this.ground=bakeTerrain(w.map);
         ctx.drawImage(this.ground, 0, 0);
+        for(const f of [0,1]){
+            const x=f?3655:745,y=1134;
+            ctx.fillStyle='#9a8b68';ctx.fillRect(x,y,400,182);
+            ctx.fillStyle='#bcad87';ctx.fillRect(x+3,y+3,394,170);
+            for(let j=0;j<4;j++)for(let i=0;i<19;i++){
+                ctx.fillStyle=(i+j)%2?'#b0a07d':'#c5b58c';ctx.fillRect(x+5+i*21,y+6+j*41,19,38);
+            }
+            for(let i=0;i<17;i++){ctx.fillStyle='#89795d';ctx.fillRect(x+6+i*23,y+166,21,9);ctx.fillStyle='#d3bf96';ctx.fillRect(x+7+i*23,y+166,19,5);}
+        }
         const ordered = [...w.structures].sort((a, b) => a.y - b.y);
         for (const s of ordered)
             if (!['keep', 'tower', 'outpost'].includes(s.type))
@@ -71,7 +80,7 @@ export class Renderer {
     }
     private unit(u: Unit, tick: number, selected: boolean, now: number) {
         const c = this.c, isSiege = UNITS[u.kind].traits.includes('siege');
-        const frame = u.swing > 0 ? 2 : Math.floor((tick + u.id) / 6) % 2, art = sprite(u.kind, u.faction, frame, (this.vfx.flashes.get(u.id) ?? 0) > now), scale = u.kind==='war_elephant'?3.25:isSiege ? 2.55 : u.tower ? 1.6 : 1.95;
+        const frame = u.swing > 0 ? 2 : u.gun&&!u.moving?0:Math.floor((tick + u.id) / 6) % 2, art = sprite(u.kind, u.faction, frame, (this.vfx.flashes.get(u.id) ?? 0) > now), scale = isSiege ? 2.55 : u.tower ? 1.6 : 1.95;
         const wid = art.width * scale, h = art.height * scale, x = Math.round(u.x), y = Math.round(u.y);
         c.fillStyle = '#141a1544';
         c.fillRect(x - wid * .42, y - 2, wid * .84, 5);
@@ -87,6 +96,12 @@ export class Renderer {
         c.scale(u.face, 1);
         if (u.z > 5 && !u.tower)
             c.rotate((tick + u.id) * .23);
+        if(u.crew!==undefined){
+            c.fillStyle='#b9a677';for(let i=0;!u.moving&&i<6;i++)c.fillRect(-25+i*9,-2+i%2*3,8,4);
+            c.fillStyle='#342e26';c.fillRect(-18,-h-7,36,4);
+            c.fillStyle='#e6c36b';c.fillRect(-18,-h-7,36*Math.max(0,1-u.cooldown/UNITS[u.kind].reload),3);
+            if(!u.crew)c.filter='brightness(.45)';
+        }
         c.drawImage(art, -wid / 2, -h, wid, h);
         if (u.kind === 'halberdier' && u.formation === 'phalanx' && u.z < 1) {
             const thrust = u.swing > 0 ? 5 : 0;
@@ -97,6 +112,9 @@ export class Renderer {
             c.fillStyle = '#d6dde6';
             c.fillRect(21 + thrust, -12, 6, 2);
             c.fillRect(16 + thrust, -15, 3, 3);
+        }
+        if(u.gun){
+            c.fillStyle='#b9a580';c.fillRect(0,-12+(u.swing?3:0),16,2);c.fillStyle='#ece8dc';c.fillRect(13,-14+(u.swing?3:0),5,5);
         }
         if(u.cargo){c.fillStyle=u.resource==='gold'?'#907442':'#775735';c.fillRect(-9,-17,8,10);c.fillStyle=u.resource==='gold'?'#c3a564':'#a08760';c.fillRect(-9,-17,7,3);}
         if(u.kind==='bannerman') c.drawImage(banner(u.faction,Math.floor(tick/7)),0,-70,40,70);
@@ -145,7 +163,7 @@ export class Renderer {
         c.setTransform(s,0,0,s,tx,ty);
         const cw = cam.w / s, ch = cam.h / s;
         // One sample grid for the terrain and all permanent ground marks.
-        c.imageSmoothingEnabled=s<1;
+        c.imageSmoothingEnabled=false;
         c.drawImage(this.landscape,0,0);
         c.imageSmoothingEnabled=false;
         for(const a of w.fires){
@@ -160,6 +178,26 @@ export class Renderer {
         for (const t of w.structures)
             if (t.hp > 0 && ['keep', 'tower', 'outpost'].includes(t.type))
                 drawStructure(c, t, w.tick);
+        // 残血要塞/箭塔/农舍升腾高空战火黑烟柱与跳动橘红火舌
+        for (const t of w.structures) {
+            if (t.hp <= 0 || !t.maxHp || t.hp >= t.maxHp * .68 || t.type === 'tree' || t.type === 'mine')
+                continue;
+            const dmg = 1 - t.hp / t.maxHp, plumes = t.type === 'keep' ? 4 : 2;
+            for (let i = 0; i < plumes; i++) {
+                const cycle = ((w.tick * 1.4 + t.id * 17 + i * 29) % 48);
+                const sx = Math.round(t.x + (i - (plumes - 1) / 2) * 26 + Math.sin((w.tick + i * 19) * .08) * 6);
+                const sy = Math.round(t.y - t.h * .65 - cycle * 1.65);
+                c.fillStyle = cycle < 14 ? '#e06b24' : cycle < 26 ? '#453c38' : '#2c2928';
+                c.globalAlpha = Math.max(.18, (.78 - cycle / 62) * (.55 + dmg * .45));
+                const sz = 7 + Math.floor(cycle * .22);
+                c.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+                if (cycle < 10) {
+                    c.fillStyle = '#ffd15c';
+                    c.fillRect(sx - 2, sy - 2, 4, 5);
+                }
+            }
+            c.globalAlpha = 1;
+        }
         for(const t of w.structures){
             if(t.hp<=0) continue;
             const first=t.queue?.[0], progress=t.needed?(t.work??0)/t.needed:first?first.progress/first.total:0;
@@ -169,6 +207,7 @@ export class Renderer {
         for (const u of w.units) {
             if (u.x < top.x - 65 || u.x > top.x + cw + 65 || u.y < top.y - 65 || u.y - u.z > top.y + ch + 65)
                 continue;
+            if(!u.hp)continue;
             this.unit(u, w.tick, o.selected.has(u.id), now);
             if (!u.tower && u.slot === 0 && !groups.has(u.group) && (u.kind === 'halberdier' || u.kind === 'heavy_lancer' || u.kind === 'musketeer')) {
                 groups.add(u.group);
@@ -204,6 +243,8 @@ export class Renderer {
                 c.fillRect(p.x - 5, y - 5, 6, 3);
             }
         }
+        if(o.selected.size){const leader=w.units.find(u=>o.selected.has(u.id));
+            if(leader){c.fillStyle='#1c2d25';c.fillRect(leader.x-25,leader.y-65,52,17);c.fillStyle='#f8d989';c.font='12px sans-serif';c.fillText('⚑ '+o.selected.size,leader.x-20,leader.y-52);}}
         this.vfx.draw(c);
         if (o.build && o.hover) {
             const b = w.blueprint(o.build, o.hover, o.faction), t = b.structure, col = b.valid ? '#d7c389' : '#e25a51';
@@ -234,10 +275,10 @@ export class Renderer {
         c.setTransform(1, 0, 0, 1, 0, 0);
         for (const t of w.structures)
             if (t.type === 'keep' && t.hp > 0)
-                this.plaque(t.x, t.y + t.h * .64, t.faction === 0 ? '铁冠主堡' : '赤棘主堡', t.faction);
+                this.plaque(t.x, t.y + t.h * .64, t.faction === 0 ? '法兰西星堡' : '英格兰星堡', t.faction);
         if (cam.zoom < cam.base * 1.7)
-            for(const t of w.structures) if(t.hp>0&&(t.type==='bridge'||t.type==='pontoon')&&w.map!=='isles')
-                this.plaque(t.x,t.y-100,t.type==='pontoon'?'临时浮桥':w.map==='bottleneck'?'绝望孤桥':t.y<1080?'北境石桥':'南境石桥',0,true);
+            for(const t of w.structures) if(t.hp>0&&(t.type==='bridge'||t.type==='pontoon'))
+                this.plaque(t.x,t.y-100,t.type==='pontoon'?'临时浮桥':t.y<1080?'北境石桥':'南境石桥',0,true);
         if(o.hover){
             const t=w.byStructure.get(w.grid.blockers[indexAt(o.hover.x,o.hover.y)]);
             if(t&&t.hp>0&&(t.type==='mine'||t.type in BUILDINGS))this.plaque(t.x,t.y-t.h-18,t.type==='mine'?'金矿余量 '+t.stock:BUILDINGS[t.type as BuildType][0]+' · '+Math.ceil(t.hp)+' HP',0,true);

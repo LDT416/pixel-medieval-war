@@ -1,60 +1,37 @@
-// Optional browser runner. Pass a Playwright module path when it is installed outside the project.
 const assert=require('node:assert/strict');
-const path=require('node:path');
-const {pathToFileURL}=require('node:url');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {build}=require('esbuild'),{pathToFileURL}=require('node:url'),path=require('node:path');
 (async()=>{
-    const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
-    try{
-        const context=await browser.newContext({offline:true,viewport:{width:1440,height:900}});
-        const page=await context.newPage(), faults=[], requests=[];
-        page.on('pageerror',e=>faults.push(e.message));
-        page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
-        await page.goto(pathToFileURL(path.resolve('dist/index.html')).href);
-        const act=id=>page.locator('[data-act="'+id+'"]').first().click();
-        await page.waitForFunction(()=>Number(document.querySelector('#dead')?.textContent?.replaceAll(',',''))>0);
-        await act('pause');
-        const count=await page.locator('#brushes canvas').count();assert.equal(count,26);
-        assert.equal(await page.locator('#brushes canvas').evaluateAll(cs=>new Set(cs.map(c=>c.toDataURL())).size),26);
-        await act('codex');
-        await page.selectOption('#book-filter','5');
-        assert.equal(await page.locator('.codex-list button').count(),5);
-        await act('entry-hwacha');assert.equal(await page.locator('.codex-card h2').innerText(),'多管火箭车');
-        await act('close');
-        await act('save');
-        const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('blood-siege-deployment-v1')));
-        assert.ok(saved.marks.length>0);assert.ok(saved.units.length>500);
-        await act('restore');await act('save');
-        const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('blood-siege-deployment-v1')));
-        assert.deepEqual(restored.marks,saved.marks);assert.deepEqual(restored.particles,saved.particles);
-        await page.selectOption('#scenario','4');
-        for(const mode of ['sandbox','lord']){
-            await act(mode);
-            for(const map of ['twin','bottleneck','isles','darkwood','gorge']){
-                await page.selectOption('#map-choice',map);
-                await act('save');
-                const info=await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('blood-siege-deployment-v1'));return [s.mode,s.map,s.structures.filter(t=>t.type==='keep').length]});
-                assert.deepEqual(info,[mode,map,2]);
-            }
-        }
-        await page.selectOption('#difficulty','brutal');
-        await act('unit-peasant');await act('save');
-        const lord=await page.evaluate(()=>JSON.parse(localStorage.getItem('blood-siege-deployment-v1')));
-        assert.equal(lord.difficulty,'brutal');
-        assert.ok(lord.structures.find(s=>s.type==='keep'&&s.faction===0).queue.some(q=>q.kind==='peasant'));
-        await act('sandbox');await page.selectOption('#map-choice','twin');await page.selectOption('#scenario','0');
-        if(process.env.BATTLE_SCREENSHOT) await page.screenshot({path:process.env.BATTLE_SCREENSHOT});
-        await page.waitForTimeout(3000);
-        console.log('默认战场帧率采样',await page.locator('#fps').innerText());
-        await act('pause');
-        const harness=await require('esbuild').build({entryPoints:['tests/ground.ts'],platform:'browser',format:'iife',globalName:'GroundQA',bundle:true,write:false});
-        const fixture=await context.newPage();
-        await fixture.addScriptTag({content:harness.outputFiles[0].text});
-        const pixels=await fixture.evaluate(()=>GroundQA.pixelTest());
-        console.log('地表像素回归',pixels);
-        assert.equal(pixels.spriteCount,52);assert.equal(pixels.flagFrames,6);
-        assert.equal(pixels.panErrors,0);assert.equal(pixels.zoomErrors,0);assert.equal(pixels.impactErrors,0);
-        assert.deepEqual(faults,[]);assert.deepEqual(requests,[]);
-        console.log('离线 file:// 通过。26 张立绘各异，图鉴筛选、双模式五图、征召、存档贴图与空中粒子往返一致。网络请求及页面异常均为零。');
-    }finally{await browser.close();}
+ const browser=await chromium.launch({headless:true,channel:process.env.BROWSER_CHANNEL||'chrome'});
+ try{
+ const ctx=await browser.newContext({offline:true,viewport:{width:1440,height:900},hasTouch:true});
+ const page=await ctx.newPage(),errors=[],requests=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+ page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
+ await page.goto(pathToFileURL(path.resolve('dist/index.html')).href);
+ await page.waitForFunction(()=>document.querySelector('#art')?.width===640);
+ if(process.env.COVER_SCREENSHOT)await page.screenshot({path:process.env.COVER_SCREENSHOT});
+ for(const [nation,mode,map] of [[1,'lord','darkwood'],[0,'sandbox','gorge'],[0,'lord','twin'],[1,'sandbox','darkwood']]){
+    await page.click('#nation'+nation);await page.selectOption('#maps',map);await page.click('#'+mode);await page.click('#menu');await page.click('#save');
+    const snap=await page.evaluate(()=>JSON.parse(localStorage.getItem('gothic-v4')).world);
+    assert.deepEqual([snap.player,snap.mode,snap.map],[nation,mode,map]);
+    if(mode==='sandbox'){await page.click('#cat1');assert.equal(await page.locator('[data-kind]').count(),5);await page.click('[data-kind="musketeer"]');}
+    await page.click('#back');
+ }
+ await page.setViewportSize({width:390,height:844});await page.click('#lord');
+ const cdp=await ctx.newCDPSession(page);const touch=(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y,id])=>({x,y,id}))});
+ const camera=()=>page.locator('#world').getAttribute('data-camera').then(v=>v.split(',').map(Number));
+ await page.waitForTimeout(300);const initial=await camera();
+ await touch('touchStart',[[80,350,1]]);await touch('touchMove',[[135,385,1]]);await touch('touchEnd',[]);await page.waitForTimeout(220);const pan=await camera();
+ assert.notEqual(pan[0],initial[0]);await page.waitForTimeout(950);
+ const before=await camera();await touch('touchStart',[[125,370,1],[205,370,2]]);await touch('touchMove',[[95,390,1],[255,390,2]]);await touch('touchEnd',[]);
+ await page.waitForTimeout(300);const after=await camera();assert.ok(Math.abs(after[2]/before[2]-2)<.03);
+ for(const [a,b,i,o] of [[165,175,0,195],[370,390,1,422]])assert.ok(Math.abs(before[i]+(a-o)/before[2]-after[i]-(b-o)/after[2])<3,'pinch anchor');
+ await page.click('#menu');await page.click('#back');
+ const g=await build({entryPoints:['tests/ground.ts'],bundle:true,write:false,format:'iife',globalName:'GroundQA'});
+ const fixture=await ctx.newPage();await fixture.addScriptTag({content:g.outputFiles[0].text});
+ const pixels=await fixture.evaluate(()=>GroundQA.pixelTest());console.log(pixels);
+ assert.equal(pixels.spriteCount,36);assert.equal(pixels.portraitCount,36);assert.equal(pixels.panErrors+pixels.zoomErrors+pixels.impactErrors,0);
+ assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);console.log('PASS offline four starts, all maps, 390x844 drag and anchored pinch, no console errors');
+ }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,17 +1,18 @@
 export type Faction = 0 | 1;
-export type Kind = 'peasant' | 'sapper' | 'monk' | 'bannerman' | 'pikeman' | 'zweihander' | 'berserker' | 'longbowman' | 'crossbowman' | 'blunderbuss' | 'fire_bomber' | 'horse_archer' | 'war_elephant' | 'ballista' | 'hwacha' | 'battering_ram' | 'militia' | 'shieldman' | 'halberdier' | 'plate_knight' | 'scout_cavalry' | 'heavy_lancer' | 'bowman' | 'musketeer' | 'catapult' | 'field_cannon';
+export type Kind = 'peasant' | 'sapper' | 'bannerman' | 'shieldman' | 'halberdier' | 'zweihander' | 'plate_knight' | 'musketeer' | 'guard_grenadier' | 'rifleman' | 'volley_gunner' | 'dragoon' | 'heavy_lancer' | 'scout_cavalry' | 'davinci_tank' | 'field_cannon' | 'siege_mortar' | 'organ_gun';
 export type Formation = 'phalanx' | 'line' | 'skirmish';
-export type MapId = 'twin' | 'bottleneck' | 'isles' | 'darkwood' | 'gorge';
+export type MapId = 'twin' | 'darkwood' | 'gorge';
 export type Mode = 'sandbox' | 'lord';
 export type Difficulty = 'easy' | 'normal' | 'brutal';
 export type Facility = 'barracks' | 'range' | 'stables' | 'abbey' | 'siege_workshop';
 export type Resource = 'wood' | 'gold';
 export type Tech = 'steel' | 'powder';
-export interface Realm {wood:number; gold:number; age:number; steel:boolean; powder:boolean; farmersKilled:number; rally:Point|null}
+export type Phase = 'PATROL_GATHER'|'WAVE_ASSAULT'|'RETREAT_REGROUP';
+export interface Realm {cooldownUntil?:number;phase:Phase; wave:number; baseline:number; policy:'gold'|'wood'|'auto';wood:number; gold:number; age:number; steel:boolean; powder:boolean; farmersKilled:number; rally:Point|null}
 export interface FireCell extends Point {end:number; faction:Faction; kind:Kind; spread:number}
 export interface Barrel extends Point {due:number; faction:Faction}
 export interface Drop extends Point {resource:Resource; amount:number}
-export type StructureType = Facility | 'mine' | 'rock' | 'keep' | 'tower' | 'gate' | 'wall' | 'lowwall' | 'palisade' | 'bridge' | 'pontoon' | 'tree' | 'house' | 'outpost';
+export type StructureType = Facility | 'wheat' | 'mine' | 'rock' | 'keep' | 'tower' | 'gate' | 'wall' | 'lowwall' | 'palisade' | 'bridge' | 'pontoon' | 'tree' | 'house' | 'outpost';
 export type BuildType = Facility | 'lowwall' | 'palisade' | 'pontoon' | 'outpost';
 export interface Point {
     x: number;
@@ -50,7 +51,7 @@ export interface Unit extends Body {
     lastAttacker: number;
     lastKind: Kind;
     lethalFall: boolean;
-    enterTower?:number; job?:number; cargo?:number; resource?:Resource; prefer?:Resource; auraUntil?:number; escort?:'drum'|'horn'|'guard'; leader?:number; guardSide?:number; laborTick?:number;
+    gun?:number; wave?:number; manual?:boolean; crew?:number; morale?:number; grenadeAt?:number; marchSlot?:number; moving?:boolean; enterTower?:number; job?:number; cargo?:number; resource?:Resource; prefer?:Resource; auraUntil?:number; escort?:'drum'|'horn'|'guard'; leader?:number; guardSide?:number; laborTick?:number;
 }
 export type Shot = 'spear' | 'rocket' | 'flask' | 'pellet' | 'bolt' | 'arrow' | 'bullet' | 'stone' | 'ball';
 export interface Projectile extends Body {
@@ -77,7 +78,7 @@ export interface SimEvent extends Point {
     power?: number;
     unitId?: number;
 }
-type Action = {type:'repair';payload:{site:number;ids:number[]}} | {type:'garrison';payload:{tower:number;ids:number[]}} | {type:'train';payload:{kind:Kind|'guard'; building?:number}} | {type:'age'|'guard';payload:Point} | {type:'research';payload:{tech:Tech}} | {type:'rally';payload:Point & {building?:number}} | {type:'gather';payload:{resource:Resource;ids?:number[];target?:number}} | {
+type Action = {type:'charge'|'recall'|'cottage'|'policy';payload:{}} | {type:'repair';payload:{site:number;ids:number[]}} | {type:'garrison';payload:{tower:number;ids:number[]}} | {type:'train';payload:{kind:Kind|'guard'; building?:number}} | {type:'age'|'guard';payload:Point} | {type:'research';payload:{tech:Tech}} | {type:'rally';payload:Point & {building?:number}} | {type:'gather';payload:{resource:Resource;ids?:number[];target?:number}} | {
     type: 'spawn';
     payload: Point & {
         kind: Kind;
@@ -132,7 +133,7 @@ export interface Stat {
     damage: number;
 }
 export interface Snapshot {
-    map?:MapId; mode?:Mode; difficulty?:Difficulty; realms?:Realm[]; fires?:FireCell[]; barrels?:Barrel[]; drops?:Drop[]; news?:string;
+    player?:Faction; map?:MapId; mode?:Mode; difficulty?:Difficulty; realms?:Realm[]; fires?:FireCell[]; barrels?:Barrel[]; drops?:Drop[]; news?:string;
     tick: number;
     seed: number;
     next: number;

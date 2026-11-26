@@ -10,23 +10,24 @@ export function kill(w: SimWorld, u: Unit, f: Faction, kind: Kind) {
     if (u.hp === -9999)
         return;
     u.hp = -9999;
+    if(u.gun){const gun=w.byUnit.get(u.gun);if(gun)gun.crew=Math.max(0,(gun.crew??1)-1);}
     w.dead[u.faction]++;
     if (f !== u.faction){
         w.stats[f][kind].kills++;
         if(w.mode==='lord') w.realms[f].gold+=u.kind==='peasant'?14:3;
         if(u.kind==='peasant'){
             w.realms[f].farmersKilled++;
-            w.news=u.faction===0?'敌骑突袭！铁冠农夫惨遭赤棘屠戮！':'血洗资源点：赤棘农夫已被斩杀！';
+            w.news=u.faction===0?'敌骑突袭！法军农夫惨遭英军屠戮！':'血洗资源点：英军农夫已被斩杀！';
             w.drops.push({x:u.x,y:u.y,resource:u.resource??'gold',amount:Math.max(3,Math.floor((u.cargo??0)/2))});
         }
     }
-    if(u.kind==='bannerman') w.news=u.faction===0?'铁冠仪仗掌旗官惨遭斩首！铁冠王旗坠入血泊！':'赤棘掌旗官被斩首，血旗坠地！';
+    if(u.kind==='bannerman') w.news=u.faction===0?'法军仪仗掌旗官惨遭斩首！法军王旗坠入血泊！':'英军掌旗官被斩首，血旗坠地！';
     w.events.push({
         type: 'death', x: u.x, y: u.y, z: u.z, faction: u.faction, kind: u.kind, dx: u.vx, dy: u.vy
     });
 }
 export function launch(w: SimWorld, u: Unit, dx: number, dy: number, strength: number) {
-    if (u.hp <= 0 || u.tower)
+    if (u.hp <= 0 || u.tower || u.gun || has(u.kind,"siege"))
         return;
     const k = strength / ((u.auraUntil??-1)>=w.tick?1.4:1) / (has(u.kind, 'brace') ? 2.6 : 1) / (u.formation === 'phalanx' ? 1.75 : 1);
     u.vx = dx * k;
@@ -41,17 +42,18 @@ export function hit(w: SimWorld, u: Unit, f: Faction, kind: Kind, raw: number, d
         return;
     let dmg = raw * (1 - Math.min(.9,UNITS[u.kind].armor*(w.realms[u.faction].steel?1.1:1)) * (1 - UNITS[kind].penetration));
     if(w.realms[f].powder&&(has(kind,'powder')||has(kind,'siege'))) dmg*=1.2;
-    if(u.kind==='battering_ram' && (arrow||kind==='crossbowman'||kind==='blunderbuss')) dmg*=.2;
-    if(kind==='ballista'&&u.kind==='war_elephant') dmg*=1.65;
-    if(kind==='pikeman'&&has(u.kind,'mount')) {dmg*=2.2;u.charge=0;}
-    if (arrow && has(u.kind, 'shield') && dx * u.face < 0) {
-        dmg *= .45;
+    if(u.kind==='davinci_tank'&&kind==='sapper')dmg=raw*2.5;
+    if(u.kind==='davinci_tank'&&has(kind,'powder')&&!has(kind,'siege'))dmg*=.08;
+    if(kind==='rifleman'&&w.rng.next()<.24)dmg*=2;
+    if((arrow||has(kind,'powder')&&!has(kind,'siege')) && has(u.kind, 'shield') && dx * u.face < 0) {
+        dmg *= .4;
         w.events.push({ type: 'block', x: u.x, y: u.y });
     }
     if (has(kind, 'brace') && has(u.kind, 'mount'))
         dmg *= 2.8;
     w.stats[f][kind].damage += Math.min(u.hp, dmg);
     u.hp -= dmg;
+    u.morale=Math.max(0,(u.morale??75)-Math.min(16,Math.ceil(dmg/8)));
     u.lastAttacker = f;
     u.lastKind = kind;
     w.events.push({
@@ -76,31 +78,37 @@ function siegeImpact(w: SimWorld, p: Projectile, r: number) {
 }
 export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
     const def = UNITS[u.kind], lx = t.x - u.x, ly = t.y - u.y, len = Math.hypot(lx, ly) || 1, dx = lx / len, dy = ly / len;
+    if(u.crew===0)return;
     u.face = dx < 0 ? -1 : 1;
     u.swing = 6;
-    const fury=has(u.kind,'rage')?1+.8*(1-u.hp/def.hp):1;
-    u.cooldown=def.reload/fury;
-    if (u.formation === 'line' && (u.kind === 'musketeer' || u.kind === 'bowman'))
+    u.cooldown=def.reload;
+    if (u.formation === 'line' && (u.kind === 'musketeer' || u.kind === 'guard_grenadier'))
         u.cooldown = def.reload - ((w.tick + u.slot % 3 * 3) % def.reload);
     if((u.auraUntil??-1)>=w.tick) u.cooldown/=1.2;
+    if('kind' in t&&def.role==='火枪'&&len<34){
+        hit(w,t,u.faction,u.kind,u.kind==='guard_grenadier'?42:22,dx,dy);u.cooldown=23;
+        w.events.push({type:'slash',x:t.x,y:t.y,kind:u.kind});return;
+    }
+    if('w' in t&&def.traits.includes('flank')&&(t.type==='house'||t.type==='wheat'))ignite(w,t,u.faction,u.kind);
     if (def.range > 50) {
-        const kind = has(u.kind,'pierce')?'spear':has(u.kind,'salvo')?'rocket':has(u.kind,'scatter')?'pellet':has(u.kind,'ignite')?'flask':has(u.kind,'bolt')?'bolt':u.kind === 'musketeer' ? 'bullet' : u.kind === 'catapult' ? 'stone' : u.kind === 'field_cannon' ? 'ball' : 'arrow';
-        const ticks = Math.max(2, Math.ceil(len / (['spear','pellet','bolt'].includes(kind)?48:kind === 'bullet' ? 42 : kind === 'ball' ? 12 : kind === 'stone' ? 9 : 12)));
-        const z = u.tower ? 46 : kind === 'stone' ? 18 : 10, gravity = ['spear','pellet','bolt','bullet'].includes(kind) ? 0 : kind === 'ball' ? .23 : kind === 'stone' ? .48 : .38;
+        const grenade=u.kind==='guard_grenadier'&&len<175&&(u.grenadeAt??0)<=w.tick;
+        if(grenade)u.grenadeAt=w.tick+165;
+        const kind:Projectile['kind']=grenade?'flask':u.kind==='siege_mortar'?'stone':u.kind==='field_cannon'?(len<190?'pellet':'ball'):u.kind==='davinci_tank'?'ball':has(u.kind,'scatter')||u.kind==='organ_gun'?'pellet':'bullet';
+        const ticks = Math.max(2, Math.ceil(len / (['spear','pellet','bolt'].includes(kind)?48:kind === 'bullet' ? 42 : kind === 'ball' ? 32 : kind === 'stone' ? 24 : 18)));
+        const z = u.tower ? 46 : kind === 'stone' ? 18 : 10, gravity = ['spear','pellet','bolt','bullet'].includes(kind) ? 0 : kind === 'ball' ? .23 : kind === 'stone' ? .32 : .38;
         const projectile: Projectile = {
             id: w.next++, kind, faction: u.faction, source: u.kind, damage: def.damage, x: u.x, y: u.y, z, vx: lx / ticks, vy: ly / ticks, vz: (-z / ticks) + gravity * (ticks + 1) / 2, gravity, remaining: ticks, bounces: kind === 'ball' ? w.rng.int(2, 3) : 0, target: t.id, hit: []
         };
-        if(kind==='pellet'||kind==='rocket'){
-            const count=kind==='rocket'?14:7;
+        if(u.kind==='davinci_tank'){
+            for(let i=0;i<8;i++){const a=Math.atan2(dy,dx)+i*Math.PI/4;
+                w.projectiles.push({...projectile,id:w.next++,vx:Math.cos(a)*len/ticks,vy:Math.sin(a)*len/ticks,hit:[]});}
+        }else if(kind==='pellet'){
+            const count=u.kind==='organ_gun'?10:6;
             for(let i=0;i<count;i++){
-                const side=kind==='rocket'?w.rng.int(-82,82):((i-3)/3)*len*.29;
-                const along=kind==='rocket'?w.rng.int(-70,70):0;
-                w.projectiles.push({...projectile,id:w.next++,vx:(lx+dx*along-dy*side)/ticks,vy:(ly+dy*along+dx*side)/ticks,hit:[]});
+                const side=(i-Math.floor(count/2))*len*.045;
+                w.projectiles.push({...projectile,id:w.next++,vx:(lx-dy*side)/ticks,vy:(ly+dx*side)/ticks,hit:[]});
             }
-        }else {
-            if(kind==='spear'){projectile.remaining=Math.ceil((def.range+60)/Math.max(1,Math.hypot(projectile.vx,projectile.vy)));projectile.vz=0;}
-            w.projectiles.push(projectile);
-        }
+        }else w.projectiles.push(projectile);
         w.events.push({
             type: 'fire', x: u.x, y: u.y, z, dx, dy, kind: u.kind
         });
@@ -108,7 +116,6 @@ export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
     }
     w.events.push({ type: 'slash', x: u.x + dx * 9, y: u.y + dy * 8, dx, dy, kind: u.kind });
     let charged = has(u.kind, 'charge') && u.charge >= 36;
-    if(charged&&'kind' in t&&t.kind==='pikeman'&&t.face*dx<0){u.charge=0;charged=false;hit(w,u,t.faction,t.kind,UNITS.pikeman.damage,-dx,-dy);if(u.hp<=0)return;}
     if ('w' in t) {
         if (charged && t.type === 'palisade') {
             hit(w, u, t.faction === 1 ? 1 : 0, 'halberdier', 160, -dx, -dy, 7);
@@ -116,7 +123,7 @@ export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
         }
         if(u.kind==='sapper'&&t.type!=='tree'){
             w.barrels.push({x:u.x+dx*16,y:u.y+dy*16,due:w.tick+50,faction:u.faction});
-        }else w.damageStructure(t,def.damage*fury*(u.kind==='battering_ram'?4:u.kind==='berserker'&&['pontoon','palisade'].includes(t.type)?2:1),u.faction,u.kind);
+        }else w.damageStructure(t,def.damage*(u.kind==='sapper'&&t.type==='tree'?4:1),u.faction,u.kind);
         return;
     }
     if (charged && has(t.kind, 'brace') && t.formation === 'phalanx' && t.face * dx < 0) {
@@ -129,10 +136,10 @@ export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
         w.hash.visit(u.x,u.y,has(u.kind,'stomp')?69:54,n=>{
             if(n.id===t.id||n.faction===u.faction||n.tower||n.hp<=0||(n.x-u.x)*dx+(n.y-u.y)*dy<0) return;
             if(u.kind==='zweihander'&&count>=4) return;
-            count++;hit(w,n,u.faction,u.kind,def.damage,dx,dy,u.kind==='war_elephant'?15:2);
+            count++;hit(w,n,u.faction,u.kind,def.damage,dx,dy,2);
         });
     }
-    hit(w, t, u.faction, u.kind, def.damage * fury * (charged ? 1.6 : 1), dx, dy, u.kind==='war_elephant'?16:charged ? 9 : has(u.kind, 'cleave') ? 3 : 0);
+    hit(w, t, u.faction, u.kind, def.damage * (charged ? 1.6 : 1), dx, dy, charged ? 9 : has(u.kind, 'cleave') ? 3 : 0);
     if (charged || has(u.kind, 'cleave'))
         w.hash.visit(t.x, t.y, charged ? 46 : 24, n => { if (n.id !== t.id && n.faction !== u.faction && !n.tower)
             hit(w, n, u.faction, u.kind, def.damage * .75, dx, dy, charged ? 10 : 3); });

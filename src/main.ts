@@ -1,212 +1,241 @@
-import type {MapId,Mode,Difficulty} from './sim/types';
-import type {Mark} from './client/decalLayer';
 import './style.css';
+import { mount, el, roster, categories } from './client/hud';
+import { coverArt } from './client/coverArt';
+import { Renderer, type Overlay } from './client/renderer';
+import { Input } from './client/input';
+import { BattleAudio } from './client/audio';
 import { SimWorld } from './sim/world';
 import { LocalTransport } from './net/transport';
-import { TPS } from './sim/config';
-import type { BuildType, CommandAction, Formation, Kind, Snapshot } from './sim/types';
-import { Hud, type Controls } from './client/hud';
-import { Renderer } from './client/renderer';
-import { Input, selectBrush, switchSide } from './client/input';
-import { BattleAudio } from './client/audio';
-const world = new SimWorld(), transport = new LocalTransport(), audio = new BattleAudio();
-const state: Controls = {
-    faction: 0, kind: 'halberdier', form: 'phalanx', count: 10, build: null, selected: new Set(), mode: 'spawn', speed: 1, paused: false, muted: false, scope: 'all'
-};
-if (innerWidth <= 760)
-    document.body.classList.add('hide-side');
-const hud = new Hud(state, world, action), renderer = new Renderer(hud.canvas, hud.mini), input = new Input(world, renderer, hud, state, send, action);
-const storageKey = 'blood-siege-deployment-v1';
-function openingVolley() {
-    if (world.scenario !== 0||world.mode!=='sandbox') return;
-    // Start on the first exchange of fire, with live projectiles and their matching effects.
-    for (let tick = 0; tick < TPS; tick++) {
-        renderer.vfx.consume(world.step([]));
-        renderer.vfx.update(1 / TPS);
-    }
-}
-openingVolley();
-type Deployment=Snapshot & {marks?:Mark[]; particles?:ReturnType<typeof renderer.vfx.snapshot>};
-function capture():Deployment {return Object.assign(world.snapshot(),{marks:structuredClone(renderer.decals.marks),particles:renderer.vfx.snapshot()});}
-let initial=capture(), saved:Deployment|null=null,lastWinner=world.winner;
-function send(a: CommandAction) { transport.send(world.tick, state.faction, a); }
-function resetView(paused = false) {
-    state.selected.clear();
-    document.getElementById('flag-dispatch')!.hidden = true;
-    input.settingRally = false;
-    state.hall = undefined;
-    state.faction = 0;
-    state.build = null;
-    state.mode = world.mode === 'lord' ? 'select' : 'spawn';
-    input.overlay.order = null;
-    renderer.reset(world);
-    hud.close();
-    state.paused = paused;
-    hud.rebuildBrushes();
-    hud.refresh();
-    accum = 0;
-}
-function action(id: string) {
-    if(id==='lord'||id==='sandbox'||id.startsWith('map-')||id.startsWith('difficulty-')||id.startsWith('scenario')){
-        const mode:Mode=id==='lord'||id==='sandbox'?id:world.mode;
-        if((id==='lord'||id==='sandbox')&&mode===world.mode){hud.close();return;}
-        const map=id.startsWith('map-')?id.slice(4) as MapId:world.map;
-        const difficulty=id.startsWith('difficulty-')?id.slice(11) as Difficulty:world.difficulty;
-        const index=id.startsWith('scenario')?Number(id.slice(8)):mode==='lord'?0:world.scenario;
-        transport.clear();send({type:'scenario',payload:{map,difficulty,mode,index}});
-        world.step(transport.drain(world.tick),false);lastWinner=null;resetView();
-        renderer.camera.frameScenario(index);
-        if(mode==='lord'){renderer.camera.scale(1.6);renderer.camera.x=960;renderer.camera.y=1050;renderer.camera.clamp();}
-        openingVolley();initial=capture();hud.update(0,renderer.camera.zoom/renderer.camera.base,renderer.camera);
+import { capacity, crews, UNITS, TPS } from './sim/config';
+import { fieldArmy, threshold } from './sim/strategy';
+import { WIDTH, HEIGHT } from './sim/maps';
+import type { CommandAction, Difficulty, Faction, Kind, MapId, Mode, Point } from './sim/types';
+mount();
+const canvas = el<HTMLCanvasElement>('world'), paint = coverArt(el('art')), world = new SimWorld(4), queue = new LocalTransport(), audio = new BattleAudio();
+const view = new Renderer(canvas, el('mini')), cam = view.camera, selected = new Set<number>(), repeat = new Set<Kind>();
+const overlay: Overlay = { selected, box: null, hover: null, order: null, build: null, faction: 1 };
+let placement: Kind | null = null, chosen: Kind = 'halberdier';
+let nation: Faction = 1, side: Faction = 1, playing = false, paused = false, speed = 1, category = '', scope = 0, accum = 0, last = 0, lastHud = 0, lastCover = -1, noticeAt = 0, history = '';
+const send = (a: CommandAction) => queue.send(world.tick, side, a);
+const say = (msg: string) => { el('notice').textContent = msg; noticeAt = performance.now(); };
+const own = () => world.units.filter(u => u.faction === side && fieldArmy(u));
+const recruit = (kind: Kind) => { chosen = kind; send({ type: 'train', payload: { kind } }); };
+function refreshCards() { el('cards').hidden = !category; if (category)
+    roster(category, side, repeat, recruit, k => { if (repeat.has(k))
+        repeat.delete(k);
+    else
+        repeat.add(k); }); }
+function selectedUnits(ids: number[]) { selected.clear(); for (const id of ids)
+    selected.add(id); el('group').textContent = selected.size ? '⚑ ' + selected.size + ' 人' : '⚑ 选团'; }
+function tap(p: Point) {
+    if (placement && world.mode === 'sandbox') {
+        send({ type: 'spawn', payload: { ...p, kind: placement, count: 1, formation: 'line' } });
+        placement = null;
         return;
     }
-    if(id==='age')send({type:'age',payload:{x:0,y:0}});
-    else if(id==='wood'||id==='gold')send({type:'gather',payload:{resource:id,ids:state.selected.size?[...state.selected]:undefined}});
-    else if(id==='steel'||id==='powder')send({type:'research',payload:{tech:id}});
-    else if(id==='honor'){
-        if(world.mode==='lord')send({type:'train',payload:{kind:'guard'}});
-        else {
-            const keep=world.keep(state.faction),d=state.faction===0?1:-1;
-            const pos=keep?{x:keep.x+d*224,y:keep.y}:{x:renderer.camera.x-d*260,y:renderer.camera.y};
-            send({type:'guard',payload:pos});
-            hud.toast('已部署皇家仪仗队');
-        }
-    }else if(id==='rally'){input.settingRally=true;hud.toast('点击地图设置新兵集结点');}
-    else if (id === 'troops' || id === 'works') {
-        state.hall=undefined;
-        selectBrush(state, id === 'works' ? 'palisade' : state.kind, id === 'works');
-        hud.rebuildBrushes();
+    if (overlay.build) {
+        send({ type: 'build', payload: { ...p, kind: overlay.build } });
+        overlay.build = null;
+        return;
     }
-    else if (id.startsWith('unit-') || id.startsWith('build-')){
-        selectBrush(state,id.split('-')[1] as Kind|BuildType,id.startsWith('build-'));
-        if(world.mode==='lord'&&id.startsWith('unit-')){send({type:'train',payload:{kind:state.kind,building:state.hall}});state.mode='select';}
+    if (selected.size) {
+        const structure = world.structures.find(s => s.hp > 0 && s.faction !== side && Math.abs(s.x - p.x) < s.w / 2 && Math.abs(s.y - p.y) < s.h / 2);
+        send({ type: 'order', payload: { point: p, ids: [...selected], structureId: structure?.id } });
+        overlay.order = p;
+        selectedUnits([]);
+        return;
     }
-    else if (id === 'f0' || id === 'f1') {
-        if(world.mode==='lord'&&id==='f1')return;
-        switchSide(state, id === 'f0' ? 0 : 1);
-        hud.rebuildBrushes();
-    }
-    else if (/^n\d+$/.test(id))
-        state.count = Number(id.slice(1));
-    else if (id.startsWith('form-')) {
-        state.form = id.slice(5) as Formation;
-        if (state.selected.size)
-            send({ type: 'formation', payload: { formation: state.form, ids: [...state.selected] } });
-    }
-    else if (id === 'apply') {
-        const scope = input.scope();
-        if (scope.ids?.length === 0) {
-            hud.toast('请先框选部队');
-            return;
-        }
-        send({ type: 'formation', payload: { ...scope, formation: state.form } });
-        hud.toast('已下达变阵指令');
-    }
-    else if (id === 'save') {
-        world.step(transport.drain(world.tick), false);
-        saved = capture();
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(saved));
-            hud.toast('布阵已保存在此浏览器');
-        }
-        catch {
-            hud.toast('已保存到本次会话，浏览器存储空间不足');
-        }
-    }
-    else if (id === 'restore') {
-        let snapshot = saved;
-        if (!snapshot) {
-            try {
-                const raw = localStorage.getItem(storageKey);
-                if (raw) {
-                    const parsed = JSON.parse(raw) as Deployment;
-                    if (Array.isArray(parsed.groups) && Array.isArray(parsed.structures) && Array.isArray(parsed.units) && parsed.stats?.length === 2)
-                        snapshot = parsed;
-                }
-            }
-            catch { /* Use this scenario's initial deployment if storage is unavailable. */ }
-        }
-        transport.clear();
-        send({ type: 'restore', payload: { state: snapshot ?? initial } });
-        world.step(transport.drain(world.tick), false);
-        lastWinner = world.winner;
-        resetView(true);
-        const data=snapshot??initial;
-        if(data.marks) renderer.decals.restore(data.marks);
-        if(data.particles) renderer.vfx.restore(data.particles);
-        hud.update(0,renderer.camera.zoom/renderer.camera.base,renderer.camera);
-        hud.toast(snapshot ? '已恢复保存的布阵（已暂停，按空格开战）' : '已恢复剧本初始布阵（已暂停，按空格开战）');
-    }
-    else if (id === 'audio') {
-        state.muted = !state.muted;
-        audio.muted = state.muted;
-        if (!state.muted)
-            audio.unlock();
-    }
-    else if (id === 'pause') {
-        state.paused = !state.paused;
-        accum = 0;
-    }
-    else if (id.startsWith('speed')) {
-        state.speed = Number(id.slice(5));
-        state.paused = false;
-    }
-    else if (id === 'plus' || id === 'minus')
-        renderer.camera.scale(id === 'plus' ? 1.25 : .8);
-    else if (id === 'spawnmode' || id === 'selectmode' || id === 'order') {
-        state.mode = id === 'spawnmode' ? 'spawn' : id === 'selectmode' ? 'select' : 'order';
-        if (state.mode === 'spawn')
-            state.selected.clear();
-        if (id === 'order')
-            hud.toast('点击地面集结，或点击建筑下达攻击指令');
-    }
-    else if (id === 'attack') {
-        const scope = state.selected.size ? { ids: [...state.selected] } : input.scope();
-        if (scope.ids?.length === 0) {
-            hud.toast('请先框选部队');
-            return;
-        }
-        send({ type: 'order', payload: { ...scope, point: null } });
-        hud.toast('部队开始向敌方城堡推进');
-    }
-    hud.refresh();
+    const troops = own(), hit = troops.filter(u => Math.hypot(u.x - p.x, u.y - p.y) < 32 / cam.zoom).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+    if (hit)
+        selectedUnits(troops.filter(u => Math.hypot(u.x - hit.x, u.y - hit.y) <= 280).map(u => u.id));
 }
-document.addEventListener('pointerdown', () => audio.unlock(), { once: true });
-let last = performance.now(), accum = 0, frames = 0, fps = 0, sample = last, screenFrames = 0;
-function frame(now: number) {
-    const dt = Math.min(.12, (now - last) / 1000);
-    last = now;
-    if (!state.paused)
-        accum += dt * state.speed;
-    const quantum = 1 / TPS;
-    if (state.paused) {
-        const commands = transport.drain(world.tick);
-        if (commands.length)
-            renderer.vfx.consume(world.step(commands, false));
+const input = new Input(canvas, cam, tap, (a, b) => selectedUnits(own().filter(u => u.x >= Math.min(a.x, b.x) && u.x <= Math.max(a.x, b.x) && u.y >= Math.min(a.y, b.y) && u.y <= Math.max(a.y, b.y)).map(u => u.id)), () => playing);
+function hud() {
+    const r = world.realms[side], army = own(), count = (f: number) => world.units.filter(u => u.faction === f && !u.gun).length;
+    el('top').dataset.mode = world.mode;
+    for (const f of [0, 1] as const)
+        el('score' + f).textContent = count(f) + ' ⚔' + world.dead[1 - f];
+    el('resources').textContent = '粮 ' + r.gold + '　木 ' + r.wood + '　农 ' + world.units.filter(u => u.kind === 'peasant' && u.faction === side).length + '/' + capacity[r.age];
+    el('policy').textContent = ({ auto: '⚖ 平衡', gold: '🌾 种田', wood: '🪵 砍树' })[r.policy];
+    el('phase').textContent = ({ PATROL_GATHER: '集结', WAVE_ASSAULT: '冲锋', RETREAT_REGROUP: '回撤' })[r.phase] + ' ' + army.length + '/' + threshold(r.age);
+    el('cottage').textContent = r.age === 4 ? '⌂ T4 庄园' : '⌂ 升农舍';
+    el('cottage').title = 'T' + r.age + ' · 升级需要 ' + r.age * 75 + ' 粮、' + r.age * 80 + ' 木';
+    canvas.dataset.player = String(world.player);
+    if (history !== world.news) {
+        history = world.news;
+        say(history);
     }
-    for (let i = 0; !state.paused && accum >= quantum && i < 12; i++) {
-        const events = world.step(transport.drain(world.tick));
-        renderer.vfx.consume(events);
-        audio.play(events);
-        hud.dispatch(events);
-        renderer.vfx.update(quantum);
-        accum -= quantum;
-        if (world.winner !== null && world.winner !== lastWinner) {
-            lastWinner = world.winner;
-            hud.open('victory');
-            state.paused = true;
-            hud.refresh();
-            accum = 0;
+    if (world.winner === null && performance.now() - noticeAt > 3400)
+        el('notice').textContent = '';
+    canvas.dataset.camera = [cam.x, cam.y, cam.zoom].map(n => n.toFixed(3)).join(',');
+}
+function start(mode: Mode) {
+    audio.unlock();
+    audio.start(nation);
+    queue.clear();
+    side = nation;
+    world.player = nation;
+    world.reset(4, el<HTMLSelectElement>('maps').value as MapId, mode, el<HTMLSelectElement>('difficulty').value as Difficulty);
+    placement = null;
+    el('place').hidden = mode !== 'sandbox';
+    playing = true;
+    paused = false;
+    accum = 0;
+    speed = 1;
+    category = '';
+    scope = 0;
+    repeat.clear();
+    input.reset();
+    selectedUnits([]);
+    overlay.order = null;
+    overlay.build = null;
+    overlay.faction = side;
+    el('cover').hidden = true;
+    el('battle').hidden = false;
+    el('settings').hidden = true;
+    el('side').hidden = mode !== 'sandbox';
+    el('pause').textContent = '暂停';
+    el('speed').textContent = '1×';
+    el('side').textContent = '布阵方 ' + (side ? '英' : '法');
+    refreshCards();
+    view.resize();
+    view.reset(world);
+    const compact = cam.w < 900;
+    cam.zoom = cam.base * (compact ? 1.15 : 1.75);
+    cam.x = side ? (compact ? 4020 : 3920) : (compact ? 780 : 880);
+    cam.y = 880;
+    cam.clamp();
+    history = world.news;
+    el('notice').textContent = '';
+    hud();
+}
+for (const f of [0, 1] as const)
+    el('nation' + f).onclick = () => { nation = f; for (const i of [0, 1])
+        el('nation' + i).setAttribute('aria-pressed', String(i === f)); };
+for (const mode of ['lord', 'sandbox'] as const)
+    el(mode).onclick = () => start(mode);
+el('back').onclick = () => { playing = false; input.reset(); audio.stop(); el('battle').hidden = true; el('cover').hidden = false; };
+el('menu').onclick = () => { el('settings').hidden = !el('settings').hidden; };
+el('music').onclick = () => { audio.music = !audio.music; el('music').textContent = '军歌 ' + (audio.music ? '开' : '关'); };
+el('sound').onclick = () => { audio.muted = !audio.muted; el('sound').textContent = '音效 ' + (audio.muted ? '关' : '开'); };
+el('gore').onclick = () => {
+    const next = !view.decals.inferno;
+    view.decals.inferno = next;
+    view.vfx.inferno = next;
+    el('gore').textContent = next ? '🩸 炼狱血海' : '🩸 常规血腥';
+    say(next ? '已开启炼狱血海模式：碎尸、血带与炮火震撼全开' : '已切换为常规血腥浓度');
+};
+el('pause').onclick = () => { paused = !paused; accum = 0; el('pause').textContent = paused ? '继续' : '暂停'; };
+el('speed').onclick = () => { speed = speed === 4 ? 1 : speed * 2; el('speed').textContent = speed + '×'; };
+el('side').onclick = () => { side = side ? 0 : 1; overlay.faction = side; repeat.clear(); selectedUnits([]); refreshCards(); cam.x = side ? 3920 : 880; cam.clamp(); el('side').textContent = '布阵方 ' + (side ? '英' : '法'); hud(); };
+el('place').onclick = () => { placement = chosen; el('settings').hidden = true; say('轻点地图放置' + UNITS[chosen].name); };
+el('save').onclick = () => { world.step(queue.drain(world.tick), false); try {
+    localStorage.setItem('gothic-v4', JSON.stringify({ world: world.snapshot(), marks: view.decals.marks, particles: view.vfx.snapshot(), side, auto: [...repeat] }));
+    say('布阵已保存');
+}
+catch {
+    say('浏览器存储空间不足');
+} };
+el('restore').onclick = () => {
+    try {
+        const data = JSON.parse(localStorage.getItem('gothic-v4') ?? 'null');
+        if (!data) {
+            say('尚无已保存布阵');
+            return;
+        }
+        queue.clear();
+        world.restore(data.world);
+        nation = world.player;
+        side = data.side;
+        overlay.faction = side;
+        selectedUnits([]);
+        overlay.order = null;
+        overlay.build = null;
+        placement = null;
+        repeat.clear();
+        for (const k of data.auto ?? [])
+            repeat.add(k);
+        view.reset(world);
+        view.decals.restore(data.marks);
+        view.vfx.restore(data.particles);
+        el('side').hidden = el('place').hidden = world.mode !== 'sandbox';
+        audio.start(nation);
+        paused = true;
+        el('pause').textContent = '继续';
+        refreshCards();
+        say('布阵已恢复');
+    }
+    catch {
+        say('无法读取布阵');
+    }
+};
+el('hire').onclick = () => recruit('peasant');
+for (const type of ['cottage', 'policy', 'charge', 'recall'] as const)
+    el(type).onclick = () => send({ type, payload: {} });
+el('group').onclick = () => { const a = own().filter(u => scope % 3 === 0 || (scope % 3 === 1 ? UNITS[u.kind].role === '火枪' : UNITS[u.kind].armor >= .3)); selectedUnits(a.map(u => u.id)); say(['主力', '火枪', '重甲'][scope++ % 3] + ' · ' + a.length + ' 人，轻点地图下令'); };
+el('workshop').onclick = () => {
+    const base = world.keep(side);
+    if (!base)
+        return;
+    const existing = world.structures.find(s => s.type === 'siege_workshop' && s.faction === side && s.hp > 0);
+    if (existing) {
+        say(existing.needed ? '军事工坊施工中' : '军事工坊已就绪');
+        return;
+    }
+    for (let i = 0; i < 36; i++) {
+        const p = { x: base.x + (i % 6 - 2) * 116, y: base.y + 265 + Math.floor(i / 6) * 90 };
+        if (world.blueprint('siege_workshop', p, side).valid) {
+            send({ type: 'build', payload: { ...p, kind: 'siege_workshop' } });
+            say('军事工坊已选址');
+            return;
         }
     }
-    input.update(dt);
-    renderer.draw(world, input.overlay, screenFrames++ % 4 === 0);
-    frames++;
-    if (now - sample >= 350) {
-        fps = frames * 1000 / (now - sample);
-        sample = now;
-        frames = 0;
-        hud.update(fps, renderer.camera.zoom / renderer.camera.base, renderer.camera);
+};
+for (const [id, kind] of [['bridge', 'pontoon'], ['stakes', 'palisade']] as const)
+    el(id).onclick = () => { overlay.build = kind; el('settings').hidden = true; say(kind === 'pontoon' ? '轻点河面架设浮桥' : '轻点地面修筑拒马'); };
+categories.forEach((cat, i) => el('cat' + i).onclick = () => { category = category === cat ? '' : cat; refreshCards(); });
+el('mini').onclick = e => { const r = el('mini').getBoundingClientRect(); cam.x = (e.clientX - r.left) / r.width * WIDTH; cam.y = (e.clientY - r.top) / r.height * HEIGHT; cam.clamp(); };
+addEventListener('keydown', e => { if (playing && e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    el('pause').click();
+} });
+function frame(now: number) {
+    const dt = Math.min(.1, (now - last) / 1000);
+    last = now;
+    if (!playing) {
+        if (now - lastCover >= 85) {
+            paint(now);
+            lastCover = now;
+        }
+    }
+    else {
+        if (!paused && world.winner === null)
+            accum += dt * speed;
+        while (accum >= 1 / TPS && world.winner === null) {
+            if (world.tick % 60 === 0)
+                for (const k of repeat)
+                    recruit(k);
+            const events = world.step(queue.drain(world.tick));
+            audio.play(events);
+            view.vfx.consume(events);
+            view.vfx.update(1 / TPS);
+            accum -= 1 / TPS;
+            if (world.winner !== null) {
+                say(world.winner === nation ? '攻克敌堡 · 征战胜利' : '要塞失守 · 征战结束');
+                history = world.news;
+                el('settings').hidden = false;
+            }
+        }
+        if (paused && world.winner === null)
+            world.step(queue.drain(world.tick), false);
+        audio.sequence(world.realms[nation].phase === 'WAVE_ASSAULT', paused || world.winner !== null);
+        input.update(dt);
+        overlay.box = input.box;
+        view.draw(world, overlay, now - lastHud > 160);
+        if (now - lastHud > 160) {
+            hud();
+            lastHud = now;
+        }
     }
     requestAnimationFrame(frame);
 }

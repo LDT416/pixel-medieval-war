@@ -2,9 +2,9 @@ import {banner} from './banners';
 import type { Structure } from '../sim/types';
 // High-contrast masonry, timber and conifers painted at native pixel resolution.
 // The ground renderer supplies the projection; sprites sit on their world footprints.
-const basalt = ['#404445', '#4c5050', '#535653', '#5d605b', '#67695f', '#77776b'];
+const basalt = ['#78838a','#929ba1','#9fa5ac','#b3b9be','#cfd4d9','#e0e4df'];
 const timber = ['#493a2c', '#594532', '#6e5339', '#876641', '#997952', '#ae8960'];
-const outline = '#202526', mortar = '#393d3c', light = '#909084';
+const outline = '#202526', mortar = '#747e83', light = '#909084';
 const atlas = new Map<string, HTMLCanvasElement>();
 function noise(a: number, b: number, c: number) {
     let n = Math.imul(a + 89, 15485863) ^ Math.imul(b + 167, 32452843) ^ Math.imul(c + 19, 49979687);
@@ -382,9 +382,15 @@ function makeScenery(type: Structure['type'], faction: number, variant: number, 
     return canvas;
 }
 const ironColor = '#67695f';
-export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick: number) {
+export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick: number, flags=true) {
     if (s.hp <= 0)
         return;
+    if(s.type==='wheat'){
+        const x=Math.round(s.x-s.w/2),y=Math.round(s.y-s.h/2);
+        ctx.fillStyle='#997344';ctx.fillRect(x,y,s.w,s.h);
+        for(let j=2;j<s.h;j+=6)for(let i=2;i<s.w;i+=4){ctx.fillStyle=i%3?'#d4ae4e':'#b88f35';ctx.fillRect(x+i,y+j,2,5);ctx.fillStyle='#eed07b';ctx.fillRect(x+i-1,y+j,2,2);}
+        return;
+    }
     const variant = s.type === 'tree' || s.type === 'house' ? s.id % 9 : 0;
     const aspect = Math.round(s.w / Math.max(1, s.h) * 8) / 8;
     const key = s.type + '|' + s.faction + '|' + variant + '|' + aspect;
@@ -415,8 +421,22 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick:
     const stretch = s.type === 'bridge' || s.type === 'pontoon' ? 1.23 : s.type === 'keep' ? 1.61 : s.type === 'tree' ? 2.12 : s.type === 'wall' || s.type === 'lowwall' ? 1.16 : 1.5;
     const width = Math.ceil(s.w * (s.type === 'tree' ? 1.58 : 1.04)), height = Math.ceil(s.h * stretch);
     const left = Math.round(s.x - width / 2), bottom = Math.round(s.y + s.h / 2), top = bottom - height;
-    ctx.drawImage(art, left, top, width, height);
     if(s.type==='keep'){
+        const path=(raise:number,color:string)=>{ctx.fillStyle=color;ctx.beginPath();
+            for(let i=0;i<16;i++){const a=i*Math.PI/8,r=i%2?.70:1;const x=Math.round(s.x+Math.cos(a)*width*.76*r),y=Math.round(s.y+Math.sin(a)*height*.34*r-raise);if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);}
+            ctx.closePath();ctx.fill();};
+        path(0,'#74818a');path(11,'#cfd4d9');path(14,'#a4adae');
+    }
+    ctx.drawImage(art, left, top, width, height);
+    if(s.type==='house'&&s.faction!==-1){
+        const level=s.age??1;ctx.fillStyle=level===1?'#d6af59':'#a85336';
+        for(let i=0;i<15;i++)ctx.fillRect(left+width*.50-i,top+8+i,2*i+3,2);
+        if(level===4){ctx.fillStyle='#ddd3bd';ctx.fillRect(left+width*.53,top+23,width*.38,22);
+            ctx.fillStyle='#733d30';for(let i=0;i<12;i++)ctx.fillRect(left+width*.73-i,top+12+i,2*i+3,2);
+            ctx.fillStyle='#634b3a';ctx.fillRect(left+width*.68,top+34,9,12);}
+        if(level>=3){ctx.fillStyle='#f3e5bf';for(let i=0;i<19;i++){ctx.fillRect(left+i,top+i-8,3,4);ctx.fillRect(left+18-i,top+i-8,3,4);}}
+    }
+    if(s.type==='keep'&&flags){
         const x=Math.round(s.x+2),y=Math.round(top+height*.16);
         ctx.drawImage(banner(s.faction===1?1:0,Math.floor(tick/7)),x,y-68,50,70);
         for(let i=1;i<(s.age??1);i++){const bx=Math.round(s.x+(i===1?-1:1)*width*.32);ctx.drawImage(banner(s.faction===1?1:0,Math.floor(tick/7)),bx,y-8,22,30);}

@@ -1,9 +1,11 @@
+import {portrait} from '../src/client/portraits';
 import { Renderer, type Overlay } from '../src/client/renderer';
 import { SimWorld } from '../src/sim/world';
 import { KINDS } from '../src/sim/config';
 import { sprite, spritePalette } from '../src/client/spriteBaker';
 import { banner } from '../src/client/banners';
 export function pixelTest() {
+    const portraits=new Set<string>();
     const images = new Set<string>();
     for (const k of KINDS)
         for (const f of [0, 1] as const) {
@@ -12,6 +14,7 @@ export function pixelTest() {
                 if (c.width < 4 || c.height < 4)
                     throw Error(k);
             }
+            const art=portrait(k,f);if(art.width!==48||art.height!==48)throw Error('portrait size');portraits.add(art.toDataURL());
             images.add(sprite(k, f).toDataURL());
             if (spritePalette(k, f).length < 4)
                 throw Error('精灵色表 ' + k);
@@ -58,5 +61,5 @@ export function pixelTest() {
                 impactErrors++;
     }
     canvas.remove();
-    return { spriteCount: images.size, flagFrames: wave.size, marks, panErrors, zoomErrors, impactErrors };
+    return { portraitCount:portraits.size,spriteCount: images.size, flagFrames: wave.size, marks, panErrors, zoomErrors, impactErrors };
 }

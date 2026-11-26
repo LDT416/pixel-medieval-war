@@ -30,7 +30,7 @@ export function environmentTick(w: SimWorld) {
     if (w.tick % 15 === 0)
         for (const a of [...w.fires]) {
             w.hash.visit(a.x, a.y, 40, u => { if (!u.tower)
-                hit(w, u, a.faction, a.kind, u.kind === 'war_elephant' ? 21.6 : 12, 0, 0); });
+                hit(w, u, a.faction, a.kind, 12, 0, 0); });
             for (const s of w.structures)
                 if (s.hp > 0 && distanceTo(a, s) < 42 && !['rock', 'mine', 'bridge', 'wall', 'lowwall'].includes(s.type)) {
                     w.damageStructure(s, 29, a.faction, a.kind);
@@ -56,9 +56,10 @@ export function environmentTick(w: SimWorld) {
 }
 export function supportTick(w: SimWorld, u: Unit) {
     const f = u.faction;
+    if(u.kind==='bannerman'&&w.realms[f].phase==='RETREAT_REGROUP')return false;
     if (u.kind === 'bannerman' && (w.tick + u.id) % 10 === 0)
         w.hash.visit(u.x, u.y, 155, n => { if (n.faction === f)
-            n.auraUntil = w.tick + 12; });
+            {n.auraUntil=w.tick+12;n.morale=Math.min(100,(n.morale??75)+8);} });
     if (u.escort) {
         if (u.escort !== 'guard' && (w.tick + u.id) % (u.escort === 'drum' ? 46 : 135) === 0)
             w.events.push({ type: u.escort, x: u.x, y: u.y, faction: f });
@@ -78,44 +79,6 @@ export function supportTick(w: SimWorld, u: Unit) {
             }
             return true;
         }
-    }
-    if (u.kind === 'monk') {
-        if ((w.tick + u.id) % 53 === 0) {
-            const allies: Unit[] = [];
-            w.hash.visit(u.x, u.y, 125, n => { if (n.faction === f && n.hp > 0 && n.hp < UNITS[n.kind].hp)
-                allies.push(n); });
-            allies.sort((a, b) => Number(UNITS[b.kind].armor > .3) - Number(UNITS[a.kind].armor > .3) || a.hp / UNITS[a.kind].hp - b.hp / UNITS[b.kind].hp);
-            for (const n of allies.slice(0, 6))
-                n.hp = Math.min(UNITS[n.kind].hp, n.hp + 26);
-            if (allies.length)
-                w.events.push({ type: 'heal', x: u.x, y: u.y });
-        }
-        let line: Unit | undefined, dist = Infinity;
-        w.hash.visit(u.x, u.y, 360, n => { if (n.faction !== f || n.tower || !['halberdier', 'shieldman', 'plate_knight', 'war_elephant', 'militia'].includes(n.kind))
-            return; const v = Math.hypot(u.x - n.x, u.y - n.y); if (v < dist) {
-            line = n;
-            dist = v;
-        } });
-        if (line) {
-            const p = { x: line.x + (f === 0 ? -1 : 1) * 55, y: line.y };
-            if (Math.hypot(u.x - p.x, u.y - p.y) > 14)
-                w.approach(u, p);
-            return true;
-        }
-    }
-    if (u.kind === 'war_elephant') {
-        if ((w.tick + u.id) % 48 === 0) {
-            const targets: Unit[] = [];
-            w.hash.visit(u.x, u.y, 255, n => { if (n.faction !== f && n.hp > 0)
-                targets.push(n); });
-            for (let i = 0; i < 2 && targets.length; i++) {
-                const t = targets[i % targets.length], time = 18;
-                w.projectiles.push({ id: w.next++, kind: 'arrow', source: u.kind, faction: f, x: u.x, y: u.y, z: 31, vx: (t.x - u.x) / time, vy: (t.y - u.y) / time, vz: -31 / time + .38 * (time + 1) / 2, gravity: .38, remaining: time, damage: 16, target: t.id, hit: [], bounces: 0 });
-            }
-        }
-        if ((w.tick + u.id) % 25 === 0)
-            w.hash.visit(u.x, u.y, 47, n => { if (n.faction !== f && !n.tower)
-                hit(w, n, f, u.kind, 21, (n.x - u.x) / 47, (n.y - u.y) / 47, 12); });
     }
     return false;
 }

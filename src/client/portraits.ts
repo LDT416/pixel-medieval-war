@@ -43,7 +43,7 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
     const { box, line, shape } = ink(ctx);
-    const cloth = faction === 0 ? '#4c7185' : '#914d41';
+    const cloth = faction === 0 ? '#265cc2' : '#cc2b2b';
     const edge = faction === 0 ? '#83a0a4' : '#c98464';
     const shade = faction === 0 ? '#293f50' : '#522f32';
     const bg = faction === 0 ? '#252c2b' : '#302927';
@@ -54,7 +54,7 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
         const x = (i * 13 + (i * i >> 2)) % 48, y = (i * 29 + (i * i >> 4)) % 48;
         box(i % 3 ? '#303530' : '#3b3c32', x, y, i % 4 === 0 ? 2 : 1);
     }
-    const armored = ['halberdier','plate_knight','heavy_lancer','shieldman','pikeman','zweihander','crossbowman','bannerman'].includes(kind);
+    const armored = ['halberdier','plate_knight','heavy_lancer','shieldman','zweihander','bannerman'].includes(kind);
     function torso() {
         shape(black, 0, 48, 1, 41, 7, 34, 16, 31, 18, 26, 28, 25, 32, 30, 38, 32, 44, 39, 48, 48);
         shape(shade, 1, 48, 3, 41, 10, 35, 20, 31, 29, 30, 36, 34, 42, 40, 44, 48);
@@ -149,96 +149,20 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
         box(gold, x - 1, y - 1, 3, 3);
         box(bone, x - 1, y - 1);
     }
-    if(['war_elephant','hwacha','ballista','battering_ram'].includes(kind)){
-        const native=sprite(kind,faction);
-        ctx.drawImage(native,1,kind==='war_elephant'?9:12,46,kind==='war_elephant'?35:30);
-        if(kind==='war_elephant'){
-            line(gold,9,22,25,22,2);for(let i=0;i<5;i++)box(bone,10+i*3,24,1,2);
-            shape(glint,34,33,40,31,44,26,43,32,39,35,35,36);
-            box(black,38,26,2);box(bone,39,26);
-        }else{
-            wheel(12,38,5);wheel(34,38,5);
-            if(kind==='ballista'){line(bone,8,23,37,12);shape(silver,35,11,45,6,40,14,36,15);}
-            if(kind==='hwacha')for(let i=0;i<5;i++){line(woodLight,7+i*7,27,15+i*7,12);shape('#c45d37',13+i*7,14,16+i*7,7,17+i*7,12,15+i*7,16);}
-            if(kind==='battering_ram')for(let i=0;i<6;i++){line(silver,7+i*5,17,3+i*5,24);box(gold,6+i*6,26,2);}
-        }
-    }else if (kind === 'catapult' || kind === 'field_cannon') {
-        shape('#141716', 0, 42, 11, 34, 41, 33, 47, 38, 42, 45, 21, 47);
-        wheel(14, 33, 7);
-        if (kind === 'catapult') {
-            shape(black, 2, 34, 4, 30, 33, 25, 45, 31, 44, 38, 17, 44);
-            shape(wood, 4, 32, 32, 27, 43, 31, 17, 38);
-            line(woodLight, 4, 32, 18, 37);
-            line(woodLight, 18, 37, 41, 31);
-            pole(7, 34, 19, 14);
-            pole(33, 30, 22, 14);
-            pole(19, 37, 22, 14);
-            line(black, 18, 15, 33, 3, 4);
-            line(woodLight, 19, 16, 33, 3, 2);
-            line('#b3ae86', 34, 4, 39, 15);
-            line('#8c8968', 35, 4, 43, 13);
-            shape(black, 36, 15, 42, 12, 46, 13, 45, 17, 40, 19);
-            box(steel, 40, 13, 4, 2);
-            box(silver, 40, 13, 2);
-            shape(black, 9, 18, 15, 15, 20, 18, 19, 26, 12, 28, 8, 25);
-            shape(iron, 10, 19, 16, 17, 19, 19, 18, 24, 13, 26, 10, 25);
-            box(steel, 10, 19, 5, 2);
-            line(gold, 13, 19, 13, 25);
-            for (let i = 0; i < 4; i++) {
-                box(gold, 20 + i, 15, 1, 4);
-                box(silver, 20 + i, 15);
-            }
-            wheel(30, 36, 7);
-        }
-        else {
-            pole(3, 39, 28, 27);
-            pole(5, 41, 30, 30);
-            shape(black, 6, 26, 8, 22, 29, 13, 37, 9, 42, 10, 46, 16, 43, 20, 34, 22, 13, 33, 7, 32);
-            shape(iron, 7, 26, 12, 23, 33, 14, 39, 12, 43, 14, 43, 18, 36, 19, 15, 30, 10, 31);
-            shape(steel, 9, 25, 35, 13, 39, 13, 35, 16, 12, 27);
-            line(silver, 12, 24, 36, 13);
-            for (let i = 0; i < 3; i++) {
-                const x = 13 + i * 8, y = 23 - i * 4;
-                line(deep, x, y, x + 3, y + 7, 2);
-                line(silver, x, y, x + 2, y + 4);
-            }
-            shape(silver, 36, 12, 40, 10, 44, 12, 46, 16, 44, 19, 41, 20, 38, 17);
-            shape(black, 39, 12, 41, 12, 44, 15, 44, 17, 42, 18, 39, 15);
-            wheel(23, 34, 9);
-            box(iron, 39, 37, 4, 3);
-            box(steel, 40, 36, 2);
-            box(deep, 42, 40, 4, 3);
-        }
-    }
-    else {
-        torso();
-        face();
+    if(['field_cannon','organ_gun','siege_mortar','davinci_tank'].includes(kind)){
+        ctx.drawImage(sprite(kind,faction),2,9,44,33);
+    }else {
+        torso(); face();
         if (armored)
             helmet(kind === 'plate_knight' || kind === 'heavy_lancer', kind === 'plate_knight' || kind === 'heavy_lancer');
-        if (kind === 'militia' || kind === 'scout_cavalry') {
+        if (kind === 'scout_cavalry') {
             shape(black, 12, 19, 14, 12, 18, 8, 27, 8, 31, 11, 33, 16, 27, 17, 22, 16, 18, 22, 14, 24);
-            shape(kind === 'militia' ? wood : cloth, 14, 18, 15, 13, 19, 10, 26, 9, 30, 12, 31, 15, 23, 14, 19, 17, 16, 22);
-            line(kind === 'militia' ? woodLight : edge, 16, 14, 22, 10);
+            shape(cloth, 14, 18, 15, 13, 19, 10, 26, 9, 30, 12, 31, 15, 23, 14, 19, 17, 16, 22);
+            line(edge, 16, 14, 22, 10);
             line(black, 16, 18, 30, 14);
             box(steel, 28, 14, 3);
         }
-        if (['bowman','longbowman','horse_archer'].includes(kind)) {
-            shape(black, 8, 31, 12, 25, 11, 16, 15, 10, 24, 5, 29, 7, 34, 14, 33, 17, 26, 14, 22, 18, 21, 24, 25, 29, 19, 33);
-            shape('#505849', 10, 30, 14, 24, 13, 16, 17, 11, 25, 7, 29, 9, 32, 14, 26, 12, 22, 15, 19, 20, 19, 25, 23, 29, 18, 31);
-            line('#89917a', 15, 16, 23, 9);
-            line('#64725d', 13, 28, 16, 24);
-            box('#a6a68a', 23, 9, 3);
-            line(black, 38, 7, 44, 17, 2);
-            line(black, 44, 17, 45, 32, 2);
-            line(black, 45, 32, 36, 47, 2);
-            line(woodLight, 38, 7, 44, 17);
-            line(woodLight, 44, 17, 45, 32);
-            line(woodLight, 45, 32, 36, 47);
-            line('#bbb298', 38, 8, 36, 46);
-            line(woodLight, 21, 37, 47, 25);
-            hand(35, 32);
-        }
-        if (kind === 'musketeer'||kind==='blunderbuss') {
+        if (['musketeer','volley_gunner','rifleman','dragoon','guard_grenadier'].includes(kind)) {
             shape(black, 7, 19, 13, 15, 17, 9, 26, 7, 30, 10, 30, 13, 39, 13, 36, 17, 21, 19);
             shape('#604f3b', 11, 17, 16, 15, 18, 10, 26, 9, 28, 12, 28, 15, 36, 14, 29, 16, 19, 18);
             line(woodLight, 17, 14, 28, 12);
@@ -252,15 +176,7 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
             box(gold, 24, 35, 4, 2);
             hand(27, 34);
         }
-        if (kind === 'militia') {
-            pole(31, 48, 39, 14);
-            line(black, 35, 14, 41, 16, 2);
-            for (let i = 0; i < 3; i++) {
-                line(iron, 35 + i * 3, 15, 37 + i * 3, 5 + i % 2, 2);
-                line(silver, 35 + i * 3, 15, 37 + i * 3, 5 + i % 2);
-            }
-            hand(32, 36);
-        }
+
         if(kind==='peasant'||kind==='sapper'){
             shape(kind==='peasant'?woodLight:iron,7,19,11,15,16,14,18,7,26,6,30,11,31,14,37,15,37,18,23,19);
             line(kind==='peasant'?bone:silver,10,16,28,13);
@@ -269,22 +185,12 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
             else {box(wood,1,31,11,16);box(iron,1,32,11,3);box(steel,1,42,11,2);line(gold,5,31,8,27);shape(silver,37,13,45,14,46,19,36,18);}
             hand(31,37);
         }
-        if(kind==='monk'){
-            shape('#50463d',10,29,12,15,18,6,25,4,33,12,34,17,27,13,21,15,20,25,25,29,17,34);
-            line('#a29270',13,19,19,10,2);pole(35,48,38,13);box(gold,37,4,3,16);box(bone,32,9,13,3);box(gold,22,34,2,9);box(bone,20,36,6,2);
-        }
+
         if(kind==='bannerman'){ctx.drawImage(banner(faction),0,1,18,32);pole(2,47,2,27);hand(2,38);}
-        if(kind==='pikeman'){pole(24,48,39,11);shape(silver,37,14,44,1,43,11,39,16);line(glint,39,11,43,3);hand(29,36);}
         if(kind==='zweihander'){shape(silver,26,35,34,19,46,1,47,8,36,29,30,37);line(glint,29,31,45,4,2);pole(21,47,29,33);line(gold,22,31,34,37,2);hand(25,38);}
-        if(kind==='berserker')for(const side of [0,1]){
-            const x=side?35:6;pole(x-5,48,x+3,21);shape(steel,x-4,14,x+1,17,x+7,15,x+9,12,x+10,23,x+5,27,x-2,24,x-6,22);
-            line(glint,x-5,20,x,24,2);hand(x-2,38);
-            box('#864a3b',20,19,2,6);
-        }
-        if(kind==='crossbowman'){pole(13,46,41,22);line(steel,26,15,41,22,3);line(steel,41,22,45,36,3);line(bone,26,15,29,33);line(bone,29,33,45,36);line(glint,26,35,46,17);hand(22,36);}
-        if(kind==='blunderbuss'){shape(gold,32,27,36,19,38,12,46,19,46,23,37,28);line(bone,38,13,45,19);line(black,39,15,44,19,2);}
-        if(kind==='fire_bomber'){shape('#595444',11,18,13,10,21,7,30,8,34,14,29,16,21,13,17,19);box(wood,35,22,5,6);shape('#585a3c',35,27,40,27,45,33,44,41,40,44,33,43,29,39,30,32);line(gold,30,33,42,30,2);line('#da723d',37,22,42,16,2);box('#f1b95e',42,14,2,4);hand(30,40);}
-        if(kind==='longbowman'){pole(6,45,2,17);for(let i=0;i<3;i++){line(bone,3+i*3,27,2+i*3,10);box(edge,1+i*3,9,3,5);}line(glint,38,6,35,45);}
+        if(kind==='volley_gunner'){shape(gold,32,27,36,19,38,12,46,19,46,23,37,28);line(bone,38,13,45,19);line(black,39,15,44,19,2);}
+        if(kind==='guard_grenadier'){box('#24282b',14,2,17,13);box('#454649',16,3,4,10);shape('#595444',11,18,13,10,21,7,30,8,34,14,29,16,21,13,17,19);box(wood,35,22,5,6);shape('#585a3c',35,27,40,27,45,33,44,41,40,44,33,43,29,39,30,32);line(gold,30,33,42,30,2);line('#da723d',37,22,42,16,2);box('#f1b95e',42,14,2,4);hand(30,40);}
+        if(kind==='rifleman'){shape('#26452b',11,29,18,26,28,28,31,45,10,45);line('#172b1b',14,29,28,43,2);box(gold,20,34,3,3);line('#2e6b3a',24,6,29,12,2);line(steel,39,21,47,14,2);line(glint,41,20,47,14);box(gold,45,13,2,2);}
         if (kind === 'halberdier') {
             pole(27, 49, 40, 7);
             shape(black, 36, 14, 40, 2, 42, 1, 41, 11, 46, 9, 46, 16, 43, 21, 36, 22, 37, 18, 31, 17);
@@ -317,7 +223,7 @@ export function portrait(kind: Kind, faction: Faction = 0): HTMLCanvasElement {
             line(gold, 30, 37, 37, 39, 2);
             hand(32, 40);
         }
-        if (kind === 'scout_cavalry' || kind === 'heavy_lancer'||kind==='horse_archer') {
+        if (kind === 'scout_cavalry' || kind === 'heavy_lancer'||kind==='dragoon') {
             // Horse in the foreground: ears, long angular muzzle, cheek plate and reins.
             shape(black, 21, 48, 24, 38, 28, 31, 28, 24, 32, 27, 34, 23, 35, 29, 39, 30, 43, 35, 47, 39, 46, 43, 42, 44, 36, 40, 34, 48);
             const horse = kind === 'heavy_lancer' ? iron : '#866649';

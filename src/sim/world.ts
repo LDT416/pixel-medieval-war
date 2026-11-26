@@ -3,24 +3,26 @@ import {civicCommand,economyTick,work} from './economy';
 import {lordCommands} from './aiDirector';
 import {environmentTick,supportTick} from './environment';
 import type {MapId,Mode,Difficulty,FireCell,Barrel,Drop} from './types';
-import { UNITS, KINDS } from './config';
+import {strategyTick, strategyMove, issueWave} from './strategy';
+import { UNITS, KINDS, crews } from './config';
 import { attack, distanceTo, hit, kill, launch, updateProjectiles } from './combat';
 import { Grid, indexAt } from './grid';
 import { FlowField } from './flowField';
 import { slotOffset } from './formation';
-import { HEIGHT, WIDTH, CELL, bridgeSize, lanes, riverX, createMap, water } from './maps';
+import { HEIGHT, WIDTH, CELL, bridgeSize, riverX, createMap, water } from './maps';
 import { Rng } from './rng';
 import { SpatialHash } from './spatialHash';
 import type { BuildType, Command, Faction, Formation, Group, Kind, Point, Projectile, SimEvent, Snapshot, Stat, Structure, Unit } from './types';
 const blankStats = () => Object.fromEntries(KINDS.map(k => [k, { kills: 0, damage: 0 }])) as Record<Kind, Stat>;
 const clamp = (v: number, max: number) => Math.max(3, Math.min(max - 3, v));
 export class SimWorld {
-    map:MapId='twin';
+    player:Faction=1;
+    map:MapId='darkwood';
     mode:Mode='sandbox';
     difficulty:Difficulty='normal';
     realms=[newRealm(),newRealm()];
     fires:FireCell[]=[]; barrels:Barrel[]=[]; drops:Drop[]=[];
-    news='铁冠北境与赤棘血朝结下百年弑君灭族之仇。两军不受降。';
+    news='法兰西与英格兰结下百年弑君灭族之仇。两军不受降。';
     tick = 0;
     next = 10000;
     scenario = 0;
@@ -30,6 +32,7 @@ export class SimWorld {
     rng = new Rng(78951);
     grid = new Grid();
     hash = new SpatialHash();
+    fronts=[{x:970,y:880,breached:false},{x:3830,y:880,breached:false}];
     fields = new Map<string, FlowField>();
     units: Unit[] = [];
     structures: Structure[] = [];
@@ -47,8 +50,8 @@ export class SimWorld {
     reset(index: number,map:MapId=this.map,mode:Mode=this.mode,difficulty:Difficulty=this.difficulty) {
         this.map=map; this.mode=mode; this.difficulty=difficulty;
         this.grid=new Grid(map); this.realms=[newRealm(),newRealm()]; this.fires=[]; this.barrels=[];this.drops=[];
-        this.news='铁冠北境与赤棘血朝结下百年弑君灭族之仇。寸土不让，绝不受降。';
-        const bridgeYs=lanes(map);
+        this.news='法兰西与英格兰结下百年弑君灭族之仇。寸土不让，绝不受降。';
+        
         this.tick = 0;
         this.next = 10000;
         this.rng.state = 78951 + index;
@@ -70,69 +73,12 @@ export class SimWorld {
         for (const s of this.structures)
             if (s.type === 'tower')
                 this.garrison(s, 3);
-        if(mode==='lord'){
-            for(const f of [0,1] as const){
-                const keep=this.keep(f)!,d=f===0?1:-1;
-                const p={x:keep.x-d*116,y:keep.y-80};
-                this.spawn(f,'peasant',4,p,'skirmish').forEach((u,i)=>u.prefer=i%2?'gold':'wood');
-                const guards=this.honorGuard(f,{x:keep.x+d*224,y:keep.y});
-                for(const u of guards) this.groups.get(u.group)!.point={x:u.x,y:u.y};
-            }
-            this.hash.rebuild(this.units); return;
-        }
-        if (index === 4)
-            return;
-        for (const f of [0, 1] as const) {
-            const d = f === 0 ? -1 : 1;
-            const deploy = (kind: Kind, n: number, offset: number, y: number, form: Formation = 'skirmish') => this.spawn(f, kind, n, { x: riverX(y) + d * offset, y }, form);
-            this.honorGuard(f,{x:riverX(bridgeYs[0])+d*310,y:bridgeYs[0]-55});
-            if(index===0||index===2){
-                deploy('war_elephant',3,205,bridgeYs[0]);deploy('hwacha',2,355,bridgeYs[0]+20);
-                deploy('fire_bomber',8,145,bridgeYs[0]+55);deploy('ballista',3,365,bridgeYs[0]-40);
-            }
-            if (index === 1) {
-                deploy(f === 0 ? 'halberdier' : 'heavy_lancer', f === 0 ? 144 : 100, 220, 655, f === 0 ? 'phalanx' : 'skirmish');
-                continue;
-            }
-            if (index === 2) {
-                for (const by of bridgeYs) {
-                    deploy('militia', 156, 170, by);
-                    deploy('halberdier', 96, 320, by, 'phalanx');
-                    deploy('musketeer', 48, 440, by, 'line');
-                }
-                continue;
-            }
-            if (index === 3) {
-                const gate = this.structures.find(s => s.type === 'gate' && s.faction === 1)!;
-                for (const side of [-1, 1]) {
-                    if (f === 0) {
-                        const guns = this.spawn(f, 'field_cannon', 6, { x: gate.x - 310, y: gate.y + side * 90 }, 'line');
-                        const engines = this.spawn(f, 'catapult', 3, { x: gate.x - 455, y: gate.y + side * 115 }, 'line');
-                        for (const group of [guns, engines])
-                            this.groups.get(group[0].group)!.targetId = gate.id;
-                        this.spawn(f, 'musketeer', 72, { x: gate.x - 230, y: gate.y + side * 90 }, 'line');
-                        this.spawn(f, 'shieldman', 36, { x: gate.x - 160, y: gate.y + side * 68 }, 'phalanx');
-                    }
-                    else {
-                        this.spawn(f, 'musketeer', 60, { x: gate.x - 95, y: gate.y + side * 110 }, 'line');
-                        this.spawn(f, 'shieldman', 44, { x: gate.x - 60, y: gate.y + side * 65 }, 'phalanx');
-                        this.spawn(f, 'field_cannon', 3, { x: gate.x + 82, y: gate.y + side * 155 }, 'line');
-                    }
-                }
-                continue;
-            }
-            for (const [lane, by] of bridgeYs.entries()) {
-                deploy('halberdier', 72, 130, by, 'phalanx');
-                deploy('shieldman', 42, 230, by + 80, 'phalanx');
-                deploy('musketeer', 36, 270, by - 52, 'line');
-                deploy('bowman', 24, 390, by + 65, 'line');
-                deploy('heavy_lancer', 20, 765, by + (lane ? -95 : 120), 'phalanx');
-                deploy('scout_cavalry', 12, 620, by - 155);
-                deploy('militia', 30, 930, by + (lane ? -175 : 190), 'phalanx');
-                deploy('plate_knight', 18, 465, by + 145, 'phalanx');
-                deploy('catapult', 3, 435, by - 18, 'line');
-                deploy('field_cannon', 4, 285, by + (lane ? 35 : 10), 'line');
-            }
+        for(const f of [0,1] as const){
+            const base=this.keep(f)!,d=f?-1:1,p={x:base.x+350*d,y:880};
+            this.spawn(f,'peasant',4,{x:base.x-120*d,y:738},'line');
+            this.honorGuard(f,p);
+            this.spawn(f,'shieldman',5,{x:p.x+80*d,y:p.y},'phalanx');
+            this.spawn(f,'musketeer',5,{x:p.x-54*d,y:p.y},'line');
         }
         this.hash.rebuild(this.units);
     }
@@ -153,7 +99,7 @@ export class SimWorld {
         const f=u.faction;
         let dx=p.x-u.x, dy=p.y-u.y;
         const distance=Math.hypot(dx,dy);
-        if(distance>65 || distance>0&&!this.grid.walk(u.x+dx/distance*12,u.y+dy/distance*12,f)){
+        if(distance>0&&!this.grid.walk(u.x+dx/distance*12,u.y+dy/distance*12,f)){
             const dir=this.field(f,p).direction(indexAt(u.x,u.y));
             if(dir.x||dir.y){dx=dir.x;dy=dir.y;}
         }
@@ -168,7 +114,7 @@ export class SimWorld {
     private garrison(s: Structure, n: number) {
         if (s.faction < 0)
             return;
-        const troops = this.spawn(s.faction as Faction, 'bowman', n, s, 'line', s.id);
+        const troops = this.spawn(s.faction as Faction, 'musketeer', n, s, 'line', s.id);
         troops.forEach((u, i) => { u.x = s.x + (i - (n - 1) / 2) * 13; u.y = s.y - 6; u.z = s.type === 'tower' ? 48 : 38; });
     }
     private rebuild() { this.grid.rebuild(this.structures); this.fields.clear(); this.dirty = false; this.revision++; }
@@ -190,11 +136,15 @@ export class SimWorld {
         for (let slot = 0; slot < n; slot++) {
             const o = slotOffset(slot, n, formation, f), p0 = { x: clamp(c.x + o.x, WIDTH), y: clamp(c.y + o.y, HEIGHT) }, p = tower ? p0 : this.nearby(p0, f);
             const u: Unit = {
-                ...p, id: this.next++, z: 0, vx: 0, vy: 0, vz: 0, face: f === 0 ? 1 : -1, formation, slot, group, faction: f, kind, hp: UNITS[kind].hp, cooldown: this.rng.int(0, 28), swing: 0, charge: 0, tower, target: 0, lastAttacker: 1 - f, lastKind: 'militia', lethalFall: false
+                ...p, id: this.next++, z: 0, vx: 0, vy: 0, vz: 0, face: f === 0 ? 1 : -1, formation, slot, group, faction: f, kind, hp: UNITS[kind].hp, cooldown: this.rng.int(0, 28), swing: 0, charge: 0, tower, target: 0, lastAttacker: 1 - f, crew:crews[kind],morale:kind==='guard_grenadier'?100:75,lastKind: 'shieldman', lethalFall: false
             };
             this.units.push(u);
             this.byUnit.set(u.id, u);
             added.push(u);
+        }
+        if(crews[kind])for(const gun of added){
+            const team=this.spawn(f,'sapper',crews[kind]!,gun,'line');
+            team.forEach((man,i)=>{man.gun=gun.id;man.slot=i;});
         }
         return added;
     }
@@ -219,6 +169,8 @@ export class SimWorld {
         return { structure: s, valid: fits && !overlap && legalTerrain && (kind !== 'outpost' || this.structures.filter(a => a.hp > 0 && a.type === 'outpost' && a.faction === f).length < 4) };
     }
     private apply(c: Command) {
+        if(c.type==='charge'||c.type==='recall'){issueWave(this,c.faction,c.type==='charge');return;}
+        if(c.type==='policy'||c.type==='cottage'){civicCommand(this,c);return;}
         if (c.type === 'restore') {
             this.restore(c.payload.state);
             return;
@@ -236,7 +188,7 @@ export class SimWorld {
         if(c.type==='garrison'){
             const tower=this.byStructure.get(c.payload.tower),ids=new Set(c.payload.ids);
             if(tower&&tower.faction===c.faction&&tower.hp>0&&!tower.needed&&['outpost','tower'].includes(tower.type)){
-                for(const u of this.units)if(ids.has(u.id)&&u.faction===c.faction&&!u.tower&&['longbowman','bowman'].includes(u.kind)) u.enterTower=tower.id;
+                for(const u of this.units)if(ids.has(u.id)&&u.faction===c.faction&&!u.tower&&u.kind==='musketeer') u.enterTower=tower.id;
             }
             return;
         }
@@ -244,6 +196,8 @@ export class SimWorld {
         if (c.type === 'spawn') {
             const p = c.payload;
             if(this.mode!=='sandbox') return;
+            if(p.kind==='bannerman'){this.honorGuard(c.faction,p);return;}
+            if(p.kind==='davinci_tank'){const remaining=2-this.units.filter(u=>u.faction===c.faction&&u.kind===p.kind).length;if(remaining>0)this.spawn(c.faction,p.kind,Math.min(remaining,p.count),p,p.formation);return;}
             this.spawn(c.faction, p.kind, p.count, p, p.formation);
             return;
         }
@@ -254,7 +208,7 @@ export class SimWorld {
             const s = b.structure;
             if(this.mode==='lord'){
                 if(!this.units.some(u=>u.hp>0&&u.faction===c.faction&&(u.kind==='sapper'||u.kind==='peasant'))||!pay(this.realms[c.faction],BUILDINGS[p.kind][1],BUILDINGS[p.kind][2])){
-                    if(c.faction===0) this.news='建造受阻：需要存活的工人及足够的木材、黄金。';return;
+                    if(c.faction===this.player) this.news='建造受阻：需要存活的工人及足够的木材、黄金。';return;
                 }
                 s.work=0;s.needed=135;s.hp=s.maxHp*.1;
                 const worker=this.units.filter(u=>u.faction===c.faction&&u.hp>0&&(u.kind==='peasant'||u.kind==='sapper')).sort((a,b)=>distanceTo(a,s)-distanceTo(b,s))[0];
@@ -285,7 +239,7 @@ export class SimWorld {
         for (const part of partitions.values()) {
             const id = this.next++, old = this.groups.get(part[0].group)!;
             this.groups.set(id, { id, count: part.length, anchor: { ...old.anchor }, point: c.type === 'order' ? c.payload.point : old.point, targetId: c.type === 'order' ? c.payload.structureId ?? 0 : old.targetId });
-            part.forEach((u, i) => { u.group = id; u.slot = i; u.target = 0; if (c.type === 'formation')
+            part.forEach((u, i) => { u.manual=c.type==='order'; u.group = id; u.slot = i; u.target = 0; if (c.type === 'formation')
                 u.formation = c.payload.formation; });
         }
     }
@@ -305,10 +259,10 @@ export class SimWorld {
             this.buildings++;
         this.events.push({ type: 'collapse', x: s.x, y: s.y, structure: { ...s }, power: s.type === 'tree' ? 1 : 7 });
         this.dirty = true;
-        const side=s.faction===0?'铁冠':'赤棘';
+        const side=s.faction===0?'法军':'英军';
         if(bridge) this.news=(s.type==='bridge'?'石桥':'木桥')+'轰塌！桥上死敌坠河溺毙！';
         else if(s.type==='tower'||s.type==='outpost') this.news='箭塔倾覆，驻塔死敌坠地摔成肉泥！';
-        else if(s.type==='keep') this.news=s.faction===1?'百年血仇终结——赤棘主堡沦为尸山焦土，屠城大胜！':'铁冠主堡陷落，全军惨遭血洗！';
+        else if(s.type==='keep') this.news=s.faction===1?'百年血仇终结——英军主堡沦为尸山焦土，屠城大胜！':'法军主堡陷落，全军惨遭血洗！';
         else if(s.type in BUILDINGS) this.news='火焚敌营！'+side+BUILDINGS[s.type as BuildType][0]+'已化作焦土！';
         if (s.type === 'keep' && this.winner === null)
             this.winner = s.faction===0?1:0;
@@ -378,21 +332,24 @@ export class SimWorld {
             }
             u.enterTower=undefined;
         }
-        if(work(this,u)||supportTick(this,u)) return;
+        if(u.gun){const gun=this.byUnit.get(u.gun);if(gun&&gun.hp>0){u.x=gun.x+(u.slot%2?15:-15);u.y=gun.y+(u.slot<2?8:-8);u.face=gun.face;u.moving=gun.moving;u.swing=!gun.moving&&gun.cooldown%35<8?3:0;return;}u.gun=undefined;}
+        if(work(this,u)||supportTick(this,u)||strategyMove(this,u)) return;
         const def = UNITS[u.kind], group = this.groups.get(u.group)!, f = u.faction, goal = objectives[f], range = def.range + (u.tower ? 130 : 0);
         let foe = this.byUnit.get(u.target);
+        if(foe?.crew===0)foe=undefined;
         if (foe && (foe.hp <= 0 || Math.hypot(foe.x - u.x, foe.y - u.y) > range + 110 || (foe.tower && range < 60)))
             foe = undefined;
-        if ((this.tick + u.id) % 12 === 0) {
+        if ((this.tick + u.id) % 12 === 0 || !foe&&u.target!==0) {
             let score = Infinity;
-            const flank = def.traits.includes('flank');
+            const flank = u.kind==='rifleman'||def.traits.includes('flank');
             this.hash.visit(u.x, u.y, range + (flank ? 185 : 50), n => {
-                if (n.faction === f || n.hp <= 0 || (n.tower && range < 60))
+                if (n.faction === f || n.hp <= 0 || n.crew===0 || (n.tower && range < 60))
                     return;
                 let d = Math.hypot(n.x - u.x, n.y - u.y);
-                if(flank && (n.kind==='peasant'||n.kind==='monk'||UNITS[n.kind].traits.includes('siege'))) d*=.11;
+                if(flank && (n.kind==='peasant'||n.kind==='bannerman'||UNITS[n.kind].traits.includes('siege'))) d*=.11;
                 else if (flank && UNITS[n.kind].range > 60)
                     d *= .23;
+                if((n.gun||n.kind==='plate_knight')&&u.kind==='rifleman')d*=.08;
                 if (d < score) {
                     foe = n;
                     score = d;
@@ -402,11 +359,11 @@ export class SimWorld {
         }
         const ordered=this.byStructure.get(group.targetId);
         let designated=ordered&&ordered.hp>0?ordered:undefined;
-        if(!designated&&(u.kind==='sapper'||u.kind==='battering_ram')){
+        if(!designated&&(u.kind==='sapper'||def.traits.includes('flank')&&!foe)){
             let nearest=115;
             for(const s of this.structures){
                 if(s.hp<=0||s.faction===f||s.faction===-1&&!['bridge','pontoon'].includes(s.type)) continue;
-                if((s.type==='bridge'||s.type==='pontoon')&&u.kind==='battering_ram')continue;
+                if((s.type==='bridge'||s.type==='pontoon')&&u.kind!=='sapper')continue;
                 const d=distanceTo(u,s);if(d<nearest){nearest=d;designated=s;}
             }
         }
@@ -414,8 +371,19 @@ export class SimWorld {
         if (!target && !group.point)
             target = goal;
         if (target && distanceTo(u, target) <= range) {
+            if(!u.tower&&def.role==='火枪'&&distanceTo(u,target)>34){
+                let blocked=false;const dx=target.x-u.x,dy=target.y-u.y,len=Math.hypot(dx,dy)||1;
+                this.hash.visit(u.x,u.y,Math.min(len,110),n=>{const x=n.x-u.x,y=n.y-u.y;
+                    if(n.faction===f&&n.id!==u.id&&x*dx+y*dy>0&&Math.abs(x*dy-y*dx)/len<8)blocked=true;});
+                if(blocked){
+                    const dir=u.y>1710?-1:u.y<50?1:u.y>=880?1:-1;
+                    const y=clamp(u.y+dir*def.speed,HEIGHT);
+                    if(this.grid.walk(u.x,y,f))u.y=y;else this.approach(u,{x:u.x-u.face*28,y:clamp(u.y-dir*55,HEIGHT)});
+                    return;
+                }
+            }
             if (u.cooldown <= 0) attack(this,u,target);
-            if(foe && u.kind==='horse_archer' && distanceTo(u,foe)<range*.84) {
+            if(foe && u.kind==='dragoon' && distanceTo(u,foe)>34 && distanceTo(u,foe)<range*.84) {
                 const len=Math.hypot(u.x-foe.x,u.y-foe.y)||1;
                 const x=clamp(u.x+(u.x-foe.x)/len*def.speed,WIDTH), y=clamp(u.y+(u.y-foe.y)/len*def.speed,HEIGHT);
                 if(this.grid.walk(x,y,f)){u.x=x;u.y=y;}
@@ -472,7 +440,7 @@ export class SimWorld {
             sx += Math.max(-.7, Math.min(.7, (group.anchor.x + off.x - u.x) * .023));
             sy += Math.max(-.7, Math.min(.7, (group.anchor.y + off.y - u.y) * .023));
         }
-        const speed = def.speed * ((u.auraUntil??-1)>=this.tick?1.2:1) * (this.grid.shallows[indexAt(u.x,u.y)] ? 0.58 : 1) * (u.formation === 'phalanx' ? .7 : 1), mx = (dx + sx * .92) * speed, my = (dy + sy * .92) * speed;
+        const speed = def.speed * ((u.morale??75)<40?.90:1) * ((u.auraUntil??-1)>=this.tick?1.2:1) * (this.grid.shallows[indexAt(u.x,u.y)] ? 0.58 : 1) * (u.formation === 'phalanx' ? .7 : 1), mx = (dx + sx * .92) * speed, my = (dy + sy * .92) * speed;
         let moved = false;
         if (this.grid.walk(u.x + mx, u.y, f)) {
             u.x = clamp(u.x + mx, WIDTH);
@@ -514,6 +482,7 @@ export class SimWorld {
             return this.events;
         for(const command of lordCommands(this)) this.apply(command);
         economyTick(this);
+        strategyTick(this);
         this.hash.rebuild(this.units);
         environmentTick(this);
         const active = new Map<number, {
@@ -547,12 +516,12 @@ export class SimWorld {
         return this.events;
     }
     snapshot(): Snapshot { return structuredClone({
-        map:this.map,mode:this.mode,difficulty:this.difficulty,realms:this.realms,fires:this.fires,barrels:this.barrels,drops:this.drops,news:this.news,
+        player:this.player,map:this.map,mode:this.mode,difficulty:this.difficulty,realms:this.realms,fires:this.fires,barrels:this.barrels,drops:this.drops,news:this.news,
         tick: this.tick, seed: this.rng.state, next: this.next, scenario: this.scenario, units: this.units, structures: this.structures, projectiles: this.projectiles, groups: [...this.groups.values()], stats: this.stats, dead: this.dead, launches: this.launches, bridges: this.bridges, buildings: this.buildings, winner: this.winner
     }); }
     restore(state: Snapshot) {
         const s = structuredClone(state);
-        this.map=s.map??'twin';this.mode=s.mode??'sandbox';this.difficulty=s.difficulty??'normal';
+        this.player=s.player??1;this.map=s.map??'twin';this.mode=s.mode??'sandbox';this.difficulty=s.difficulty??'normal';
         this.realms=s.realms??[newRealm(),newRealm()];this.fires=s.fires??[];this.barrels=s.barrels??[];this.drops=s.drops??[];this.news=s.news??'两军重新列阵。';
         this.grid=new Grid(this.map);
         this.tick = s.tick;

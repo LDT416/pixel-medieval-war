@@ -39,11 +39,11 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
     g.imageSmoothingEnabled = false;
     const w = native.width, h = native.height, pixels = g.createImageData(w, h), dst = new Uint32Array(pixels.data.buffer);
     const large = field(16, 11, 12), medium = field(84, 56, 221), small = field(329, 194, 73);
-    const green = swatches(map==='gorge'?'#33342c #38392e #404331 #464837 #4d503a #54553d #595b42 #606047 #67634b':map==='darkwood'?'#202a23 #252e25 #283428 #2a372b #303c2d #394333 #414a36 #4b533a #565941':'#283025 #2b3326 #303828 #343e2b #3b442f #434a33 #4b5038 #54563c #5d5b41');
-    const road = swatches('#3b352a #433b2e #4b4233 #514635 #59503c #645843 #71614a');
+    const green = swatches('#446635 #4e6e39 #547640 #5c7e44 #658748 #70904e #799751 #829d58 #8da45e');
+    const road = swatches('#756143 #846e4c #927958 #9b8362 #a58c68 #b59c74 #bea682');
     const gravel = swatches('#474734 #50523c #56553e #615941 #696047 #756a50');
     const bank = swatches('#5b5841 #686247 #777157 #79705a #67644e #514e3f #423f34 #383a32');
-    const river = swatches('#14262d #182834 #1a2c37 #1e333e #233b45 #2a4048 #30464b #384e50 #445952');
+    const river = swatches('#2a5d80 #2f688a #367296 #3c789d #4381a5 #4f8cb0 #5b97b6 #66a0be #79abc2');
     const rMask = new Uint8Array(w * h);
     const woods = new Uint8Array(w * h);
     for (const [cx, cy] of [[220, 430], [620, 290], [1140, 325], [1660, 260], [2240, 230], [2740, 300], [3370, 350], [3650, 600], [290, 1450], [620, 1850], [1240, 1810], [1700, 1950], [2330, 1880], [2760, 1780], [3360, 1850], [3670, 1450], [1350, 1090], [2480, 1040], [380, 780], [3470, 925]]) {
@@ -53,7 +53,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
                 woods[x + y * w] = Math.max(woods[x + y * w], Math.floor(v * 255));
             }
     }
-    const duff = swatches('#22291e #273021 #2c3425 #333a29 #3a402d #424530');
+    const duff = swatches('#435d39 #4b653c #516c40 #557144 #597347 #637b4b');
     function route(points: XY[], radius: number) {
         // Mark a soft distance band. Neighbouring segments share a round end cap.
         for (let i = 1; i < points.length; i++) {
@@ -74,19 +74,9 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
                 }
         }
     }
-    const north = bridgeSize(bridgeYs[0]).x, south = bridgeSize(bridgeYs[1]).x;
-    route([[-60, 1088], [120, 1075], [480, 1030], [692, 1050], [880, 1052], [1060, 989], [1230, 890], [1450, 842], [1610, 743], [1780, 670], [north, 655], [2180, 652], [2388, 700], [2550, 800], [2738, 855], [2910, 980], [3075, 1050], [3170, 1050], [3550, 1040], [3890, 1070]], 47);
-    route([[826, 1050], [1005, 1122], [1170, 1260], [1350, 1325], [1480, 1420], [1695, 1470], [south, 1470], [2205, 1470], [2375, 1410], [2540, 1362], [2750, 1284], [2910, 1140], [3075, 1050]], 48);
-    route([[1130, 828], [992, 766], [792, 650], [640, 510], [408, 398], [210, 267], [-40, 178]], 21);
-    route([[1440, 841], [1378, 759], [1248, 730], [1105, 788], [990, 816], [900, 920], [880, 1052]], 24);
-    route([[1180, 1260], [1140, 1390], [1055, 1439], [938, 1480], [824, 1540], [659, 1668], [420, 1710], [170, 1840]], 24);
-    route([[1640, 1465], [1572, 1580], [1460, 1707], [1410, 1850], [1305, 2010]], 19);
-    route([[2910, 982], [2885, 824], [2975, 715], [2950, 620], [2840, 583], [2730, 470], [2670, 329]], 25);
-    route([[2375, 1410], [2370, 1260], [2506, 1180], [2675, 1220], [2775, 1290], [2880, 1402], [3050, 1440], [3290, 1590], [3560, 1666]], 24);
-    route([[2410, 700], [2386, 538], [2325, 414], [2280, 260]], 17);
-    route([[3080, 1050], [3225, 1165], [3390, 1245], [3500, 1355], [3740, 1390]], 18);
-    if(map==='bottleneck')route([[820,1050],[1400,1100],[riverX(1080),1080],[2630,1040],[3090,1050]],74);
-    if(map==='darkwood')for(const y of [490,1080,1630])route([[780,1050],[1230,y+40],[1750,y],[2180,y+110],[2660,y+60],[3050,1050]],38);
+    for(const lane of map==='gorge'?[880]:map==='twin'?bridgeYs:[520,880,1240]){
+        route([[0,880],[880,880],[1350,lane],[3450,lane],[3900,880],[4800,880]],map==='gorge'?46:37);
+    }
     const centers = new Float32Array(h), half = new Float32Array(h);
     for (let j = 0; j < h; j++) {
         centers[j] = riverX(2 * j);
@@ -134,7 +124,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
                 else if (t > .07 + edge)
                     col = gravel[Math.min(4, Math.floor(n * 4))];
             }
-            dst[id] = shore<0 && map==='isles' && ford(y) ? river[6+detail%3] : col;
+            dst[id] = col;
         }
     }
     g.putImageData(pixels, 0, 0);
@@ -178,39 +168,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             line('#50574e', x + rx * .1, y - ry * .45, x + rx * .32, y + ry * .25);
         }
     }
-    function farm(X: number, Y: number, W: number, H: number, seed: number) {
-        const x = X / 2, y = Y / 2, ww = W / 2, hh = H / 2, slant = ww * .15;
-        poly('#3d3c2d', x, y, x + ww, y - 4, x + ww + slant, y + hh - 4, x + slant, y + hh);
-        poly('#5b5139', x + 2, y + 2, x + ww - 2, y - 2, x + ww + slant - 2, y + hh - 5, x + slant + 2, y + hh - 2);
-        for (let j = 4; j < hh - 2; j += 3) {
-            const xx = x + slant * j / hh;
-            line('#443f2c', xx + 2, y + j, xx + ww - 2, y + j - 4);
-            for (let i = 2; i < ww - 2; i += 3) {
-                const v = hash(i, j, seed), yy = y + j - 4 * i / ww;
-                if (v % 9 === 0)
-                    continue;
-                rect(v % 3 ? '#78704a' : '#5c6540', xx + i, yy - 1, 2);
-                if (seed % 2 && v % 3)
-                    rect('#98905e', xx + i, yy - 2);
-            }
-        }
-        // Low split-rail fences surround the worked strip, with an open lane.
-        line('#524732', x - 1, y - 1, x + ww - 1, y - 5);
-        for (let i = 0; i < ww; i += 9) {
-            const yy = y - 4 * i / ww;
-            rect('#4d422e', x + i, yy - 4, 2, 5);
-            rect('#99815a', x + i, yy - 4);
-        }
-        for (let j = 8; j < hh; j += 10) {
-            rect('#4d422e', x + slant * j / hh - 1, y + j - 3, 2, 5);
-            rect('#99815a', x + slant * j / hh - 1, y + j - 3);
-        }
-    }
-    const lots = [[1070, 687, 105, 52], [1200, 653, 86, 70], [1250, 808, 86, 57], [830, 1470, 91, 58], [912, 1552, 106, 62], [1035, 1550, 75, 49], [2708, 1376, 85, 63], [2805, 1400, 116, 73], [2600, 1300, 76, 54], [2810, 485, 91, 57], [2940, 503, 90, 62], [3040, 608, 77, 65]];
-    for (const [i, a] of lots.entries())
-        farm(a[0], a[1], a[2], a[3], i + 9);
-    const inFarm = (x: number, y: number) => lots.some(([a, b, c, d]) => x >= a - 3 && x <= a + c * 1.15 + 3 && y >= b - 10 && y <= b + d + 3);
-    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && !inFarm(x, y) && Math.min(Math.max(Math.abs(x - 670) / 215, Math.abs(y - 1050) / 160), Math.max(Math.abs(x - 3160) / 215, Math.abs(y - 1050) / 160)) > 1;
+    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && Math.min(Math.max(Math.abs(x - 670) / 215, Math.abs(y - 1050) / 160), Math.max(Math.abs(x - 3160) / 215, Math.abs(y - 1050) / 160)) > 1;
     let state = 85063;
     const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
     // Thin seams of stratified rock give unoccupied corners a shape at overview zoom.
@@ -274,7 +232,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
         const x = c + (random() * 2 - 1) * radius * .96, xx = x / 2, yy = y / 2;
         if(!water(x,y)) continue;
         const band = Math.abs(x - c) / radius;
-        rect(band > .73 ? '#435956' : '#29424b', xx, yy, 1 + random() * 5);
+        rect(band > .73 ? '#435956' : '#4f8cb0', xx, yy, 1 + random() * 5);
         if (i % 6 === 0) {
             rect(band > .7 ? '#566760' : '#35505a', xx + 2, yy - 1, 2 + random() * 4);
             rect('#203944', xx + 6, yy + 1, 4);

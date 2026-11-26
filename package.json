@@ -1,5 +1,5 @@
 {
-  "name": "blood-and-siege", "version": "1.0.0", "private": true, "type": "module",
-  "scripts": { "dev": "vite", "build": "tsc --noEmit && vite build", "preview": "vite preview" },
+  "name": "blood-and-siege", "version": "4.0.0", "private": true, "type": "module",
+  "scripts": { "test": "node tests/phase2.mjs", "dev": "vite", "build": "tsc --noEmit && vite build", "preview": "vite preview" },
   "devDependencies": { "typescript": "~5.9.3", "vite": "^7.0.0" }
 }
