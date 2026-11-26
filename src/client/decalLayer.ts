@@ -141,8 +141,22 @@ export class DecalLayer {
         this.ctx.clearRect(0, 0, WIDTH, HEIGHT);
     }
 
-    restore(_marks: Mark[]) {
+    snapshot() {
+        return this.items.map(it => ({ ...it }));
+    }
+
+    restore(data: unknown) {
         this.clear();
+        if (!Array.isArray(data)) return;
+        for (const raw of data.slice(-MAX_REMNANTS)) {
+            if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'kind' in raw && 'x' in raw) {
+                this.items.push({ ...(raw as Remnant) });
+            } else if (Array.isArray(raw) && raw.length >= 5) {
+                const [x, y, w, _h, color] = raw as Mark;
+                if (color === 'flag') this.fallen(x, y, (w ? 1 : 0) as Faction);
+                else this.stamp(x, y, w, color);
+            }
+        }
     }
 
     private h(x: number, y: number, salt: number) {

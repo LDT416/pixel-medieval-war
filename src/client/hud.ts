@@ -16,7 +16,7 @@ function flag(f: Faction, w: number, h: number) {
 }
 export function mount() {
     el('app').innerHTML = `<main id="cover"><div class="folio">
-    <header><b>战役图册　·　一八一五</b><span>ÉDITION VI　/　6.0</span></header>
+    <header><b>战役图册　·　一八一五</b><span>ÉDITION VI　/　6.2</span></header>
     <div class="painting"><img id="art" alt="英法两军在星堡前列阵齐射" width="640" height="360">
     <div class="title"><small>CAMPAGNE DE BELGIQUE　/　JUIN 1815</small><h1>拿破仑 1815</h1><strong>精品像素线列</strong></div></div>
     <section class="parchment"><div class="campaign"><h2>选择阵营</h2><div id="nations"></div></div>

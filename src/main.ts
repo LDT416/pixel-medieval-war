@@ -185,7 +185,7 @@ const storageKey = 'napoleon-6.0';
 el('save').onclick = () => {
     world.step(queue.drain(world.tick), false);
     try {
-        localStorage.setItem(storageKey, JSON.stringify({ world: world.snapshot(), side, marks: view.decals.marks, particles: view.vfx.snapshot() }));
+        localStorage.setItem(storageKey, JSON.stringify({ world: world.snapshot(), side, marks: view.decals.snapshot(), particles: view.vfx.snapshot() }));
         say('布阵已保存');
     }
     catch {

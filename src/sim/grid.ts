@@ -108,13 +108,20 @@ export class Grid {
     }
     walk(x: number, y: number, _f?: Faction) { return x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && !!this.pass[indexAt(x, y)]; }
     walkSolid(x: number, y: number) { return x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && !!this.solidPass[indexAt(x, y)]; }
-    lineClear(ax: number, ay: number, bx: number, by: number): boolean {
+    walkNav(x: number, y: number) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return false;
+        const nc = Math.min(NCOLS - 1, Math.max(0, Math.floor(x / NAV_CELL)));
+        const nr = Math.min(NROWS - 1, Math.max(0, Math.floor(y / NAV_CELL)));
+        return !!this.nav[nc + nr * NCOLS];
+    }
+    lineClear(ax: number, ay: number, bx: number, by: number, useNav = false): boolean {
         const dist = Math.hypot(bx - ax, by - ay);
-        if (dist < 16) return this.walkSolid(bx, by);
+        if (dist < 16) return useNav ? this.walkNav(bx, by) : this.walkSolid(bx, by);
         const steps = Math.ceil(dist / 16);
         for (let i = 1; i <= steps; i++) {
             const t = i / steps;
-            if (!this.walkSolid(ax + (bx - ax) * t, ay + (by - ay) * t))
+            const px = ax + (bx - ax) * t, py = ay + (by - ay) * t;
+            if (useNav ? !this.walkNav(px, py) : !this.walkSolid(px, py))
                 return false;
         }
         return true;

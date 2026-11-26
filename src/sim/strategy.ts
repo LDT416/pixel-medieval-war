@@ -127,9 +127,10 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
         }
         g.enemy = enemy?.id ?? 0;
         const foes = enemy ? members.get(enemy.id) : undefined;
-        if (enemy && g.kind === 'guard_grenadier' && g.state === 'advance' && !g.manual && nearest < 330 &&
-            foes?.some(u => u.pose === 'reload'))
-            g.assaultTarget = enemy.id;
+        if (enemy && g.state === 'advance' && !g.manual && rankFire(g.kind)) {
+            if ((g.kind === 'guard_grenadier' && nearest < 330 && foes?.some(u => u.pose === 'reload')) || nearest < 105)
+                g.assaultTarget = enemy.id;
+        }
         const assault = g.state === 'advance' && !g.manual && rankFire(g.kind) &&
             (first.formation === 'melee' || (enemy !== undefined && g.assaultTarget === enemy.id));
         const engaging = enemy && distanceTo(g.anchor, enemy.anchor) < (assault ? 15 : rangeOf(first) * .85);
@@ -168,10 +169,11 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
         }
         if (g.state === 'assemble')
             goal = g.home;
-        // 群体级 A* 智能寻路（遇星堡/教堂/风车/河流自动规划绕行路线，绝不傻傻顶墙！）
+        // 群体级 A* 智能寻路（非驻防部队严格沿星堡外围大弧度绕行，绝不穿堡顶或蹭角台！）
+        const useNav = g.state !== 'garrison';
         let navGoal = crossing(w, g.anchor, goal, g);
         if (distanceTo(g.anchor, goal) > 22) {
-            if (w.grid.lineClear(g.anchor.x, g.anchor.y, goal.x, goal.y)) {
+            if (w.grid.lineClear(g.anchor.x, g.anchor.y, goal.x, goal.y, useNav)) {
                 g.path = undefined;
                 navGoal = goal;
             } else {
@@ -273,7 +275,7 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
                     }
                 }
                 let waypoint = g.state === 'retreat' ? crossing(w, u, desired, g) : desired;
-                if (g.path?.length && !w.grid.lineClear(u.x, u.y, desired.x, desired.y))
+                if (g.path?.length && !w.grid.lineClear(u.x, u.y, desired.x, desired.y, useNav))
                     waypoint = g.path[0];
                 march(w, u, waypoint, g.state === 'retreat' ? speed : speed * 1.15, g);
                 // 刺刀冲锋态：近卫/线列在肉搏冲锋靠近敌人时端平刺刀前冲！

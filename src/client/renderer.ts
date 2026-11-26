@@ -207,10 +207,10 @@ export class Renderer {
             for (let k = 0; k < lanes; k++) {
                 const h = ((seed * 73 + k * 197) ^ (seed * 13)) & 255;
                 const len = 8 + (h & 7) * 2;
-                // 严格裁剪掉与任意石桥桥面重叠的水波纹（绝不画到石桥顶面上！）
+                // 严格裁剪掉与任意石桥桥面及下缘石拱立面重叠的水波纹（绝不画到桥面或桥拱砖石上！）
                 let onBridge = false;
                 for (const b of bridges) {
-                    if (wy + len > b.y - b.h * .85 - 12 && wy < b.y + b.h * .72 + 16) { onBridge = true; break; }
+                    if (wy + len > b.y - b.h * .85 - 12 && wy < b.y + b.h * .5 + 98) { onBridge = true; break; }
                 }
                 if (onBridge) continue;
                 const ratio = ((k + .5) / lanes) * 2 - 1 + (((h & 15) / 15) - .5) * .28;
@@ -225,9 +225,9 @@ export class Renderer {
                 }
             }
         }
-        // 桥拱下游激流白沫涟漪（严格在石拱桥南侧桥洞下方涌出！）
+        // 桥拱下游激流白沫涟漪（严格在石拱桥南侧桥洞水面下方涌出！）
         for (const b of bridges) {
-            const southArch = b.y + b.h * .72 + 16;
+            const southArch = b.y + b.h * .5 + 100;
             if (southArch + 36 < upper || southArch - 10 > upper + height) continue;
             const cx = riverX(southArch + 12), half = riverWidth(southArch + 12, w.map) * .42;
             const phase = (w.tick * 1.8) % 28;
