@@ -73,15 +73,15 @@ export class VfxPool {
         const muzzle={...e,x:e.x+offset.x,y:e.y+offset.y};
         const spark=this.add(muzzle,Effect.Spark,'#f4bd74',gun?4:3,.067);
         spark.z=e.z??0;
-        const count=gun?8:4+(Math.random()*3|0);
+        const count=gun?6:3+(Math.random()*2|0);
         for(let i=0;i<count;i++){
-            const t=i/(count-1),side=(Math.random()-.5)*(gun?9:4);
-            const life=1.4+Math.random();
-            const p=this.add(muzzle,Effect.Smoke,'',gun?42+Math.random()*21:28+Math.random()*13,life);
-            const advance=t*(gun?14:5);p.x+=dx*advance-dy*side;p.y+=dy*advance+dx*side;
-            p.vx=dx*(15+t*(gun?125:68))+(Math.random()-.5)*15;
-            p.vy=dy*(15+t*(gun?125:68))+(Math.random()-.5)*13;
-            p.vz=6+Math.random()*9;
+            const t=i/Math.max(1,count-1),side=(Math.random()-.5)*(gun?10:5);
+            const life=(gun?1.7:1.25)+Math.random()*.75;
+            const p=this.add(muzzle,Effect.Smoke,'',gun?40+Math.random()*18:24+Math.random()*11,life);
+            const advance=t*(gun?16:6);p.x+=dx*advance-dy*side;p.y+=dy*advance+dx*side;
+            p.vx=dx*(14+t*(gun?115:62))+(Math.random()-.5)*14;
+            p.vy=dy*(14+t*(gun?115:62))+(Math.random()-.5)*12;
+            p.vz=7+Math.random()*9;
         }
     }
     consume(events:SimEvent[]){
@@ -92,15 +92,21 @@ export class VfxPool {
             if(e.type==='fire'){this.smoke(e);continue;}
             if(e.type==='death'){
                 const cloth=e.faction?'#a73232':'#2c5082';
-                const colors=['#79131e','#a31b29','#d9cdb3',cloth,e.kind==='cuirassier'?'#b2bfbd':cloth];
-                for(let i=0;i<(dense?14:7);i++){
-                    const p=this.add(e,Effect.Gib,colors[i%colors.length],3+i%3,.85,138,35+Math.random()*95);
-                    p.z+=8;
+                if(e.explosive){
+                    // 被炮弹/手榴弹炸中：四散喷飞血肉块与破布！
+                    const colors=['#79131e','#b41c2b','#d9cdb3',cloth,e.kind==='cuirassier'?'#b2bfbd':cloth];
+                    for(let i=0;i<(dense?16:9);i++){
+                        const p=this.add(e,Effect.Gib,colors[i%colors.length],3+i%3,.9,155,48+Math.random()*115);
+                        p.z+=8;
+                    }
+                    for(let i=0;i<(dense?10:5);i++)this.add(e,Effect.Blood,i%2?'#b4212b':'#790e19',2+i%2,.85,160,55+Math.random()*110);
+                }else{
+                    // 普通枪弹/刺刀阵亡：少量血花 + 军帽飞落，地面保留精致倒地尸体！
+                    for(let i=0;i<(dense?5:3);i++)this.add(e,Effect.Blood,i%2?'#a91c26':'#710d17',2+i%2,.55,75,28+Math.random()*55);
                 }
-                for(let i=0;i<(dense?10:4);i++)this.add(e,Effect.Blood,i%2?'#b4212b':'#790e19',2+i%2,.8,152,45+Math.random()*110);
                 if(e.kind!=='field_cannon'){
-                    const hat=this.add(e,Effect.Skullcap,e.kind==='cuirassier'?'#bcc8cc':'#262528',e.kind==='guard_grenadier'?6:4,1.3,85,116);
-                    hat.z+=19;
+                    const hat=this.add(e,Effect.Skullcap,e.kind==='cuirassier'?'#bcc8cc':'#262528',e.kind==='guard_grenadier'?6:4,1.1,65,88);
+                    hat.z+=17;
                 }
                 if(e.flag)this.add(e,Effect.Flag,'#715135',23,1,100,60).z+=25;
             }else if(e.type==='hit'){
@@ -146,10 +152,11 @@ export class VfxPool {
             if(x<left||x>right||y<top||y>bottom)continue;
             const age=p.initialLife-p.life;
             if(p.mode===Effect.Smoke){
-                const growth=.24+.76*Math.min(1,age*3.5)+age*.37;
+                const growth=.26+.74*Math.min(1,age*3.2)+age*.42;
                 const w=Math.round(p.size*growth),h=Math.round(w*.77);
                 const phase=Math.floor(age*4)%4;
-                c.globalAlpha=Math.min(.88,p.life/.85)*Math.min(1,.3+age*8);
+                const peak=p.size>34?.44:.34;
+                c.globalAlpha=Math.min(peak,(p.life/p.initialLife)*peak*1.35)*Math.min(1,.25+age*7);
                 c.drawImage(cloud(p.variant,phase),x-(w>>1),y-(h>>1),w,h);c.globalAlpha=1;
             }else if(p.mode===Effect.Flag){
                 c.drawImage(banner(p.faction),x,y-29,22,29);

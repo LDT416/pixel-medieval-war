@@ -9,14 +9,17 @@ import type { Faction, CommandAction } from '../src/sim/types';
 const kinds = ['line_infantry', 'guard_grenadier', 'cuirassier', 'field_cannon', 'bannerman'] as const;
 assert.deepEqual([...KINDS].sort(), [...kinds].sort());
 assert.deepEqual(kinds.map(k => strength[k]), [30, 24, 14, 1, 3]);
-assert.equal(WIDTH, 5600);
-assert.equal(HEIGHT, 2200);
+assert.equal(WIDTH, 6800);
+assert.equal(HEIGHT, 2600);
 for (const map of ['twin', 'gorge', 'darkwood'] as const) {
     const a = createMap(map);
     assert.deepEqual(a, createMap(map));
     for (const faction of [0, 1]) {
         assert.equal(a.filter(s => s.type === 'keep' && s.faction === faction).length, 1);
         assert.equal(a.filter(s => s.type === 'barracks' && s.faction === faction).length, 2);
+    }
+    for (const landmark of ['windmill', 'church', 'haystack', 'ruins', 'pond', 'tents'] as const) {
+        assert.ok(a.some(s => s.type === landmark), `map ${map} includes ${landmark}`);
     }
 }
 for (const file of readdirSync('src/sim', {recursive:true}).filter(f => String(f).endsWith('.ts'))) {
@@ -182,4 +185,38 @@ function advance(w: SimWorld, n: number) {
     send(w,{type:'order',payload:{ids:[company[0].id],point:{x:1500,y:730}}});
     assert.deepEqual(w.groups.get(company[0].group)!.point,{x:1500,y:730});
     console.log('PASS lord muster, paid reinforcements, automated waves, recall, charge and company orders');
+}
+
+{
+    // v6.1: Starfort 4 bastion cannons fire at approaching enemies & compact collision blocks keep center while allowing ramparts
+    const w = blank(), keep = w.keep(0)!;
+    assert.equal(w.grid.walk(keep.x, keep.y), false, 'starfort inner core has collision');
+    w.spawn(1, 'guard_grenadier', 24, { x: keep.x + 520, y: keep.y }, 'line');
+    w.spawn(1, 'guard_grenadier', 24, { x: keep.x + 520, y: keep.y + 120 }, 'line');
+    let fortShots = 0;
+    for (let t = 0; t < TPS * 8; t++) {
+        const events = w.step([]);
+        for (const e of events)
+            if (e.type === 'fire' && e.kind === 'field_cannon' && e.faction === 0) fortShots++;
+    }
+    assert.ok(fortShots >= 4, `starfort bastion cannons fire independently (${fortShots} shots)`);
+    console.log('PASS v6.1 starfort bastion cannons & compact obstacle collision:', fortShots, 'bastion shots');
+}
+
+{
+    // v6.2: A* pathfinding routes around starfort core & river, edge-road entry, explosive vs corpse death flags
+    const w = blank(), keep = w.keep(0)!;
+    const path = w.grid.findPath({ x: keep.x - 220, y: keep.y }, { x: keep.x + 260, y: keep.y });
+    assert.ok(path.length >= 2, 'A* routes around solid starfort core instead of straight through');
+    assert.ok(path.some(pt => Math.abs(pt.y - keep.y) > 70), 'A* detours around starfort perimeter');
+    const target1 = w.spawn(1, 'line_infantry', 1, { x: 2400, y: 1200 }, 'line')[0];
+    const target2 = w.spawn(1, 'line_infantry', 1, { x: 2440, y: 1200 }, 'line')[0];
+    w.events = [];
+    hit(w, target1, 0, 'line_infantry', 999, 1, 0, true, false);
+    hit(w, target2, 0, 'field_cannon', 999, 1, 0, true, true);
+    const deaths = w.events.filter(e => e.type === 'death');
+    assert.equal(deaths.length, 2);
+    assert.equal(deaths[0].explosive, false, 'musket kill leaves intact corpse');
+    assert.equal(deaths[1].explosive, true, 'cannonball kill bursts into gibs');
+    console.log('PASS v6.2 A* pathfinding detour, corpse vs cannon-gib death flags');
 }

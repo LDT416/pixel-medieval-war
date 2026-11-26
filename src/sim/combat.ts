@@ -3,7 +3,7 @@ import type { Faction, Kind, Point, Projectile, Structure, Unit } from './types'
 import type { SimWorld } from './world';
 export const rangeOf = (u: Unit) => UNITS[u.kind].range * (u.tower ? 1.2 : 1);
 export const distanceTo = (p: Point, t: Point) => Math.hypot(t.x - p.x, t.y - p.y);
-export function hit(w: SimWorld, u: Unit, f: Faction, kind: Kind, damage: number, dx: number, dy: number, ranged = true) {
+export function hit(w: SimWorld, u: Unit, f: Faction, kind: Kind, damage: number, dx: number, dy: number, ranged = true, explosive = false) {
     if (u.hp <= 0)
         return;
     const dealt = damage * (ranged && u.tower ? .5 : 1);
@@ -16,7 +16,7 @@ export function hit(w: SimWorld, u: Unit, f: Faction, kind: Kind, damage: number
     u.hp = 0;
     w.dead[u.faction]++;
     w.stats[f][kind].kills++;
-    w.events.push({ type: 'death', x: u.x, y: u.y, z: u.z, dx, dy, kind: u.kind, faction: u.faction, flag: u.kind === 'bannerman' && u.slot === 0 });
+    w.events.push({ type: 'death', x: u.x, y: u.y, z: u.z, dx, dy, kind: u.kind, faction: u.faction, flag: u.kind === 'bannerman' && u.slot === 0, explosive });
 }
 export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
     if (u.kind === 'bannerman' || u.routed || u.cooldown > 0)
@@ -88,7 +88,7 @@ function impact(w: SimWorld, p: Projectile) {
         const radius = p.kind === 'ball' ? 39 : 28;
         w.hash.visit(p.x, p.y, radius, u => {
             if (u.faction !== p.faction)
-                hit(w, u, p.faction, p.source, p.damage * (1 - .28 * distanceTo(p, u) / radius), u.x - p.x, u.y - p.y);
+                hit(w, u, p.faction, p.source, p.damage * (1 - .28 * distanceTo(p, u) / radius), u.x - p.x, u.y - p.y, true, true);
         });
     }
     if (s && s.hp > 0 && s.faction !== p.faction)

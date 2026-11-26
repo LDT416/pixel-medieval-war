@@ -28,25 +28,56 @@ function crossing(w: SimWorld, p: Point, to: Point, g: Group): Point {
         return { x: center + sign * edge, y: lane };
     return to;
 }
+const STEER_ANGLES = [0.42, -0.42, 0.88, -0.88, 1.36, -1.36, 1.88, -1.88, 2.42, -2.42];
 function march(w: SimWorld, u: Unit, dest: Point, speed: number, g: Group) {
-    const next = { x: u.x, y: u.y };
-    move(next, dest, speed);
-    if (!w.grid.walk(next.x, next.y)) {
-        const path = crossing(w, u, dest, g);
-        next.x = u.x;
-        next.y = u.y;
-        move(next, path, speed);
-        if (!w.grid.walk(next.x, next.y)) {
-            if (w.grid.walk(u.x, next.y))
-                next.x = u.x;
-            else if (w.grid.walk(next.x, u.y))
-                next.y = u.y;
-            else
-                return;
+    const dx = dest.x - u.x, dy = dest.y - u.y, dist = Math.hypot(dx, dy);
+    if (dist < .15)
+        return;
+    const step = Math.min(speed, dist);
+    const ux = dx / dist, uy = dy / dist;
+    const nx = u.x + ux * step, ny = u.y + uy * step;
+    const look = Math.min(dist, Math.max(step * 2.2, 12));
+    if (w.grid.walk(nx, ny) && w.grid.walk(u.x + ux * look, u.y + uy * look)) {
+        u.x = nx;
+        u.y = ny;
+        return;
+    }
+    // Check river crossing route first if crossing water
+    const pathTarget = crossing(w, u, dest, g);
+    const pdx = pathTarget.x - u.x, pdy = pathTarget.y - u.y, pdist = Math.hypot(pdx, pdy) || 1;
+    const baseAng = Math.atan2(pdy, pdx);
+    const px = u.x + (pdx / pdist) * step, py = u.y + (pdy / pdist) * step;
+    if (w.grid.walk(px, py)) {
+        u.x = px;
+        u.y = py;
+        return;
+    }
+    // Deterministic multi-angle tangent obstacle avoidance (smoothly walks around trees, walls & corners!)
+    const bias = (u.id & 1) ? 1 : -1;
+    let bestX = u.x, bestY = u.y, bestScore = Infinity;
+    for (let i = 0; i < STEER_ANGLES.length; i++) {
+        const ang = baseAng + STEER_ANGLES[i] * bias;
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const cx = u.x + ca * step, cy = u.y + sa * step;
+        if (!w.grid.walk(cx, cy))
+            continue;
+        const aheadOk = w.grid.walk(u.x + ca * Math.max(step * 2.5, 16), u.y + sa * Math.max(step * 2.5, 16));
+        const rem = Math.hypot(pathTarget.x - cx, pathTarget.y - cy) + Math.abs(STEER_ANGLES[i]) * 18 - (aheadOk ? 14 : 0);
+        if (rem < bestScore) {
+            bestScore = rem;
+            bestX = cx;
+            bestY = cy;
         }
     }
-    u.x = next.x;
-    u.y = next.y;
+    if (bestScore < Infinity) {
+        u.x = bestX;
+        u.y = bestY;
+        return;
+    }
+    if (w.grid.walk(u.x, py))
+        u.y = py;
+    else if (w.grid.walk(px, u.y))
+        u.x = px;
 }
 function setRout(w: SimWorld, g: Group) {
     g.state = 'retreat';
@@ -137,7 +168,33 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
         }
         if (g.state === 'assemble')
             goal = g.home;
-        move(g.anchor, crossing(w, g.anchor, goal, g), speed);
+        // 群体级 A* 智能寻路（遇星堡/教堂/风车/河流自动规划绕行路线，绝不傻傻顶墙！）
+        let navGoal = crossing(w, g.anchor, goal, g);
+        if (distanceTo(g.anchor, goal) > 22) {
+            if (w.grid.lineClear(g.anchor.x, g.anchor.y, goal.x, goal.y)) {
+                g.path = undefined;
+                navGoal = goal;
+            } else {
+                const stale = !g.path?.length || !g.pathGoal || distanceTo(g.pathGoal, goal) > 56 || (w.tick - (g.pathTick ?? -999)) >= 24;
+                if (stale) {
+                    g.path = w.grid.findPath(g.anchor, goal);
+                    g.pathGoal = { x: goal.x, y: goal.y };
+                    g.pathTick = w.tick;
+                }
+                while (g.path && g.path.length > 1 && distanceTo(g.anchor, g.path[0]) < 34)
+                    g.path.shift();
+                if (g.path?.length)
+                    navGoal = g.path[0];
+            }
+        } else {
+            g.path = undefined;
+        }
+        const prevAnchorX = g.anchor.x, prevAnchorY = g.anchor.y;
+        move(g.anchor, navGoal, speed);
+        if (!w.grid.walkSolid(g.anchor.x, g.anchor.y) && w.grid.walkSolid(prevAnchorX, prevAnchorY)) {
+            if (w.grid.walkSolid(g.anchor.x, prevAnchorY)) g.anchor.y = prevAnchorY;
+            else if (w.grid.walkSolid(prevAnchorX, g.anchor.y)) g.anchor.x = prevAnchorX;
+        }
         if (g.kind === 'bannerman' && w.tick % 48 === 0 && g.state !== 'retreat' && troops.some(u => u.slot === 1))
             w.events.push({ type: 'drum', ...g.anchor, faction: g.faction });
         if (foes && rankFire(g.kind) && nearest < rangeOf(first) + 210 && w.tick >= g.nextVolley && troops.some(u => u.cooldown === 0)) {
@@ -165,7 +222,7 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
             }
             if (!target && g.state === 'advance' && !g.manual && u.kind !== 'bannerman') {
                 const end = w.keep(g.faction ? 0 : 1)!;
-                if (end.hp > 0 && distanceTo(u, end) < rangeOf(u) + 10)
+                if (end.hp > 0 && distanceTo(u, end) < rangeOf(u) + 135)
                     target = end;
             }
             const age = w.tick - (u.firedAt ?? -1000);
@@ -200,11 +257,28 @@ export function strategyTick(w: SimWorld, members: Map<number, Unit[]>) {
                 const bridge = Math.abs(g.anchor.x - riverX(g.anchor.y)) < riverWidth(g.anchor.y, w.map) / 2 + 80;
                 const center = g.state === 'retreat' ? refuge : g.anchor;
                 const desired = slot ?? { x: center.x + u.offset.x, y: center.y + u.offset.y * (bridge ? .31 : 1) };
-                const waypoint = g.state === 'retreat' ? crossing(w, u, desired, g) : desired;
                 desired.x = Math.min(WIDTH - 4, Math.max(4, desired.x));
                 desired.y = Math.min(HEIGHT - 4, Math.max(4, desired.y));
+                // 有碰撞体积后的 AI 智能调位：若目标槽位刚好被树干/建筑占住，自动就近寻找周围空位展开阵线！
+                if (!slot && !w.grid.walk(desired.x, desired.y)) {
+                    const sideSign = (u.slot & 1) ? 1 : -1;
+                    for (const [ox, oy] of [[0, 18 * sideSign], [0, -18 * sideSign], [-forward * 18, 12 * sideSign], [forward * 18, 12 * sideSign], [0, 34 * sideSign], [-forward * 28, -22 * sideSign]] as const) {
+                        const tx = Math.min(WIDTH - 4, Math.max(4, desired.x + ox));
+                        const ty = Math.min(HEIGHT - 4, Math.max(4, desired.y + oy));
+                        if (w.grid.walk(tx, ty)) {
+                            desired.x = tx;
+                            desired.y = ty;
+                            break;
+                        }
+                    }
+                }
+                let waypoint = g.state === 'retreat' ? crossing(w, u, desired, g) : desired;
+                if (g.path?.length && !w.grid.lineClear(u.x, u.y, desired.x, desired.y))
+                    waypoint = g.path[0];
                 march(w, u, waypoint, g.state === 'retreat' ? speed : speed * 1.15, g);
-                u.pose = Math.floor(u.marchDistance / 6) % 2 ? 'march1' : 'march2';
+                // 刺刀冲锋态：近卫/线列在肉搏冲锋靠近敌人时端平刺刀前冲！
+                const bayonetCharge = rankFire(u.kind) && assault && enemy !== undefined && distanceTo(u, enemy.anchor) < 165;
+                u.pose = bayonetCharge ? 'bayonet' : Math.floor(u.marchDistance / 6) % 2 ? 'march1' : 'march2';
                 u.target = 0;
             }
             u.vx = u.x - prevX;

@@ -1,5 +1,5 @@
 import { KINDS, UNITS, formationSize, rankFire, strength, shelter } from './config';
-import { WIDTH, HEIGHT, createMap, lanesForMap, riverX, rampartSlot, siteCapacity } from './maps';
+import { WIDTH, HEIGHT, bastionOffsets, createMap, lanesForMap, riverX, rampartSlot, siteCapacity } from './maps';
 import { Grid } from './grid';
 import { campaignTick } from './aiDirector';
 import { slotOffset } from './formation';
@@ -41,7 +41,8 @@ export class SimWorld {
     keep(f: Faction) { return this.bases[f]; }
     refuge(g: Group): Point {
         const fort = this.keep(g.faction);
-        return { x: fort.x + (g.home.x - fort.x) * .14, y: fort.y + (g.home.y - fort.y) * .4 };
+        const dir = g.faction ? -1 : 1;
+        return { x: fort.x + dir * 210, y: fort.y + (g.home.y - fort.y) * .4 };
     }
     private homeOrders(g: Group) {
         const order = this.realms[g.faction].order;
@@ -90,14 +91,20 @@ export class SimWorld {
         return { x: base.x + (f ? -1 : 1) * (304 + Math.floor(n % 9 / 3) * 94), y: base.y + ((n % 3) - 1) * 178 };
     }
     private muster(f: Faction, k: Kind) {
-        const p = this.musterPoint(f), troops = this.spawn(f, k, strength[k], p, 'line'), g = this.groups.get(troops[0].group)!;
+        const p = this.musterPoint(f);
+        const dir = f ? -1 : 1;
+        const n = [...this.groups.values()].filter(g => g.faction === f).length;
+        // 登场新兵从地图外缘乡间小道昂首行军走进战场，再绕过星堡在操场整队出击！
+        const entryX = this.tick === 0 ? (f === 0 ? 155 + (n % 3) * 52 : WIDTH - 155 - (n % 3) * 52) : (f === 0 ? 36 : WIDTH - 36);
+        const entryY = HEIGHT / 2 + ((n % 3) - 1) * 190;
+        const entry = inside({ x: entryX, y: entryY });
+        const troops = this.spawn(f, k, strength[k], entry, 'line'), g = this.groups.get(troops[0].group)!;
         g.state = 'assemble';
         g.home = p;
         g.readyAt = this.tick + 125;
-        const dir = f ? -1 : 1;
         for (const u of troops) {
-            u.x -= dir * (44 + (u.slot % 6) * 6);
-            u.y += (u.slot % 2 ? 1 : -1) * (10 + u.slot % 15);
+            u.x = Math.max(6, Math.min(WIDTH - 6, entry.x - dir * ((u.slot % 8) * 9)));
+            u.y = Math.max(6, Math.min(HEIGHT - 6, entry.y + (Math.floor(u.slot / 8) - 1.5) * 10));
         }
         this.homeOrders(g);
         return troops;
@@ -279,13 +286,59 @@ export class SimWorld {
             if (!members.has(id))
                 this.groups.delete(g.id);
         strategyTick(this, members);
-        softSpacing(this.units);
+        this.fortressCannons();
+        this.hash.rebuild(this.units);
+        softSpacing(this.units, this.hash, this.grid);
         this.hash.rebuild(this.units);
         updateProjectiles(this);
         this.units = this.units.filter(u => { if (u.hp > 0)
             return true; this.byUnit.delete(u.id); return false; });
         this.tick++;
         return this.events;
+    }
+    // 沃邦星堡四座突出角台独立火炮系统：超远射程自动开火，让星堡极难攻克！
+    private fortressCannons() {
+        for (const fort of this.bases) {
+            if (!fort || fort.hp <= 0 || fort.faction < 0)
+                continue;
+            const f = fort.faction as Faction;
+            const slots = bastionOffsets(f);
+            if (!fort.cannonCooldowns || fort.cannonCooldowns.length !== 4)
+                fort.cannonCooldowns = [30, 70, 110, 150];
+            if (!fort.cannonAim || fort.cannonAim.length !== 4)
+                fort.cannonAim = slots.map(() => ({ x: f ? -1 : 1, y: 0, firedAt: -999 }));
+            for (let i = 0; i < 4; i++) {
+                if (fort.cannonCooldowns[i] > 0) {
+                    fort.cannonCooldowns[i]--;
+                    continue;
+                }
+                const gx = fort.x + slots[i].x, gy = fort.y + slots[i].y;
+                let target: Unit | undefined, best = 860;
+                for (const u of this.units) {
+                    if (u.hp <= 0 || u.faction === f)
+                        continue;
+                    const d = Math.hypot(u.x - gx, u.y - gy);
+                    if (d < best) {
+                        best = d;
+                        target = u;
+                    }
+                }
+                if (!target)
+                    continue;
+                const dx = (target.x - gx) / (best || 1), dy = (target.y - gy) / (best || 1);
+                fort.cannonCooldowns[i] = 148 + this.rng.int(0, 36);
+                fort.cannonAim[i] = { x: dx, y: dy, firedAt: this.tick };
+                const tx = target.x + this.rng.int(-14, 14), ty = target.y + this.rng.int(-14, 14);
+                const ticks = Math.max(4, Math.ceil(best / 34));
+                const x = gx + dx * 18, y = gy + dy * 18, z = 26;
+                this.projectiles.push({
+                    id: this.next++, x, y, z, vx: (tx - x) / ticks, vy: (ty - y) / ticks, vz: -z / ticks,
+                    gravity: 0, remaining: ticks, target: target.id, kind: 'ball', source: 'field_cannon',
+                    damage: 138, faction: f
+                });
+                this.events.push({ type: 'fire', x: gx, y: gy, z, dx, dy, kind: 'field_cannon', faction: f });
+            }
+        }
     }
     snapshot(): Snapshot {
         return structuredClone({ version: 6, tick: this.tick, seed: this.rng.state, next: this.next, scenario: this.scenario, player: this.player,

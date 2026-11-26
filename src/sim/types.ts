@@ -8,7 +8,7 @@ export interface Point {
     x: number;
     y: number;
 }
-export type StructureType = 'keep' | 'barracks' | 'tree' | 'bridge' | 'farmhouse' | 'redoubt';
+export type StructureType = 'keep' | 'barracks' | 'tree' | 'bridge' | 'farmhouse' | 'redoubt' | 'windmill' | 'church' | 'haystack' | 'ruins' | 'pond' | 'tents';
 export interface Structure extends Point {
     id: number;
     type: StructureType;
@@ -20,6 +20,8 @@ export interface Structure extends Point {
     treeArt?: 'oak' | 'beech' | 'spruce' | 'bush';
     scale?: number;
     flip?: boolean;
+    cannonCooldowns?: number[];
+    cannonAim?: { x: number; y: number; firedAt: number }[];
 }
 export interface Unit extends Point {
     id: number;
@@ -71,6 +73,9 @@ export interface Group {
     manual: boolean;
     assaultTarget?: number;
     scatteredUntil?: number;
+    path?: Point[];
+    pathGoal?: Point;
+    pathTick?: number;
 }
 export interface Realm {
     gold: number;
@@ -104,6 +109,7 @@ export interface SimEvent extends Point {
     power?: number;
     unitId?: number;
     flag?: boolean;
+    explosive?: boolean;
 }
 export type CommandAction = {
     type: 'charge' | 'recall' | 'rampart';

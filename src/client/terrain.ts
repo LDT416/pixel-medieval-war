@@ -88,18 +88,22 @@ export function bakeTerrain(map:MapId='twin'): HTMLCanvasElement {
         }), map==='gorge'?44:38);
     }
     for (const direction of [-1, 1]) {
-        const base = direction > 0 ? 650 : WIDTH - 650;
+        const base = direction > 0 ? 720 : WIDTH - 720;
+        const edgeX = direction > 0 ? 0 : WIDTH;
         for (const side of [-1, 1]) {
-            route([[base, HEIGHT/2 + side*370], [base + direction*240, HEIGHT/2 + side*355],
-                [base + direction*350, HEIGHT/2 + side*270], [base + direction*430, HEIGHT/2 + side*112],
-                [base + direction*505, roadY(base + direction*505, HEIGHT/2)]], 24);
+            // 地图外缘入场乡间小道（新兵连队沿着小道走入战场，绕过星堡进入操场！）
+            route([[edgeX, HEIGHT/2 + side*190], [edgeX + direction*360, HEIGHT/2 + side*225],
+                [base - direction*150, HEIGHT/2 + side*310], [base, HEIGHT/2 + side*390]], 28);
+            route([[base, HEIGHT/2 + side*390], [base + direction*260, HEIGHT/2 + side*370],
+                [base + direction*380, HEIGHT/2 + side*285], [base + direction*470, HEIGHT/2 + side*120],
+                [base + direction*550, roadY(base + direction*550, HEIGHT/2)]], 26);
         }
     }
     function parade(x: number, y: number) {
-        const dx = Math.min(Math.abs(x - 650), Math.abs(x - (WIDTH - 650)));
+        const dx = Math.min(Math.abs(x - 720), Math.abs(x - (WIDTH - 720)));
         const dy = Math.abs(y - HEIGHT / 2);
-        const bx = Math.min(Math.abs(x - 585), Math.abs(x - (WIDTH - 585)));
-        return Math.min(dx*dx/275**2 + dy*dy/252**2, bx*bx/154**2 + (dy-370)**2/115**2);
+        const bx = Math.min(Math.abs(x - 650), Math.abs(x - (WIDTH - 650)));
+        return Math.min(dx*dx/290**2 + dy*dy/265**2, bx*bx/160**2 + (dy-390)**2/122**2);
     }
     const centers = new Float32Array(h), half = new Float32Array(h);
     for (let j = 0; j < h; j++) {

@@ -1,4 +1,5 @@
-import type { Structure } from '../sim/types';
+import type { Faction, Structure } from '../sim/types';
+import { bastionOffsets } from '../sim/maps';
 import { artwork } from './artLoader';
 import { banner } from './banners';
 
@@ -131,6 +132,11 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, _tick
     } else if (s.type === 'barracks') {
         width = 300;
         height = 240;
+    } else if (s.type === 'windmill' || s.type === 'church' || s.type === 'ruins' || s.type === 'haystack' || s.type === 'tents') {
+        base = .76;
+        const sw = Math.round(width * .72), sh = Math.max(8, Math.round(height * .16));
+        ctx.fillStyle = '#24322055';
+        ctx.fillRect(Math.round(s.x - sw * .46), Math.round(s.y - sh * .2), sw, sh);
     }
 
     const x = Math.round(s.x), top = Math.round(s.y - height * base);
@@ -143,6 +149,67 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, _tick
         ctx.restore();
     } else {
         ctx.drawImage(sprite, x - Math.round(width / 2), top, width, height);
+    }
+}
+
+export function drawFortCannons(ctx: CanvasRenderingContext2D, fort: Structure, tick: number) {
+    if (fort.type !== 'keep' || fort.faction === -1 || fort.hp <= 0) return;
+    const f = fort.faction as Faction;
+    const offsets = bastionOffsets(f);
+    const defaultDx = f === 0 ? 1 : -1;
+    const coat = f === 0 ? '#325a96' : '#b23b32';
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < offsets.length; i++) {
+        const cx = Math.round(fort.x + offsets[i].x);
+        const cy = Math.round(fort.y + offsets[i].y);
+        const aim = fort.cannonAim?.[i];
+        const dx = aim ? aim.x : defaultDx;
+        const dy = aim ? aim.y : 0;
+        const ang = Math.atan2(dy, dx);
+        const age = aim ? tick - aim.firedAt : 999;
+        const recoil = age >= 0 && age < 14 ? (1 - age / 14) * 5.5 : 0;
+
+        // Bastion stone emplacement platform
+        ctx.fillStyle = '#2a2c2866';
+        ctx.fillRect(cx - 12, cy - 8, 24, 18);
+        ctx.fillStyle = '#6f6b60';
+        ctx.fillRect(cx - 10, cy - 9, 20, 16);
+        ctx.fillStyle = '#928c7c';
+        ctx.fillRect(cx - 8, cy - 7, 16, 12);
+
+        // Miniature artilleryman operating the bastion cannon
+        const gx = cx + (dx >= 0 ? -9 : 6), gy = cy - 4;
+        ctx.fillStyle = '#1e2024';
+        ctx.fillRect(gx, gy - 5, 3, 2); // shako
+        ctx.fillStyle = '#e8c4a0';
+        ctx.fillRect(gx, gy - 3, 3, 2); // face
+        ctx.fillStyle = coat;
+        ctx.fillRect(gx, gy - 1, 3, 4); // coat
+        ctx.fillStyle = '#d8d4ca';
+        ctx.fillRect(gx, gy + 3, 3, 3); // trousers
+
+        // Rotating wooden carriage + heavy brass barrel with recoil
+        ctx.save();
+        ctx.translate(cx, cy - 1);
+        ctx.rotate(ang);
+        ctx.fillStyle = '#4e3522';
+        ctx.fillRect(-8 - recoil, -5, 11, 10);
+        ctx.fillStyle = '#241a14';
+        ctx.fillRect(-6 - recoil, -7, 6, 2);
+        ctx.fillRect(-6 - recoil, 5, 6, 2);
+        ctx.fillStyle = '#a8833e';
+        ctx.fillRect(-5 - recoil, -3, 18, 6);
+        ctx.fillStyle = '#d8b464';
+        ctx.fillRect(-4 - recoil, -2, 16, 2);
+        ctx.fillStyle = '#684e22';
+        ctx.fillRect(11 - recoil, -4, 3, 8); // muzzle ring
+        if (age >= 0 && age <= 4) {
+            ctx.fillStyle = 'rgba(255, 248, 204, 0.92)';
+            ctx.fillRect(14, -4, 9 - age, 8);
+            ctx.fillStyle = 'rgba(255, 255, 245, 0.95)';
+            ctx.fillRect(15, -2, 5, 4);
+        }
+        ctx.restore();
     }
 }
 

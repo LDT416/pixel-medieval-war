@@ -3,7 +3,8 @@ import { banner } from './banners';
 
 export const pixelArt = [
     'cover_1815', 'oak', 'beech', 'spruce', 'bush', 'hedge', 'bridge',
-    'starfort', 'barracks', 'farmhouse', 'redoubt'
+    'starfort', 'barracks', 'farmhouse', 'redoubt',
+    'windmill', 'church', 'haystack', 'ruins', 'pond', 'tents'
 ] as const;
 
 const bandPortraits = new Map<Faction, string>();

@@ -31,10 +31,10 @@ class Pixels {
 
 function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:number,dy:number,role=-1) {
     const [dark,coat,edge]=shades(f), steps=[-2,0,2,0];
-    const walking=a==='march'||a==='run', loading=a==='load', back=dy<-.37;
-    const stride=walking?steps[frame%4]*(a==='run'?1.5:1):0;
+    const walking=a==='march'||a==='run'||a==='thrust', loading=a==='load', back=dy<-.37;
+    const stride=walking?steps[frame%4]*(a==='run'||a==='thrust'?1.45:1):0;
     const rise=walking&&frame%2===1?-1:0;
-    const lean=a==='thrust'||a==='run'?2:0;
+    const lean=a==='thrust'?3:a==='run'?2:0;
     const headX=lean+(loading?1:0), headY=rise+(loading?1:0);
     for(const [hip,foot,color] of [[-2,-2-stride,'#a49e91'],[1,1+stride,ivory]] as const){
         p.line(color,hip,-5,foot,-2);p.line(color,hip+1,-5,foot+1,-2);
@@ -89,12 +89,22 @@ function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:numb
         return;
     }
     if(a==='aim'||a==='thrust'){
-        const y=-12,x=Math.abs(dy)>.85?4:0,l=a==='thrust'?17:14;
-        p.line(walnut,x-3*dx,y-3*dy,x+dx*l,y+dy*l);
+        const lunge=a==='thrust'&&frame%2===1?2:0;
+        const y=a==='thrust'?-10+rise:-12, x=(Math.abs(dy)>.85?4:0)+(a==='thrust'?2:0), l=a==='thrust'?16+lunge:14;
+        // 步兵枪托、铁管与亮银长刺刀（刺刀冲锋时端平前冲、寒光毕露！）
+        p.line(ink,x-3*dx,y+1-3*dy,x+dx*l,y+1+dy*l);
+        p.line(walnut,x-3*dx,y-3*dy,x+dx*(l-3),y+dy*(l-3));
         p.line(steel,x+3*dx,y-1+3*dy,x+dx*l,y-1+dy*l);
-        p.line(ink,x+4*dx,y+1+4*dy,x+9*dx,y+1+9*dy);
         p.box(gilt,x+2*dx,y+2*dy);
-        if(a==='thrust')p.line(glint,x+dx*(l-2),y-1+dy*(l-2),x+dx*(l+4),y-1+dy*(l+4));
+        if(a==='thrust'){
+            // 超清晰三棱长刺刀 + 亮白剑锋高光 + 冲锋臂袖
+            p.line(coat,lean-1,rise-12,x+2*dx,y+2*dy);
+            p.line(edge,lean+1,rise-12,x+7*dx,y+7*dy);
+            p.line(ink,x+dx*(l-1),y+dy*(l-1),x+dx*(l+7),y+dy*(l+7));
+            p.line(steel,x+dx*(l-1),y-1+dy*(l-1),x+dx*(l+7),y-1+dy*(l+7));
+            p.line(glint,x+dx*(l+1),y-1+dy*(l+1),x+dx*(l+8),y-1+dy*(l+8));
+            if(lunge) p.box('#ffffff',x+dx*(l+8),y-1+dy*(l+8),2,1);
+        }
         hand(x+2*dx,y+2*dy);hand(x+7*dx,y+7*dy);
     }else if(a==='throw'){
         // Musket slung while the throwing arm carries through in the target direction.
@@ -116,66 +126,196 @@ function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:numb
 }
 
 function cavalry(p:Pixels,f:Faction,frame:number,moving:boolean,thrust:boolean){
-    const [dark,coat]=shades(f),g=moving?frame%4:1;
-    const feet=moving?[[-4,4,-3,5],[-2,2,2,3],[4,-3,4,-3],[1,-4,0,-5]][g]:[0,2,-1,1];
-    const bob=moving&&g%2===0?-1:0;
-    for(let i=0;i<4;i++){
-        const hip=i<2?-8+i*2:6+(i-2)*2;
-        const knee=hip+feet[i]*.55,y=-5+(moving&&i%2===g%2?-1:0);
-        p.line(i%2?'#ae825a':'#664836',hip,-11+bob,knee,y);
-        p.line(i%2?'#8c5f42':'#533e32',knee,y,hip+feet[i],moving&&g===2?-2:-1);
-        p.box(ink,hip+feet[i],moving&&g===2?-2:0,3);
+    // 与步兵完全统一的 16-bit 精细像素画风：1px ink 深墨勾边 + 3 阶明暗 + 高清装备细节
+    const [dark,coat,edge]=shades(f), g=moving?frame%4:1;
+    const frontFoot=moving?[[-3,-1],[3,-4],[7,-2],[1,0]][g]:[1,0];
+    const rearFoot=moving?[[5,-2],[-2,0],[-6,-3],[1,-1]][g]:[-1,0];
+    const bob=moving?[0,-2,-1,0][g]:0;
+    const hDark=f?'#4a2c1c':'#362218', hMid=f?'#7e4e31':'#5e3d2b', hLit=f?'#ad754c':'#8a6045';
+
+    // 远侧马腿（ink 描边 + 暗部着色 + 铁蹄）
+    p.line(ink,-9,-12+bob,-10+rearFoot[0]*.6,-5+bob);
+    p.line(hDark,-8,-12+bob,-9+rearFoot[0]*.6,-5+bob);
+    p.line(hDark,-9+rearFoot[0]*.6,-5+bob,-8+rearFoot[0],rearFoot[1]);
+    p.box(ink,-9+rearFoot[0],rearFoot[1]-1,3,2);
+    p.line(ink,8,-12+bob,9+frontFoot[0]*.6,-6+bob);
+    p.line(hDark,7,-12+bob,8+frontFoot[0]*.6,-6+bob);
+    p.line(hDark,8+frontFoot[0]*.6,-6+bob,9+frontFoot[0],frontFoot[1]);
+    p.box(ink,8+frontFoot[0],frontFoot[1]-1,3,2);
+
+    // 飘逸黑亮马尾（带 ink 外轮廓）
+    p.line(ink,-11,-15+bob,-19,-10+bob+(g%2?2:-1));
+    p.line('#3f3229',-12,-14+bob,-18,-9+bob+(g%2?2:-1));
+    p.line(ink,-12,-13+bob,-17,-7+bob+(g%2?2:-1));
+
+    // 精雕战马躯干（1px ink 轮廓 + 肌肉明暗三层渐变）
+    p.oval(ink,0,-13+bob,13,6);
+    p.oval(hDark,0,-12+bob,12,5);
+    p.oval(hMid,0,-13+bob,11,4);
+    p.oval(hLit,2,-15+bob,8,2);
+    p.box(hLit,-9,-15+bob,5,2);
+    // 胸前皮革挽具与铜扣
+    p.line(ink,7,-16+bob,11,-11+bob);
+    p.box(gilt,9,-13+bob,2,1);
+
+    // 近侧马腿（明亮立体，四蹄清晰）
+    p.line(ink,-7,-11+bob,-7-rearFoot[0]*.5,-5+bob);
+    p.line(hLit,-6,-11+bob,-6-rearFoot[0]*.5,-5+bob);
+    p.line(hMid,-6-rearFoot[0]*.5,-5+bob,-5-rearFoot[0],Math.min(0,rearFoot[1]+1));
+    p.box(ink,-6-rearFoot[0],Math.min(0,rearFoot[1]+1)-1,3,2);
+    p.line(ink,8,-11+bob,9-frontFoot[0]*.5,-6+bob);
+    p.line(hLit,9,-11+bob,10-frontFoot[0]*.5,-6+bob);
+    p.line(hMid,10-frontFoot[0]*.5,-6+bob,11-frontFoot[0],Math.min(0,frontFoot[1]+1));
+    p.box(ink,10-frontFoot[0],Math.min(0,frontFoot[1]+1)-1,3,2);
+
+    // 昂扬骏马脖颈、马头、鬃毛、眼眸与缰绳
+    p.oval(ink,10,-18+bob,5,6);
+    p.oval(hMid,10,-18+bob,4,5);
+    p.line(hLit,11,-21+bob,12,-15+bob);
+    p.box(ink,10,-25+bob,8,6);
+    p.box(hMid,11,-24+bob,6,4);
+    p.box(hLit,14,-23+bob,5,3);
+    p.box(ink,18,-22+bob,2,3);
+    p.box(ivory,17,-21+bob,2,2);
+    p.line(ink,8,-23+bob,9,-15+bob); // 浓密马鬃
+    p.box(ink,11,-27+bob,2,3); p.box(hLit,12,-26+bob,1,2); // 竖起双耳
+    p.box(ink,15,-23+bob,1,1); // 眼睛
+    p.box(gilt,16,-20+bob,1,1); // 铜马嚼
+    p.line(ink,3,-16+bob,16,-20+bob); // 缰绳
+
+    // 皇家阵营鞍褥（带 ink 边 + 金丝镶边 + 骑兵皮靴马镫）
+    p.box(ink,-9,-17+bob,14,8);
+    p.box(dark,-8,-16+bob,12,6);
+    p.box(coat,-7,-15+bob,10,4);
+    p.box(edge,-6,-15+bob,4,2);
+    p.box(gilt,-8,-10+bob,12,1);
+    p.box(gilt,-7,-12+bob,2,1);
+    p.box('#563925',-5,-17+bob,8,3);
+    p.box(ivory,-2,-15+bob,4,4); // 白色马裤
+    p.box(ink,-2,-12+bob,5,7);
+    p.box(boot,-1,-12+bob,3,5);
+    p.box(steel,0,-6+bob,3,1); // 亮银马镫
+
+    // 迎风翻飞的阵营短披风（与步兵同三色阶）
+    p.line(ink,-4,-24+bob,-13,-19+bob+(g%2?1:-2));
+    p.line(dark,-4,-23+bob,-12,-18+bob+(g%2?1:-2));
+    p.line(coat,-4,-22+bob,-11,-17+bob+(g%2?1:-2));
+    p.line(edge,-5,-21+bob,-10,-16+bob+(g%2?1:-2));
+
+    // 骑兵上身：精确对齐步兵比例的 ink 勾边 + 三阶军装 + 亮银胸甲 + 步兵同款面容
+    p.box(ink,-5,-25+bob,10,10);
+    p.box(coat,-4,-24+bob,8,8);
+    p.box(dark,-4,-22+bob,2,6);
+    p.box('#5d6870',-2,-24+bob,6,7);
+    p.box(steel,-1,-24+bob,5,6);
+    p.box(glint,0,-23+bob,3,3);
+    p.box(gilt,-4,-24+bob,2,2); // 金色肩章
+    p.box(ivory,-3,-17+bob,7,1);
+    p.box(brass,0,-17+bob,2,1); // 铜皮带扣
+
+    // 步兵同款精雕面容 + 铜脊马鬃胸甲骑兵钢盔
+    p.box(hide,-2,-28+bob,5,4);
+    p.box(skin,-1,-28+bob,4,3);
+    p.box(ink,1,-28+bob,1,1);
+    p.box('#9b3330',-1,-25+bob,3,1);
+    p.box(ink,-4,-33+bob,9,5);
+    p.box('#4e5860',-3,-32+bob,7,3);
+    p.box(steel,-2,-32+bob,5,2);
+    p.box(glint,-1,-32+bob,3,1);
+    p.box(gilt,0,-34+bob,3,2); // 鎏金头盔脊
+    p.box(ink,-2,-29+bob,8,1); // 帽檐
+    // 飘扬马鬃羽饰
+    p.line(ink,-2,-33+bob,-9,-29+bob-(g%2));
+    p.line(f?'#cc3930':'#262b30',-2,-32+bob,-8,-28+bob-(g%2));
+    p.line(f?'#f0745d':'#4c5258',-3,-31+bob,-7,-27+bob-(g%2));
+
+    // 手持雪亮弧形重骑兵马刀（行军高举 / 冲锋前刺寒光四射）
+    p.box(coat,2,-23+bob,3,3);
+    p.box(hide,3,-21+bob,3,2);
+    p.box(skin,4,-21+bob,2,1);
+    p.box(gilt,5,-22+bob,3,2); // 铜护手
+    if(thrust){
+        p.line(ink,7,-20+bob,21,-18+bob);
+        p.line(steel,7,-21+bob,21,-19+bob);
+        p.line(glint,10,-22+bob,22,-19+bob);
+    }else{
+        p.line(ink,7,-22+bob,15,-33+bob);
+        p.line(steel,6,-22+bob,14,-33+bob);
+        p.line(glint,9,-26+bob,15,-34+bob);
     }
-    p.oval('#5a4235',0,-11+bob,11,5);p.oval('#976a48',0,-12+bob,10,4);p.box('#b58b63',-8,-14+bob,7);
-    p.line(ink,-9,-14+bob,-15,-9+bob+g%2);p.line('#514130',-10,-14+bob,-15,-7+bob+g%2);
-    p.oval('#83593c',8,-15+bob,4,5);p.box('#644c39',9,-21+bob,5,5);
-    p.box('#956e4d',11,-20+bob,6,4);p.box('#b59673',15,-18+bob,3,3);
-    p.box(ink,10,-23+bob,2,4);p.box(hide,13,-22+bob,1,3);p.box(ink,14,-20+bob);
-    p.line(ivory,12,-19+bob,15,-16+bob);p.line('#3e342c',4,-14+bob,15,-17+bob);
-    p.box(dark,-7,-15+bob,10,6);p.box(brass,-7,-10+bob,10);
-    p.box('#593f2e',-4,-15+bob,7,2);p.box(boot,-1,-14+bob,3,6);p.box(ink,0,-9+bob,4,2);
-    p.box(coat,-4,-23+bob,6,8);p.box('#5a7079',-2,-23+bob,5,7);
-    p.box(steel,-2,-23+bob,4,5);p.box(glint,0,-22+bob,2,3);p.line(brass,-2,-23+bob,2,-18+bob);
-    p.box(skin,-1,-26+bob,4,3);p.box('#555c60',-3,-29+bob,6,3);p.box(steel,-2,-29+bob,5);
-    p.box(gilt,-1,-30+bob,3);p.box(ink,-2,-27+bob,7);
-    p.line(f?'#c84939':'#252829',-2,-30+bob,-6,-28+bob-g%2);p.line(dark,-4,-22+bob,-9,-17+bob+g%2);
-    p.box(skin,3,-20+bob,3,2);p.line(brass,4,-21+bob,6,-19+bob);
-    p.line(steel,5,-21+bob,thrust?16:12,thrust?-20+bob:-28+bob);
-    p.box(glint,thrust?16:12,thrust?-21+bob:-29+bob);
-    if(moving){p.box('#a49a6a',-14-g,-1,3);p.box('#c0ac82',-18-g,-3,2);}
+    if(moving){p.box('#b5a97d',-15-g,-1,3,2);p.box('#d4c49a',-19-g,-3,2,2);}
 }
 
 function wheel(p:Pixels,x:number,y:number,frame:number){
     for(let i=0;i<8;i++){
         const theta=(i+frame/4)*circle/8;
-        p.line('#996a40',x,y,x+Math.cos(theta)*5,y+Math.sin(theta)*5);
+        p.line('#6c4b2d',x,y,x+Math.cos(theta)*5.5,y+Math.sin(theta)*5.5);
+        p.line('#a87948',x,y,x+Math.cos(theta)*4.5,y+Math.sin(theta)*4.5);
     }
-    for(let i=0;i<40;i++){
-        const theta=i*circle/40;
-        p.box(ink,x+Math.cos(theta)*6,y+Math.sin(theta)*6);
-        p.box(Math.sin(theta)<0?'#bd8c53':'#755038',x+Math.cos(theta)*5,y+Math.sin(theta)*5);
+    for(let i=0;i<44;i++){
+        const theta=i*circle/44;
+        p.box(ink,x+Math.cos(theta)*6.5,y+Math.sin(theta)*6.5);
+        p.box(Math.sin(theta)<0?'#c99658':'#785134',x+Math.cos(theta)*5.5,y+Math.sin(theta)*5.5);
     }
-    p.box('#4e3c2e',x-1,y-1,3,3);p.box(gilt,x,y);
+    p.box(ink,x-2,y-2,5,5);p.box('#564131',x-1,y-1,3,3);p.box(gilt,x,y);
 }
 
 function crew(p:Pixels,f:Faction,x:number,y:number,role:number,frame:number,pushing:boolean){
-    const step=pushing?[0,1,0,-1][frame%4]:0,lean=pushing?2:0;
-    const coat=f?'#334d6c':'#314b74';
-    p.box('#b7ac92',x-2,y-6,2,5);p.box(ivory,x+1,y-6,2,4);
-    p.box(boot,x-2-step,y-2,3,2);p.box(ink,x+1+step,y-2,3,2);
-    p.box(coat,x-3+lean,y-12,6,7);p.line(ivory,x-2+lean,y-12,x+2+lean,y-7);
-    p.box('#be5540',x-3+lean,y-7,5);p.box(skin,x+lean,y-15,3,3);
-    p.box(ink,x-2+lean,y-18,5,4);p.box(brass,x+1+lean,y-17);p.box(ink,x-2+lean,y-15,7);
-    p.box('#bd493e',x-2+lean,y-19);
+    // 与步兵完全一致的 16-bit 精致像素人物工艺（ink 轮廓 + 阵营三阶明暗 + 交叉背带 + 高清头饰）
+    const [dark,coat,edge]=shades(f);
+    const step=pushing?[-1,0,1,0][frame%4]:0, rise=pushing&&frame%2===1?-1:0, lean=pushing?2:0;
+    const gx=x+lean, gy=y+rise;
+    // 步兵同款明暗双腿与黑皮靴
+    p.line('#a49e91',x-2,y-5,x-2-step,y-2);p.line('#a49e91',x-1,y-5,x-1-step,y-2);
+    p.line(ivory,x+1,y-5,x+1+step,y-2);p.line(ivory,x+2,y-5,x+2+step,y-2);
+    p.box(boot,x-2-step,y-2,2,2);p.box(ink,x-2-step,y,3,1);
+    p.box(boot,x+1+step,y-2,2,2);p.box(ink,x+1+step,y,3,1);
+    // 步兵同款 ink 描边上衣 + 交叉白背带 + 铜扣 + 弹药盒
+    p.box(ink,gx-4,gy-14,8,8);
+    p.box(dark,gx-4,gy-12,2,7);
+    p.box(coat,gx-3,gy-14,6,7);
+    p.box(edge,gx-2,gy-14,3,1);
+    p.box(coat,gx-3,gy-7,3,2);p.box(dark,gx,gy-7,3,2);
+    p.box(ivory,gx-3,gy-7,6,1);p.box(brass,gx,gy-7,1,1);
+    p.line(ivory,gx-3,gy-14,gx+2,gy-8);
+    p.line('#c2bca9',gx+2,gy-14,gx-3,gy-8);
+    p.box(gilt,gx-3,gy-14,2,1); // 炮兵金肩饰
+    // 步兵同款精雕面容 + 炮兵礼帽与赤红羽饰
+    p.box(hide,gx-2,gy-18,5,4);
+    p.box(skin,gx,gy-17,3,3);p.box(skin,gx+3,gy-16,1,1);p.box(ink,gx+1,gy-17,1,1);
+    p.box('#9b3330',gx-1,gy-15,3,1);
+    p.box(ink,gx-3,gy-22,6,5);
+    p.box('#464449',gx-3,gy-22,5,1);
+    p.box('#674f38',gx-3,gy-19,6,1);
+    p.box(ink,gx-2,gy-18,7,1);
+    p.box(gilt,gx+1,gy-20,1,1);
+    p.box('#cf3e34',gx-2,gy-24,2,2); // 炮兵专属火红羽饰
+
     const beat=[0,1,2,1][frame%4];
+    const hand=(hx:number,hy:number)=>{p.box(hide,hx-1,hy,3,2);p.box(skin,hx,hy,2,1);};
     if(pushing){
-        p.line(coat,x+1,y-11,x+5,y-8);p.box(skin,x+4,y-8,2);
+        p.line(coat,gx+1,gy-12,gx+6,gy-9);p.line(edge,gx+1,gy-11,gx+5,gy-9);
+        hand(gx+5,gy-9);
     }else if(role===0){
-        p.line(walnut,x-4,y-6-beat,x+9,y-14-beat);p.box('#c9bb98',x+7,y-15-beat,4,3);p.box(skin,x+3,y-10-beat,2);
+        // 炮手 1：挥舞木柄海绵通条清理炮膛
+        p.line(ink,gx-4,gy-5-beat,gx+10,gy-14-beat);
+        p.line(walnut,gx-4,gy-6-beat,gx+10,gy-15-beat);
+        p.box(ink,gx+7,gy-17-beat,5,4);
+        p.box('#d8cbb0',gx+8,gy-16-beat,3,2);
+        hand(gx+3,gy-10-beat);
     }else if(role===1){
-        p.oval('#272a2a',x+4,y-9+beat,3,3);p.box('#7c827e',x+3,y-11+beat,2);p.box(skin,x+2,y-8+beat,2);
+        // 炮手 2：托举高亮铁质实心炮弹
+        p.oval(ink,gx+5,gy-10+beat,3,3);
+        p.oval('#3a4044',gx+5,gy-10+beat,2,2);
+        p.box(glint,gx+4,gy-11+beat,1,1);
+        hand(gx+2,gy-9+beat);
     }else{
-        p.line('#886342',x+2,y-8,x+8,y-13-beat);p.box('#c79056',x+8,y-13-beat);p.box(skin,x+3,y-9,2);
+        // 炮手 3：举起闪耀火星的点火绳
+        p.line(ink,gx+2,gy-7,gx+9,gy-13-beat);
+        p.line('#8c6642',gx+2,gy-8,gx+9,gy-14-beat);
+        p.box('#f27b2b',gx+9,gy-15-beat,2,2);
+        p.box('#fff09a',gx+9,gy-15-beat,1,1);
+        hand(gx+3,gy-9);
     }
 }
 
@@ -183,25 +323,34 @@ function cannon(p:Pixels,f:Faction,a:Action,frame:number,dx:number,dy:number,cre
     const marching=a==='march'||a==='run', recoil=a==='recoil'?[0,7,7,6,5,4,3,2,1][frame]:0;
     const x=-Math.round(recoil*dx),y=-Math.round(recoil*dy),wy=y-6;
     const pushing=marching||a==='recoil'&&frame>=3;
-    if(crewCount>0)crew(p,f,-13,-5,0,frame,pushing);
-    if(crewCount>1)crew(p,f,0,-7,1,frame,pushing);
-    // Back wheel, oak trail and bronze barrel casting all travel with the carriage.
+    if(crewCount>0)crew(p,f,-14,-5,0,frame,pushing);
+    if(crewCount>1)crew(p,f,1,-8,1,frame,pushing);
     const rotation=marching?frame:a==='recoil'?recoil:0;
     wheel(p,x+2,wy-4,rotation);
-    p.line(ink,x-17*dx,y-2-17*dy,x+4*dx,y-8+4*dy);
-    p.line(walnut,x-17*dx,y-3-17*dy,x+4*dx,y-9+4*dy);
-    p.line('#b78a4e',x-15*dx,y-4-15*dy,x+3*dx,y-9+3*dy);
+    // 橡木炮架（ink 勾边 + 三阶木纹 + 铁箍）
+    p.line(ink,x-18*dx,y-1-18*dy,x+5*dx,y-7+5*dy);
+    p.line(ink,x-18*dx,y-4-18*dy,x+5*dx,y-10+5*dy);
+    p.line(walnut,x-17*dx,y-2-17*dy,x+4*dx,y-8+4*dy);
+    p.line('#b98c52',x-16*dx,y-3-16*dy,x+3*dx,y-9+3*dy);
+    p.box(steel,x-15*dx,y-3-15*dy,2,2);
+    // 精铸青铜重炮管（ink 轮廓 + 3阶青铜反光 + 加强铜箍 + 炮耳）
     const barrel=(from:number,to:number,thickness:number,col:string,offset=0)=>{
         const ax=x+dx*from-dy*offset,ay=y-10+dy*from+dx*offset;
         for(let i=0;i<thickness;i++)p.line(col,ax-dy*i,ay+dx*i,x+dx*to-dy*(offset+i),y-10+dy*to+dx*(offset+i));
     };
-    barrel(-5,16,5,'#49372b',-2);barrel(-5,16,3,'#9d733c',-1);barrel(-4,16,1,'#edce85',-1);
-    for(const ring of [-4,2,10,15]){barrel(ring,ring+1,6,'#76532e',-3);barrel(ring,ring+1,2,'#f1cc7f',-3);}
-    barrel(17,17,3,ink,-1);wheel(p,x-1,wy,rotation);
-    if(crewCount>2)crew(p,f,-17,5,2,frame,marching);
+    barrel(-6,18,7,ink,-3);
+    barrel(-5,17,5,'#573f28',-2);
+    barrel(-5,17,3,'#b3833e',-1);
+    barrel(-4,17,1,'#f4d88c',-1);
+    for(const ring of [-4,2,10,16]){barrel(ring,ring+1,7,'#6e4d26',-3);barrel(ring,ring+1,2,'#f7df94',-3);}
+    barrel(18,18,3,ink,-1);
+    wheel(p,x-1,wy,rotation);
+    if(crewCount>2)crew(p,f,-18,6,2,frame,marching);
     if(!marching){
-        p.box('#4d392a',-24,3,8,5);p.box('#9a7547',-24,3,8);p.box('#c6a75e',-22,3,1,5);p.box('#c6a75e',-18,3,1,5);
-        p.box('#584b39',5,3,5,5);p.box(steel,5,3,5);p.box('#99927d',5,6,5);
+        // 精致木制弹药箱与水桶（带 ink 描边与铜带）
+        p.box(ink,-25,2,10,7);p.box('#563e2c',-24,3,8,5);p.box('#a87e4b',-24,3,8,2);
+        p.box(gilt,-22,3,1,5);p.box(gilt,-18,3,1,5);
+        p.box(ink,4,2,7,7);p.box('#62533f',5,3,5,5);p.box(steel,5,3,5,1);p.box('#9d9582',5,6,5,1);
     }
 }
 
@@ -213,8 +362,8 @@ function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:number,c
     const known=cache.get(key);if(known)return known;
     const gun=kind==='field_cannon', mounted=kind==='cuirassier',band=kind==='bannerman';
     const art=document.createElement('canvas');
-    art.width=gun?65:mounted?42:band?46:46;art.height=gun?54:band?47:40;
-    const footX=Math.floor(art.width/2),footY=art.height-(gun?17:band?3:9);
+    art.width=gun?68:mounted?50:band?46:50;art.height=gun?58:mounted?44:band?47:42;
+    const footX=Math.floor(art.width/2),footY=art.height-(gun?18:mounted?6:band?3:9);
     const c=art.getContext('2d')!;c.imageSmoothingEnabled=false;
     c.translate(footX,footY);
     const angle=dir*circle/16,dx=Math.cos(angle),dy=Math.sin(angle);
@@ -242,13 +391,15 @@ export function drawUnitSprite(c:CanvasRenderingContext2D,u:Unit,tick:number,aim
     const gun=u.kind==='field_cannon', mounted=u.kind==='cuirassier', band=u.kind==='bannerman';
     const since=tick-(u.firedAt??-10000),throwAge=tick-(u.thrownAt??-10000);
     let action:Action='stand',frame=0;
-    if(retreating||u.moving){
+    if(!retreating&&u.pose==='bayonet'){
+        action='thrust';
+        frame=u.moving?Math.floor((u.marchDistance??tick)/3.5)%4:Math.floor(tick/5)%2;
+    }else if(retreating||u.moving){
         action=retreating?'run':'march';
         frame=Math.floor((u.marchDistance??tick)/(gun?2.4:mounted?7:4))%4;
     }else if(u.kind==='guard_grenadier'&&throwAge>=0&&throwAge<8){
         action='throw';frame=Math.min(3,Math.floor(throwAge/2));
-    }else if(u.pose==='bayonet')action='thrust';
-    else if(gun&&since>=0&&since<40){
+    }else if(gun&&since>=0&&since<40){
         action='recoil';frame=since<1?0:Math.min(8,1+Math.floor((since-1)/5));
     }else if(!gun&&(u.pose==='aim'||since<5))action='aim';
     else if(u.pose==='reload'||u.pose==='kneel'||gun&&u.cooldown>0){
