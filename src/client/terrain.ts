@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, bridgeSize, bridgeYs, riverWidth, riverX, water as mapWater, shoreAt, ford } from '../sim/maps';
+import { WIDTH, HEIGHT, roadY, bridgeSize, bridgeYs, riverWidth, riverX, water as mapWater, shoreAt, ford } from '../sim/maps';
 // World art uses a two-world-pixel brush. Quantized value noise makes contiguous
 // patches of lichen, turf and exposed earth without putting noise over the UI.
 function hash(x: number, y: number, seed = 0) {
@@ -75,7 +75,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
         }
     }
     for(const lane of map==='gorge'?[880]:map==='twin'?bridgeYs:[520,880,1240]){
-        route([[0,880],[880,880],[1350,lane],[3450,lane],[3900,880],[4800,880]],map==='gorge'?46:37);
+        route(Array.from({length:97},(_,i)=>[i*50,roadY(i*50,lane)] as XY),map==='gorge'?46:37);
     }
     const centers = new Float32Array(h), half = new Float32Array(h);
     for (let j = 0; j < h; j++) {
@@ -106,7 +106,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             else if (bankEdge < 46 + (n - .5) * 25) {
                 col = gravel[Math.min(5, Math.floor(material * 5) + (detail === 0 ? 1 : 0))];
             }
-            const castle = Math.min(Math.max(Math.abs(x - 670) / 217, Math.abs(y - 1050) / 173), Math.max(Math.abs(x - 3160) / 217, Math.abs(y - 1050) / 173));
+            const castle = Math.min(Math.max(Math.abs(x - 610) / 217, Math.abs(y - 880) / 173), Math.max(Math.abs(x - 4190) / 217, Math.abs(y - 880) / 173));
             if (castle < 1 + (micro - .5) * .15)
                 col = gravel[Math.max(0, Math.min(5, Math.floor(n * 3 + micro * 2 + core)))];
             if (shore >= 0 && rMask[id] > 0) {
@@ -168,7 +168,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
             line('#50574e', x + rx * .1, y - ry * .45, x + rx * .32, y + ry * .25);
         }
     }
-    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && Math.min(Math.max(Math.abs(x - 670) / 215, Math.abs(y - 1050) / 160), Math.max(Math.abs(x - 3160) / 215, Math.abs(y - 1050) / 160)) > 1;
+    const clear = (x: number, y: number) => !water(x, y) && !rMask[Math.floor(x / 2) + Math.floor(y / 2) * w] && Math.min(Math.max(Math.abs(x - 610) / 215, Math.abs(y - 880) / 160), Math.max(Math.abs(x - 4190) / 215, Math.abs(y - 880) / 160)) > 1;
     let state = 85063;
     const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
     // Thin seams of stratified rock give unoccupied corners a shape at overview zoom.
@@ -261,7 +261,7 @@ export function bakeTerrain(map:import('../sim/types').MapId='twin'): HTMLCanvas
     full.width = WIDTH;
     full.height = HEIGHT;
     const ctx = full.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
     ctx.drawImage(native, 0, 0, WIDTH, HEIGHT);
     cached = full;
     return full;

@@ -3,13 +3,14 @@ import type { MapId, Faction, Structure } from './types';
 export const indexAt = (x: number, y: number) => Math.max(0, Math.min(COLS - 1, Math.floor(x / CELL))) + Math.max(0, Math.min(ROWS - 1, Math.floor(y / CELL))) * COLS;
 export class Grid {
     readonly terrain = new Uint8Array(COLS * ROWS);
+    readonly nearTree=new Uint8Array(COLS*ROWS);
     readonly blockers = new Int32Array(COLS * ROWS);
     readonly pass = [new Uint8Array(COLS * ROWS), new Uint8Array(COLS * ROWS)];
     readonly shallows = new Uint8Array(COLS * ROWS);
     constructor(map:MapId = 'twin') { for (let i = 0; i < this.terrain.length; i++)
         { const x=(i%COLS+.5)*CELL,y=(Math.floor(i/COLS)+.5)*CELL; const wet=water(x,y,map); this.shallows[i]=0; this.terrain[i]=this.shallows[i] || Number(!wet); } }
     rebuild(structures: Structure[]) {
-        this.blockers.fill(0);
+        this.blockers.fill(0);this.nearTree.fill(0);
         for (const p of this.pass)
             p.set(this.terrain);
         for (const s of structures) {
@@ -18,6 +19,8 @@ export class Grid {
             const bridge = (s.type === 'bridge' || s.type === 'pontoon')&&!s.needed;
             const xmin = Math.max(0, Math.ceil((s.x - s.w / 2) / CELL - .5)), xmax = Math.min(COLS - 1, Math.floor((s.x + s.w / 2) / CELL - .5));
             const ymin = Math.max(0, Math.ceil((s.y - s.h / 2) / CELL - .5)), ymax = Math.min(ROWS - 1, Math.floor((s.y + s.h / 2) / CELL - .5));
+            if(s.type==='tree')for(let row=Math.max(0,ymin-2);row<=Math.min(ROWS-1,ymax+2);row++)
+                this.nearTree.fill(1,row*COLS+Math.max(0,xmin-2),row*COLS+Math.min(COLS,xmax+3));
             for (let y = ymin; y <= ymax; y++)
                 for (let x = xmin; x <= xmax; x++) {
                     const i = y * COLS + x;

@@ -75,7 +75,7 @@ export class DecalLayer {
             }
             // 尸体碎肉、白骨、红蓝破衣/银甲与折断武器永久烘焙到地表贴图
             const cloth = e.faction === 1 ? '#9e2022' : '#20478e';
-            const armored = e.kind === 'plate_knight' || e.kind === 'halberdier' || e.kind === 'heavy_lancer' || e.kind === 'shieldman';
+            const armored = e.kind==='cuirassier' || e.kind==='lancer';
             const gibs = dense ? 7 : 4;
             for (let i = 0; i < gibs; i++) {
                 const a = this.h(e.x, e.y, 30 + i) * Math.PI * 2;

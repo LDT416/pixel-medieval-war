@@ -1,4 +1,4 @@
-// Retain the existing simulation regression entry point after the roster migration.
 import {build} from 'esbuild';
-const bundle=await build({entryPoints:['tests/v4.ts'],platform:'node',format:'esm',bundle:true,write:false});
-await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+import {createRequire} from 'node:module';
+const bundle=await build({entryPoints:['tests/v52.ts'],platform:'node',format:'cjs',bundle:true,write:false});
+new Function('require',bundle.outputFiles[0].text+'\n//# sourceURL=v52-regressions.cjs')(createRequire(import.meta.url));

@@ -1,89 +1,73 @@
-import type { Faction, Kind } from '../sim/types';
-// Native pixel matrices face east. Animation is baked once, never drawn per soldier.
-const matrices: Record<Kind, string[]> = {
-    peasant: ["...lll.....","..wlllw....",".llllllw..m","...kfs..sm.","..wlfs..w..",".wwclb.w...","blwgfsw....",".bwbb.w....","..wwbw.....","..bb.b.....",".dd..dd...."],
-    sapper: ["..msh....q..",".mssmb..gg..","..kfs..wbbw.",".wbfs..hssm.","llwccs.wllw.","bwgbwfswbbw.","bwwbb..mhhm.","..wdb..wwww.","..b.b.......",".dd.dd......"],
-    bannerman: ["..g..gcccct.","..w..wTTcTt.","..w..wTcgcct","..w..wcggcc.","..ah.wcccct.",".mssmwTTc...","..kfsw..t...",".hccsw......",".scgsw......","..cgbw......","..m.mw......",".kk.kk......"],
-    shieldman: ["..hh....",".masb...",".khfs..a","..kcc..s","hgbcg.sb","hcgcbs..","hgccb...",".gcdb...","..m.m...",".kk.kk.."],
-    halberdier: ["..ah..a.",".mhmb.ha",".kks..mh","..ms..wg",".ahc.w..",".mcgs...","..cmb...","..kmb...","..m.m...",".kk.kk.."],
-    zweihander: ["..tah.......aa.",".Thssh.....ahs.","..mkfs....ahs..",".hsmgs...ahs...",".mccss..ahs....",".scgms.ahs.....","..mcfgggg......","..mbfw.........","..m.wm.........",".kk..kk........"],
-    plate_knight: [".tTc....","..hac..a",".hssm..h",".mkhs.a.",".hsm.hh.","hmccgs..",".smmb...","..gbm...","..s.s...",".kk.kk.."],
-    musketeer: ["..kkkk.........",".kkgkkk........","...kfs.........","..gcac....aaaaa","..ccacffwwsssss","..caccwww......","...gcb.........","...aba.........","...a.a.........","..kk.kk........"],
-    guard_grenadier: ["...kkkk.........","..kkmkkk........","..kkmkkk........","..kkkkkk........","...kffs.........","..ggcagg...aaaaa","..ccacffwwsssss.","..cacccww.......","...bbb..........","...a.a..........","..kk.kk........."],
-    rifleman: ["..tTtt.............",".ttgttt............","...kfs.............","..Tctt....ssssssaaa","..cccsffwwwwww.....","..ctcbww...........","...bcb.............","...b.b.............","..kk.kk............"],
-    volley_gunner: ["..lll.......gh.",".wlllwb....ggs.","..kfs....ggssm.",".wccs..gggsmm..",".Tcgssggmmk....","..bfswwk.......","..wwwb.........","..bdb..........","..m.m..........",".kk.kk........."],
-    dragoon: ["....tw......","...wTwb...b.","....kfs..bwb","....ccc..wlfssssss","....Tcs.wlbwwww...","..wwccwwlkw.",".wlwgbwwb...","bwwwwwwwb...","..bb..bb....","..b....b....",".kk...kk...."],
-    heavy_lancer: ["...tTT...a..","....ham..ll.","...hksm..wm.","....mms..hsh","....hcs.hshm","..hmccswmgb.",".hsmTgmhmb..","bmcchmssm...","..mk..mk....","..m....m....",".kk...kk...."],
-    scout_cavalry: ["....tw......","...wTwb...b.","....kfs..bwb","....ccc..wlf","....Tcs.wlbw","..wwccwwlkw.",".wlwgbwwb...","bwwwwwwwb...","..bb..bb....","..b....b....",".kk...kk...."],
-    davinci_tank: ["..........g...........",".........gsg..........","........wwlww.........","......wllwlwlww.......","....wllwwlwlwlwww.....","..wllwlwwlwlwlwlwww...",".ggggggggggggggggggg..","wwkkllkklllkklllkkllww","ssmmwwsswwwsswwwmmwwss",".gggwwggwwwggwwwggggg.","..wwwwwwwwwwwwwwwww...","....kkk.......kkk....."],
-    field_cannon: ["....................","....................","....................","................hma.",".............hahksh.","..........ahmsshhms.",".......hahmssmmsmk..",".....hmssmmsmmkk....","....msmmmsmkk.......","....kmmggkllb.......","....blwwlwgwll......","...blwgwgbwgwg......","..blwbwwwwlwwl......",".bwwb.lwgwgwgb......",".....blwwlwll.......","......bwwwwb........"],
-    siege_mortar: ["....shhhhs.....","...hkkkkmhh....","...smkkkmhh....","....hsssms.....","....mhshsm.....",".....mssm......","...wggggwww....","..bwwllwllwb...",".bwwggbwwggwb..","..bwwb..bwwb..."],
-    organ_gun: ["....hs.hs.hs.hs.hs.","....ms.ms.ms.ms.ms.","...hs.hs.hs.hs.hs..","...ms.ms.ms.ms.ms..","..hsshsshsshsshss..","..ggggggggggggggg..","..bwlwwwwwlwwwwwb..","..bwwgbwwwbgwgb....","...bwb.....bwb....."]
-};
-function colors(faction: Faction): Record<string, string> {
-    return {
-        k: '#202325', d: '#322d2a', b: '#46352b', w: '#84613e', l: '#b59a64',
-        f: '#c69c71', s: '#9ba6ab', a: '#e2e8f0', h: '#c1c9c8', m: '#697778', g: '#c7a35e',
-        q: '#aaa183', c: faction === 0 ? '#265cc2' : '#cc2b2b', T: faction === 0 ? '#78a1c0' : '#d18870', t: faction === 0 ? '#36566b' : '#702e2a'
-    };
-}
-const sprites = new Map<string, HTMLCanvasElement>();
-const palettes = new Map<string, readonly string[]>();
-export function sprite(kind: Kind, faction: Faction, frame = 0, flash = false): HTMLCanvasElement {
-    frame = ((Math.floor(frame) % 3) + 3) % 3;
-    const key = kind + faction + frame + Number(flash);
-    const known = sprites.get(key);
-    if (known)
-        return known;
-    const matrix = matrices[kind], atlas = colors(faction);
-    if(kind==='rifleman'){atlas.c='#365e39';atlas.T='#658348';atlas.t='#254634';}
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(...matrix.map(row => row.length));
-    canvas.height = matrix.length;
-    const ctx = canvas.getContext('2d')!;
-    const siege = ['siege_mortar','field_cannon','organ_gun','davinci_tank'].includes(kind);
-    for (let y = 0; y < matrix.length; y++)
-        for (let x = 0; x < matrix[y].length; x++) {
-            const color = atlas[matrix[y][x]];
-            if (!color)
-                continue;
-            let dx = x, dy = y;
-            if (frame === 1 && !siege) {
-                if (y >= matrix.length - 2)
-                    dx += x < canvas.width / 2 ? -1 : 1;
-                else if (y < matrix.length - 4)
-                    dy++;
-            }
-            if (frame === 2) {
-                if (siege && kind === 'siege_mortar' && y < 7)
-                    dx -= Math.floor((7 - y) / 2);
-                else if (siege && kind === 'field_cannon' && y < 9)
-                    dx--;
-                else if (!siege && x >= 5 && y < 7) {
-                    dx++;
-                    dy = Math.min(6, dy + 1);
-                }
-                else if (!siege && y < 6)
-                    dx++;
-            }
-            ctx.fillStyle = flash && 'sham'.includes(matrix[y][x]) ? '#b1a79a' : color;
-            ctx.fillRect(dx, dy, 1, 1);
+import {crews,UNITS} from '../sim/config';
+import type {Faction,Kind,Unit} from '../sim/types';
+type Pose=Unit['pose']|'braceNorth'|'braceSouth';
+const cache=new Map<string,HTMLCanvasElement>();
+const black='#222527',white='#e9e4cf',skin='#d9ad82',wood='#835c3a',gold='#dfb96c',silver='#c3ced2';
+export function spritePalette(k:Kind,f:Faction){return [black,white,skin,wood,gold,silver,k==='rifleman'?'#315a3d':f?'#ae312b':'#285798'];}
+export function sprite(k:Kind,f:Faction,pose:Pose|number='march1',flash=false){
+    if(typeof pose==='number')pose=(['march1','march2','aim'] as const)[pose%3];
+    const key=[k,f,pose,flash].join('/'),known=cache.get(key);if(known)return known;
+    const mounted=UNITS[k].traits.includes('mount'),gun=!!crews[k],wagon=k==='supply_wagon';
+    const art=document.createElement('canvas');art.width=gun||wagon?28:mounted?18:12;art.height=gun?20:mounted||wagon?16:15;
+    const c=art.getContext('2d')!, coat=spritePalette(k,f)[6],step=pose==='march2'?1:0;
+    const rect=(col:string,x:number,y:number,w=1,h=1)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
+    const line=(col:string,x:number,y:number,ex:number,ey:number)=>{
+        const n=Math.max(Math.abs(ex-x),Math.abs(ey-y),1);for(let i=0;i<=n;i++)rect(col,Math.round(x+(ex-x)*i/n),Math.round(y+(ey-y)*i/n));};
+    const wheel=(x:number,y:number,r:number)=>{for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){
+        const d=Math.hypot(i,j);if(d<=r&&(d>=r-1||i===0||j===0||Math.abs(i)===Math.abs(j)))rect(d>=r-1?black:wood,x+i,y+j);}
+        rect(gold,x,y);};
+    if(gun){
+        line(wood,1,18,16,10);line(wood,2,18,17,10);
+        const muzzle=k==='howitzer'?21:27,high=k==='howitzer'?2:6;
+        for(let i=0;i<(k==='howitzer'?6:4);i++)line(i===0?silver:i===1?'#82867e':black,9,10+i,muzzle,high+i);
+        rect(gold,9,12,6,2);wheel(12,14,k==='horse_artillery'?4:5);
+    }else if(wagon||mounted){
+        const x=wagon?12:0;
+        rect('#533b2b',x+2,8,11,5);rect('#956a45',x+3,8,9,3);rect('#684b36',x+11,6,4,5);rect(wood,x+13,5,4,3);
+        rect(black,x+13,4,1,2);rect(black,x+15,5);line(black,x+2,9,x,13);
+        for(const [leg,dx] of [[3,step?2:-1],[10,step?-1:2]]){line(wood,x+leg,12,x+leg+dx,15);rect(black,x+leg+dx,15,2);}
+        if(wagon){rect('#594430',0,6,13,6);rect('#b69b6a',1,4,11,5);rect('#d0be94',2,3,9,4);wheel(3,12,3);wheel(10,12,3);}
+        else{
+            rect(black,6,1,5,2);rect(k==='cuirassier'?silver:gold,7,0,3,1);rect(skin,7,3,3,2);
+            rect(k==='cuirassier'?silver:coat,5,5,5,4);rect(gold,5,5,2);line(white,6,5,9,8);rect(black,6,9,2,3);
+            if(k==='lancer'){line(wood,9,8,16,0);rect('#c44939',13,1,3);rect(white,12,2,3);}
+            else line(k==='dragoon'?wood:silver,9,7,16,k==='dragoon'?6:2);
         }
-    if(!matrix.some(row=>/[ctT]/.test(row))){
-        const x=Math.max(1,Math.floor(canvas.width*.36)),y=Math.floor(canvas.height*.6);
-        ctx.fillStyle=atlas.t;ctx.fillRect(x,y,4,3);ctx.fillStyle=atlas.c;ctx.fillRect(x,y,3,2);ctx.fillStyle=atlas.T;ctx.fillRect(x,y,1,2);
+    }else{
+        const kneel=pose==='kneel',thrust=pose==='bayonet',aim=pose==='aim',load=kneel||pose==='reload';
+        const x=thrust?4:3,y=kneel?4:1;
+        rect(black,x,y,4,3);rect(k==='peasant'?wood:black,x-1,y+2,6);
+        rect(k==='rifleman'?'#48754b':gold,x+2,y+1);
+        if(k==='guard_grenadier')rect(black,x-1,y-1,5,4);
+        rect(skin,x+1,y+3,3,2);rect('#9b7256',x+1,y+4);
+        rect(k==='peasant'?'#ae9473':coat,x-1,y+5,5,5);
+        line(white,x-1,y+5,x+3,y+9);line(white,x+3,y+5,x,y+8);
+        rect(gold,x-1,y+5,2);rect(gold,x+3,y+5);rect(black,x-1,y+10,5);
+        if(k==='sapper')rect(white,x,y+7,4,4);
+        if(k==='highlander')rect('#416850',x-1,y+10,5,2);
+        if(kneel){rect(black,1,13,4,2);rect(black,6,12,2,3);rect(black,7,14,2);}
+        else{rect(black,x-1-step,12,2,3);rect(black,x+2+step,11,2,3);rect(black,x+2+step,14,3);}
+        if(k==='sapper'||k==='peasant'){
+            line(wood,5,y+9,thrust?11:8,thrust?y+6:y+1);rect(k==='sapper'?silver:'#a39c82',thrust?9:7,thrust?y+5:y+1,3,2);
+        }else if(pose==='braceNorth'||pose==='braceSouth'){
+            const tip=pose==='braceNorth'?0:14;line(wood,3,10,8,tip+(tip? -2:2));line(white,7,tip+(tip?-3:3),8,tip);rect(skin,5,8,2);
+        }else if(load){rect(wood,8,3,1,11);rect(silver,8,2,1,5);rect(skin,7,7,2);rect(skin,6,10,3);}
+        else if(aim||thrust){rect(wood,3,y+7,8);rect(silver,6,y+6,6);rect(skin,7,y+7,2);if(thrust){rect(white,9,y+5,3);rect(white,11,y+4);}}
+        else{line(wood,3,11,9,2);line(silver,7,5,10,0);rect(skin,5,8,2);}
     }
-    if(kind==='rifleman'){ctx.fillStyle=faction?'#cc2b2b':'#265cc2';ctx.fillRect(2,2,2,1);}
-    sprites.set(key, canvas);
-    return canvas;
-}
-export function spritePalette(kind: Kind, faction: Faction): readonly string[] {
-    const key = kind + faction;
-    let result = palettes.get(key);
-    if (!result) {
-        const atlas = colors(faction);
-        result = [...new Set([...matrices[kind].join('').split('').map(c => atlas[c]).filter(Boolean),atlas.c,atlas.T])];
-        palettes.set(key, result);
+    const facingColor=f?'#ba3834':'#315eb2';
+    if(gun){
+        rect(facingColor,5,15,3,2);rect(gold,5,15);
+        if(k==='horse_artillery'){wheel(3,15,2);rect('#aaa77f',0,10,7,3);}
+    }else if(wagon)rect(facingColor,4,5,5,2);
+    else if(mounted){rect(facingColor,3,9,4,2);if(k==='hussar'){line(gold,5,5,8,7);rect('#c54e39',6,0);}}
+    else{
+        rect(facingColor,3,pose==="kneel"?10:7,1,2);
+        if(k==='rocket_crew'){line(black,2,12,9,1);line('#aa4d30',3,12,10,1);rect(silver,9,1,2);}
+        if(k==='volley_gunner'){const y=pose==='aim'||pose==='bayonet'?6:2;rect('#696e6e',8,y,3,3);rect(black,8,y);rect(black,10,y+1);}
+        if(k==='highlander'){rect('#6b884e',2,11,5,2);rect('#903f38',3,11,1,2);rect('#d4473b',3,1,2);}
+        if(k==='rifleman')rect(facingColor,3,3,2);
     }
-    return result;
+    if(flash){c.globalCompositeOperation='source-atop';rect('#f5e9dc44',0,0,art.width,art.height);}
+    cache.set(key,art);return art;
 }

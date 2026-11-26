@@ -1,3 +1,4 @@
+import {artwork} from './artLoader';
 import {banner} from './banners';
 import type { Structure } from '../sim/types';
 // High-contrast masonry, timber and conifers painted at native pixel resolution.
@@ -19,7 +20,7 @@ function makeScenery(type: Structure['type'], faction: number, variant: number, 
             H = 118;
             break;
         case 'tower':
-        case 'outpost':
+        case 'redoubt':
             W = 42;
             H = 58;
             break;
@@ -220,7 +221,7 @@ function makeScenery(type: Structure['type'], faction: number, variant: number, 
             dot('#ebbd71', x + 1, 83, 1, 3);
         }
     }
-    else if (type === 'tower' || type === 'outpost') {
+    else if (type === 'tower' || type === 'redoubt') {
         if (type === 'tower') {
             turret(7, 15, 28, 40);
             bricks(4, 49, 34, 7);
@@ -383,8 +384,21 @@ function makeScenery(type: Structure['type'], faction: number, variant: number, 
 }
 const ironColor = '#67695f';
 export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick: number, flags=true) {
-    if (s.hp <= 0)
+    if(s.hp<=0){
+        if(s.type==='tree'){ctx.fillStyle='#584732';ctx.beginPath();ctx.ellipse(s.x,s.y,7,4,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#aa8961';ctx.fillRect(s.x-4,s.y-3,8,3);}
         return;
+    }
+    const name=s.type==='tree'?s.treeArt??'oak':({keep:'starfort',house:'cottage',windmill:'windmill',farmhouse:'farmhouse',redoubt:'redoubt'} as Record<string,string>)[s.type];
+    const image=name&&artwork.get('scenery_'+name);
+    if(image){
+        const size=s.type==='tree'?(name==='bush'?42:72)*(s.scale??1):s.w*(s.type==='keep'?1.55:1.25);
+        const h=size*image.naturalHeight/image.naturalWidth;
+        ctx.save();ctx.translate(s.x,s.y);ctx.scale(s.flip?-1:1,1);ctx.imageSmoothingEnabled=true;
+        ctx.drawImage(image,-size/2,-h*.62,size,h);ctx.restore();
+        if(flags&&s.faction!==-1&&['keep','windmill','farmhouse','redoubt'].includes(s.type))
+            ctx.drawImage(banner(s.faction,Math.floor(tick/7)),s.x-4,s.y-h*.52-26,26,37);
+        return;
+    }
     if(s.type==='wheat'){
         const x=Math.round(s.x-s.w/2),y=Math.round(s.y-s.h/2);
         ctx.fillStyle='#997344';ctx.fillRect(x,y,s.w,s.h);
@@ -396,7 +410,7 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick:
     const key = s.type + '|' + s.faction + '|' + variant + '|' + aspect;
     let art = atlas.get(key);
     if (!art) {
-        const hall=['barracks','range','stables','abbey','siege_workshop'].includes(s.type);
+        const hall=['barracks','range','stables','academy','foundry'].includes(s.type);
         art = makeScenery(hall?'house':s.type, s.faction, variant, aspect);
         const g=art.getContext('2d')!;
         const ink=(color:string,x:number,y:number,w:number,h:number)=>{g.fillStyle=color;g.fillRect(x,y,w,h);};
@@ -410,10 +424,10 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick:
         }
         if(hall){
             ink('#342d25',14,20,13,11);ink('#a58653',15,20,11,1);
-            if(s.type==='abbey'){ink('#bca46d',19,4,2,23);ink('#dac593',15,8,10,2);}
+            if(s.type==='academy'){ink('#bca46d',19,4,2,23);ink('#dac593',15,8,10,2);}
             if(s.type==='range')for(let i=0;i<3;i++)ink(['#cab18a','#7e3e30','#d9c695'][i],16+i*2,21+i*2,10-i*4,9-i*4);
             if(s.type==='stables'){ink('#b29970',18,22,2,5);ink('#b29970',23,22,2,5);ink('#b29970',19,27,5,2);}
-            if(s.type==='siege_workshop'){ink('#474341',29,7,5,16);ink('#81786a',28,6,7,2);ink('#bd9758',18,24,7,3);}
+            if(s.type==='foundry'){ink('#474341',29,7,5,16);ink('#81786a',28,6,7,2);ink('#bd9758',18,24,7,3);}
             if(s.type==='barracks')for(let i=0;i<6;i++){ink('#c8c7b8',17+i,22+i,2,1);ink('#c8c7b8',23-i,22+i,2,1);}
         }
         atlas.set(key, art);
@@ -441,7 +455,7 @@ export function drawStructure(ctx: CanvasRenderingContext2D, s: Structure, tick:
         ctx.drawImage(banner(s.faction===1?1:0,Math.floor(tick/7)),x,y-68,50,70);
         for(let i=1;i<(s.age??1);i++){const bx=Math.round(s.x+(i===1?-1:1)*width*.32);ctx.drawImage(banner(s.faction===1?1:0,Math.floor(tick/7)),bx,y-8,22,30);}
     }
-    if (s.type === 'tower' || s.type === 'outpost') {
+    if (s.type === 'tower' || s.type === 'redoubt') {
         const scale = Math.max(1, Math.round(width / art.width));
         const x = Math.round(left + width * (.32)), y = Math.round(top + height * (.23));
         const n = Math.floor(tick / 6) % 6, colors = s.faction === 0 ? ['#263e50', '#386fa3', '#80a6c0'] : ['#592b2b', '#a43f3a', '#c8986e'];

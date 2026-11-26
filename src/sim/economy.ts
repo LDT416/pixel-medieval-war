@@ -1,5 +1,6 @@
+import {supplyBend} from './maps';
 import {pay,ready} from './buildings';
-import {batchSize,capacity,crews,UNITS} from './config';
+import {batchSize,capacity,crews,UNITS,strength,shelter} from './config';
 import { distanceTo } from './combat';
 import type { SimWorld } from './world';
 import type { Command, Faction, Structure, Unit } from './types';
@@ -14,31 +15,34 @@ export function civicCommand(w: SimWorld, c: Command) {
         if(realm.age>=4)return refuse('农舍已达最高等级');
         if(w.mode==='lord'&&!pay(realm,80*realm.age,75*realm.age))return refuse('升级所需木材或军粮不足');
         realm.age++;keep.age=realm.age;
+        for(const farm of w.structures)if(farm.type==='house'&&farm.faction===f)farm.age=realm.age;
         for(const type of ['house','wheat'] as const){
             const model=w.structures.find(s=>s.type===type&&s.faction===f)!;
-            const s={...model,id:w.next++,age:realm.age,x:model.x+(f?-1:1)*(realm.age%2===0?220:0),y:model.y-(realm.age>=3?115:0),hp:model.maxHp};
+            const s={...model,id:w.next++,age:realm.age,x:model.x+(f?-1:1)*(realm.age===3?0:170),y:model.y-(realm.age>=3?125:0),hp:model.maxHp};
             w.structures.push(s);w.byStructure.set(s.id,s);
         }
         w.dirty=true;return true;
     }
     if(c.type==='train'){
-        const kind=c.payload.kind==='guard'?'bannerman':c.payload.kind,def=UNITS[kind];
+        const kind=c.payload.kind,def=UNITS[kind];
+        if(kind==='supply_wagon')return true;
         const pending=(keep.queue??[]).filter(q=>q.kind===kind).length;
         const total=pending+w.units.filter(u=>u.faction===f&&u.kind===kind&&!u.gun).length;
-        if(kind==='davinci_tank'&&total>=2)return refuse('木甲战车已达两台上限');
         if(kind==='peasant'&&w.mode==='lord'&&total>=capacity[realm.age])return refuse('农舍已满，请扩建村落');
-        if(w.mode==='lord'&&def.role==='重炮机械'&&!w.structures.some(s=>s.type==='siege_workshop'&&s.faction===f&&ready(s)))return refuse('请先建造军事工坊');
-        if(w.mode==='lord'&&!pay(realm,def.wood,def.gold))return refuse('军粮或木材不足');
-        (keep.queue??=[]).push({kind,progress:0,total:w.mode==='sandbox'?1:kind==='peasant'?10:18});return true;
+        if(w.mode==='lord'&&def.role==='重炮机械'&&!w.structures.some(s=>s.type==='foundry'&&s.faction===f&&ready(s)))return refuse('请先建造重炮铸造厂');
+        if(w.mode==='lord'&&['guard_grenadier','highlander','cuirassier'].includes(kind)&&!w.structures.some(s=>s.type==='barracks'&&s.faction===f&&ready(s)))return refuse('请先建成近卫军营');
+        const cost=c.payload.full?strength[kind]/batchSize(kind):1;
+        if(w.mode==='lord'&&!pay(realm,Math.ceil(def.wood*cost),Math.ceil(def.gold*cost)))return refuse('军粮或木材不足');
+        (keep.queue??=[]).push({kind,full:c.payload.full,progress:0,total:w.mode==='sandbox'?1:kind==='peasant'?10:18});return true;
     }
     if (c.type === 'research') {
         const key = c.payload.tech;
-        if (w.mode !== 'lord' || realm[key])
+        if (realm[key])
             return true;
-        if (!w.structures.some(s => s.faction === f && s.type === 'abbey' && ready(s)) || realm.age < 2)
-            return refuse('研发需要 T2 时代与建成的修道院。');
-        if (!pay(realm, 100, 140))
-            return refuse('研发需要木材 100、黄金 140。');
+        if (w.mode==='lord'&&(!w.structures.some(s => s.faction === f && s.type === 'academy' && ready(s)) || realm.age < 2))
+            return refuse('研发需要 T2 时代与建成的陆军学院。');
+        if (w.mode==="lord"&&!pay(realm, 100, 140))
+            return refuse('研发需要木材 100、军粮 140。');
         realm[key] = true;
         return true;
     }
@@ -59,11 +63,6 @@ export function civicCommand(w: SimWorld, c: Command) {
             }
         return true;
     }
-    if (c.type === 'guard') {
-        if (w.mode === 'sandbox')
-            w.honorGuard(f, c.payload);
-        return true;
-    }
     return false;
 }
 export function economyTick(w: SimWorld) {
@@ -74,6 +73,13 @@ export function economyTick(w: SimWorld) {
                 w.realms[f].wood += 8;
             }
     for (const s of w.structures) {
+        if(s.faction!==-1&&ready(s)&&w.tick>0){
+            if(w.tick%90===0&&shelter(s.type)&&w.units.some(n=>n.tower===s.id&&n.hp>0))w.realms[s.faction].gold+=8;
+            if(s.type==='house'&&(s.age??1)>=2&&(w.tick+s.id)%360===0&&!w.units.some(u=>u.farm===s.id)){
+                const wagon=w.spawn(s.faction,'supply_wagon',1,{x:s.x,y:s.y+48},'line')[0];
+                wagon.farm=s.id;wagon.cargo=64*(s.age??2);
+            }
+        }
         const item = s.queue?.[0];
         if (!item || !ready(s) || s.faction === -1)
             continue;
@@ -82,14 +88,11 @@ export function economyTick(w: SimWorld) {
         s.queue!.shift();
         const f = s.faction, p = { x: s.x + (f === 0 ? 1 : -1) * (s.w / 2 + 28), y: s.y }, kind = item.kind;
         if(kind==='peasant'){p.x=s.x-(f?-1:1)*120;p.y=s.y-145;}
-        const unitKind = kind === 'guard' ? 'bannerman' : kind;
-        const qty = unitKind === 'bannerman' ? 1 : batchSize(unitKind);
-        const form = UNITS[unitKind].role === '步兵' ? 'phalanx' : UNITS[unitKind].role === '火枪' ? 'line' : 'skirmish';
-        const troops = unitKind === 'bannerman' ? w.honorGuard(f, p) : w.spawn(f, unitKind, qty, p, form);
+        const qty=item.full?strength[kind]:batchSize(kind);
+        const troops=item.full?w.spawn(f,kind,qty,p,'line'):w.reinforce(f,kind,qty,p);
         for (const u of troops) {
-            if (u.kind === 'peasant')
-                u.prefer = w.units.filter(n => n.faction === f && n.kind === 'peasant').length % 2 ? 'wood' : 'gold';
-            w.groups.get(u.group)!.point = s.rally ?? w.realms[f].rally;
+            const rally=s.rally??w.realms[f].rally;
+            if(rally)w.groups.get(u.group)!.point=rally;
         }
     }
 }
@@ -105,6 +108,20 @@ function closest(u: Unit, sites: Structure[]) {
     return best;
 }
 export function work(w: SimWorld, u: Unit) {
+    if(u.kind==='supply_wagon'){
+        const farm=w.byStructure.get(u.farm??0),keep=w.keep(u.faction);
+        const dest=u.returning?farm:keep;
+        if(!farm||!keep||!dest||dest.hp<=0){u.hp=0;return true;}
+        if(!u.passedBend){
+            const bend=supplyBend(farm,keep);
+            if(Math.hypot(u.x-bend.x,u.y-bend.y)>10){w.approach(u,bend);return true;}
+            u.passedBend=true;
+        }
+        if(distanceTo(u,dest)>24)w.approach(u,dest);
+        else if(u.returning){u.hp=0;}
+        else{w.realms[u.faction].gold+=u.cargo??0;w.realms[u.faction].wood+=Math.floor((u.cargo??0)/2);u.cargo=0;u.returning=true;u.passedBend=false;}
+        return true;
+    }
     if (u.kind !== 'peasant' && u.kind !== 'sapper')
         return false;
     const f = u.faction;
@@ -132,7 +149,7 @@ export function work(w: SimWorld, u: Unit) {
                 job.hp = Math.min(job.maxHp, job.hp + rate * job.maxHp / job.needed);
                 if (job.work >= job.needed) {
                     job.needed = 0;
-                    w.finishBuilding(job);
+                    w.finishBuilding();
                     u.job = undefined;
                 }
             }
@@ -147,6 +164,9 @@ export function work(w: SimWorld, u: Unit) {
     if(u.kind==='sapper'){
         const gun=w.units.find(n=>n.faction===f&&n.crew&&n.hp>0&&n.hp<UNITS[n.kind].hp&&distanceTo(u,n)<85);
         if(gun){if(distanceTo(u,gun)>23)w.approach(u,gun);else gun.hp=Math.min(UNITS[gun.kind].hp,gun.hp+1.5);return true;}
+        if(u.manual||u.gun)return false;
+        const tree=w.structures.find(s=>s.type==='tree'&&s.hp>0&&distanceTo(u,s)<36);
+        if(tree&&u.cooldown<=0){w.damageStructure(tree,tree.hp,f,'sapper');w.realms[f].wood+=38;u.cooldown=20;u.swing=6;return true;}
         return false;
     }
     const keep = w.keep(f);
@@ -165,7 +185,7 @@ export function work(w: SimWorld, u: Unit) {
     const workers=w.units.filter(n=>n.faction===f&&n.kind==='peasant'&&n.hp>0);
     const rank=workers.indexOf(u);
     const fraction=realm.policy==='auto'?.5:realm.policy==='gold'?.75:.25;
-    const resource=rank<Math.round(workers.length*fraction)?'gold':'wood';
+    const resource=u.prefer??(rank<Math.round(workers.length*fraction)?'gold':'wood');
     const type=resource==='wood'?'tree':'wheat';
     if (!job || job.hp <= 0 || job.type !== type || (job.stock ?? 1) <= 0) {
         job = closest(u, w.structures.filter(s => s.type === type && (type==='tree'||s.faction===f) && s.hp > 0 && (s.stock ?? 1) > 0));

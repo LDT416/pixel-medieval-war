@@ -3,7 +3,7 @@ import { Rng } from './rng';
 export const WIDTH = 4800, HEIGHT = 1760, CELL = 16, COLS = 300, ROWS = 110;
 export const bridgeYs = [520, 1240];
 export function riverX(y: number) { return 2360 + Math.sin(y / 312 + .7) * 114 + Math.sin(y / 137) * 32 + y * .045; }
-export const MAPS:Record<MapId,string>={darkwood:'幽暗密林古道',gorge:'铁血大草原',twin:'双桥血河与林谷'};
+export const MAPS:Record<MapId,string>={darkwood:'阿登自然古林',gorge:'滑铁卢乡间高地',twin:'双桥血河与农庄'};
 export function riverWidth(y:number,map:MapId='twin'){return map==='twin'?208+Math.sin(y/165)*26+Math.cos(y/93)*12:0;}
 export function shoreAt(x:number,y:number,map:MapId,center=riverX(y),half=riverWidth(y,map)/2){return half?Math.abs(x-center)-half:WIDTH;}
 export function water(x:number,y:number,map:MapId='twin') {return shoreAt(x,y,map)<0;}
@@ -17,6 +17,20 @@ export function bridgeSize(y:number,map:MapId='twin',at=riverX(y)) {
         left=Math.min(left,a);right=Math.max(right,b);
     }
     return {x:(left+right)/2,w:right-left+48};
+}
+function valueNoise(x:number,y:number,seed:number){
+    const ix=Math.floor(x),iy=Math.floor(y);
+    const sample=(a:number,b:number)=>{let h=Math.imul(a+seed,374761393)^Math.imul(b,668265263);h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296;};
+    const smooth=(n:number)=>n*n*(3-2*n),u=smooth(x-ix),v=smooth(y-iy);
+    return (sample(ix,iy)*(1-u)+sample(ix+1,iy)*u)*(1-v)+(sample(ix,iy+1)*(1-u)+sample(ix+1,iy+1)*u)*v;
+}
+export function roadY(x:number,lane:number){
+    const bend=Math.sin((x-2400)/230)*30+Math.sin((x-2400)/570)*42;
+    return 880+(lane-880)*Math.min(1,Math.max(0,(Math.min(x,WIDTH-x)-820)/560))+bend;
+}
+// Farm carts meet the estate road south of the wheat before turning towards the fort.
+export function supplyBend(farm:Structure,keep:Structure){
+    return {x:farm.x+(keep.x-farm.x)*.33,y:farm.y+Math.min(85,(keep.y-farm.y)*.45)};
 }
 export function createMap(map:MapId='twin'): Structure[] {
     const result: Structure[] = [], rng = new Rng(21812);
@@ -39,34 +53,22 @@ export function createMap(map:MapId='twin'): Structure[] {
         const d=f?-1:1,base=f?4190:610;
         place('house',base-d*110,650,66,50,520,f);
         place('wheat',base,640,100,65,400,f);
-        for(let i=0;i<36;i++) place('tree',base-d*(220+rng.int(0,170)),460+i*24,30,28,65);
     }
-    // 地图上下与左右四面边缘全部环绕茂密森林带（保留南北翼骑兵绕后走廊与宽阔中央线列战场）
-    for (let x = 40; x < WIDTH - 40; x += 48) {
-        for (const band of [42, 92, 144, HEIGHT - 144, HEIGHT - 92, HEIGHT - 42]) {
-            const tx = x + rng.int(-12, 12), ty = band + rng.int(-10, 10);
-            if (water(tx, ty, map) || Math.abs(tx - 610) < 160 && Math.abs(ty - 880) < 260 || Math.abs(tx - 4190) < 160 && Math.abs(ty - 880) < 260)
-                continue;
-            place('tree', tx, ty, 38, 34, 75);
-        }
-    }
-    for (let y = 190; y < HEIGHT - 190; y += 52) {
-        for (const edgeX of [48, 106, 168, WIDTH - 168, WIDTH - 106, WIDTH - 48]) {
-            const tx = edgeX + rng.int(-12, 12), ty = y + rng.int(-12, 12);
-            place('tree', tx, ty, 38, 34, 75);
-        }
-    }
-    // 中央缓冲交战带树木加密（密林古道留窄隘口与绕后通道，大草原保留开阔线列决战地并点缀茂密侧翼林簇）
-    const step = map === 'darkwood' ? 46 : map === 'twin' ? 68 : 112;
-    for(let x=1220;x<3580;x+=step)for(let y=195;y<HEIGHT-195;y+=step){
-        const tx=x+rng.int(-10,10),ty=y+rng.int(-10,10);
-        // 留出中央主战场宽阔线列展开区与南北骑兵绕后走廊
-        if (Math.abs(ty - 245) < 42 || Math.abs(ty - (HEIGHT - 245)) < 42) continue;
-        if (map === 'darkwood' && [520, 880, 1240].some(l => Math.abs(ty - l) < 58)) continue;
-        if (map === 'twin' && ([520, 1240].some(l => Math.abs(ty - l) < 92) || Math.abs(tx - 2400) > 680)) continue;
-        if (map === 'gorge' && (Math.abs(ty - 880) < 340 || rng.next() > .42)) continue;
-        if (water(tx, ty, map)) continue;
-        place('tree',tx,ty,step<=50?42:36,step<=50?40:32,75);
+    place('farmhouse', map==='twin'?2110:2310,780,128,92,1800);
+    place('windmill',map==='twin'?2700:2550,1190,82,74,1300);
+    const clearings=result.slice(), seed=map==='darkwood'?13:map==='twin'?31:47;
+    for(let i=0;i<3800;i++){
+        const x=rng.int(25,WIDTH-25),y=rng.int(25,HEIGHT-25);
+        const edge=Math.min(x,WIDTH-x,y,HEIGHT-y);
+        const noise=.62*valueNoise(x/410,y/330,seed)+.27*valueNoise(x/150,y/180,seed)+.11*valueNoise(x/53,y/66,seed);
+        if(noise+Math.max(0,1-edge/210)*.54<(map==='darkwood'?.50:map==='twin'?.59:.64))continue;
+        if(water(x,y,map)||clearings.some(s=>Math.abs(s.x-x)<s.w/2+40&&Math.abs(s.y-y)<s.h/2+44))continue;
+        if([255,520,880,1240,1505].some(l=>Math.abs(y-roadY(x,l))<(l===880?80:46)))continue;
+        if(Math.min(Math.abs(x-960),Math.abs(x-3840))<230&&Math.abs(y-880)<360)continue;
+        if(result.some(s=>s.type==='tree'&&(s.x-x)**2+(s.y-y)**2<26**2))continue;
+        const roll=rng.next(),scale=.75+rng.next()*.6;
+        place('tree',x,y,27*scale,24*scale,75);
+        Object.assign(result[result.length-1],{treeArt:roll<.55?'oak':roll<.8?'beech':roll<.92?'spruce':'bush',scale,flip:rng.next()<.5});
     }
     return result;
 }

@@ -1,19 +1,19 @@
 export type Faction = 0 | 1;
-export type Kind = 'peasant' | 'sapper' | 'bannerman' | 'shieldman' | 'halberdier' | 'zweihander' | 'plate_knight' | 'musketeer' | 'guard_grenadier' | 'rifleman' | 'volley_gunner' | 'dragoon' | 'heavy_lancer' | 'scout_cavalry' | 'davinci_tank' | 'field_cannon' | 'siege_mortar' | 'organ_gun';
-export type Formation = 'phalanx' | 'line' | 'skirmish';
+export type Kind = 'peasant' | 'sapper' | 'highlander' | 'rocket_crew' | 'lancer' | 'supply_wagon' | 'line_infantry' | 'guard_grenadier' | 'rifleman' | 'volley_gunner' | 'dragoon' | 'cuirassier' | 'hussar' | 'field_cannon' | 'howitzer' | 'horse_artillery';
+export type Formation = 'square' | 'line' | 'crescent' | 'melee';
 export type MapId = 'twin' | 'darkwood' | 'gorge';
 export type Mode = 'sandbox' | 'lord';
 export type Difficulty = 'easy' | 'normal' | 'brutal';
-export type Facility = 'barracks' | 'range' | 'stables' | 'abbey' | 'siege_workshop';
+export type Facility = 'barracks' | 'range' | 'stables' | 'academy' | 'foundry';
 export type Resource = 'wood' | 'gold';
-export type Tech = 'steel' | 'powder';
+export type Tech = 'steel' | 'powder' | 'grape';
 export type Phase = 'PATROL_GATHER'|'WAVE_ASSAULT'|'RETREAT_REGROUP';
-export interface Realm {cooldownUntil?:number;phase:Phase; wave:number; baseline:number; policy:'gold'|'wood'|'auto';wood:number; gold:number; age:number; steel:boolean; powder:boolean; farmersKilled:number; rally:Point|null}
+export interface Realm {cooldownUntil?:number;phase:Phase; wave:number; baseline:number; policy:'gold'|'wood'|'auto';wood:number; gold:number; age:number; grape:boolean; steel:boolean; powder:boolean; farmersKilled:number; rally:Point|null}
 export interface FireCell extends Point {end:number; faction:Faction; kind:Kind; spread:number}
 export interface Barrel extends Point {due:number; faction:Faction}
 export interface Drop extends Point {resource:Resource; amount:number}
-export type StructureType = Facility | 'wheat' | 'mine' | 'rock' | 'keep' | 'tower' | 'gate' | 'wall' | 'lowwall' | 'palisade' | 'bridge' | 'pontoon' | 'tree' | 'house' | 'outpost';
-export type BuildType = Facility | 'lowwall' | 'palisade' | 'pontoon' | 'outpost';
+export type StructureType = Facility | 'wheat' | 'mine' | 'rock' | 'keep' | 'tower' | 'gate' | 'wall' | 'lowwall' | 'palisade' | 'bridge' | 'pontoon' | 'tree' | 'house' | 'farmhouse' | 'windmill' | 'redoubt';
+export type BuildType = Facility | 'lowwall' | 'palisade' | 'pontoon' | 'redoubt';
 export interface Point {
     x: number;
     y: number;
@@ -31,7 +31,7 @@ export interface Structure extends Point {
     h: number;
     hp: number;
     maxHp: number;
-    stock?: number; work?:number; needed?:number; age?:number; queue?:{kind:Kind|'guard'; progress:number; total:number}[]; rally?:Point;
+    treeArt?:'oak'|'beech'|'spruce'|'bush'; scale?:number; flip?:boolean; stock?: number; work?:number; needed?:number; age?:number; queue?:{kind:Kind; full?:boolean; progress:number; total:number}[]; rally?:Point;
     faction: Faction | -1;
 }
 export interface Unit extends Body {
@@ -43,7 +43,7 @@ export interface Unit extends Body {
     group: number;
     slot: number;
     cooldown: number;
-    face: number;
+    face: number; faceLock:number; squareSide?:number; rankIndex:number; pose:'march1'|'march2'|'aim'|'kneel'|'bayonet'|'reload'; firedAt?:number; commandRole?:'flag'|'drum'; farm?:number; returning?:boolean; passedBend?:boolean;
     swing: number;
     charge: number;
     tower: number;
@@ -51,7 +51,7 @@ export interface Unit extends Body {
     lastAttacker: number;
     lastKind: Kind;
     lethalFall: boolean;
-    gun?:number; wave?:number; manual?:boolean; crew?:number; morale?:number; grenadeAt?:number; marchSlot?:number; moving?:boolean; enterTower?:number; job?:number; cargo?:number; resource?:Resource; prefer?:Resource; auraUntil?:number; escort?:'drum'|'horn'|'guard'; leader?:number; guardSide?:number; laborTick?:number;
+    gun?:number; wave?:number; manual?:boolean; crew?:number; morale?:number; grenadeAt?:number; marchSlot?:number; moving?:boolean; deployed?:boolean; enterTower?:number; job?:number; cargo?:number; resource?:Resource; prefer?:Resource; auraUntil?:number; escort?:'drum'|'horn'|'guard'; leader?:number; guardSide?:number; laborTick?:number;
 }
 export type Shot = 'spear' | 'rocket' | 'flask' | 'pellet' | 'bolt' | 'arrow' | 'bullet' | 'stone' | 'ball';
 export interface Projectile extends Body {
@@ -76,9 +76,9 @@ export interface SimEvent extends Point {
     faction?: Faction;
     structure?: Structure;
     power?: number;
-    unitId?: number;
+    unitId?: number; flag?:boolean;
 }
-type Action = {type:'charge'|'recall'|'cottage'|'policy';payload:{}} | {type:'repair';payload:{site:number;ids:number[]}} | {type:'garrison';payload:{tower:number;ids:number[]}} | {type:'train';payload:{kind:Kind|'guard'; building?:number}} | {type:'age'|'guard';payload:Point} | {type:'research';payload:{tech:Tech}} | {type:'rally';payload:Point & {building?:number}} | {type:'gather';payload:{resource:Resource;ids?:number[];target?:number}} | {
+type Action = {type:'charge'|'recall'|'cottage'|'policy';payload:{}} | {type:'repair';payload:{site:number;ids:number[]}} | {type:'garrison';payload:{tower:number;ids:number[]}} | {type:'train';payload:{kind:Kind; full?:boolean; building?:number}} | {type:'age';payload:Point} | {type:'research';payload:{tech:Tech}} | {type:'rally';payload:Point & {building?:number}} | {type:'gather';payload:{resource:Resource;ids?:number[];target?:number}} | {
     type: 'spawn';
     payload: Point & {
         kind: Kind;
@@ -125,7 +125,7 @@ export interface Group {
     id: number;
     count: number;
     point: Point | null;
-    targetId: number;
+    lineFacing?:number; reformUntil?:number; contactTick?:number; firingLine?:Point; reform?:Point; escortGroup?:number; volleyStart?:number; resting?:boolean; restTick?:number; peak?:number; destination?:Point; targetId: number;
     anchor: Point;
 }
 export interface Stat {
@@ -133,7 +133,7 @@ export interface Stat {
     damage: number;
 }
 export interface Snapshot {
-    player?:Faction; map?:MapId; mode?:Mode; difficulty?:Difficulty; realms?:Realm[]; fires?:FireCell[]; barrels?:Barrel[]; drops?:Drop[]; news?:string;
+    fronts?:{x:number;y:number;breached:boolean}[]; player?:Faction; map?:MapId; mode?:Mode; difficulty?:Difficulty; realms?:Realm[]; fires?:FireCell[]; barrels?:Barrel[]; drops?:Drop[]; news?:string;
     tick: number;
     seed: number;
     next: number;

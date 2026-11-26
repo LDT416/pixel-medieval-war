@@ -465,3 +465,22 @@ h2,label {
         height: 10px;
     }
 }
+
+.painting{background:#39392f}
+.painting #art{width:100%;height:clamp(230px,52vh,550px);object-fit:cover;display:block;object-position:center 52%}
+.painting:after{inset:0;background:linear-gradient(0deg,#171911e0,transparent 52%),linear-gradient(90deg,#26231b44,transparent 70%)}
+.title{left:4%;right:auto;bottom:6%;text-align:left}.title h1{text-indent:0;letter-spacing:.045em;font-family:Georgia,"STKaiti","KaiTi",serif}.title strong{letter-spacing:.32em}
+.portrait{width:64px;height:64px;object-fit:cover;border:3px double #b89b5f;box-shadow:0 2px 5px #10140e75}
+.unitCard{flex:none;display:grid;min-width:88px;gap:2px}.unitCard>button:first-child{width:100%}
+#book{background:#ede4cf;color:#342e22;border:3px double #9a845b;width:min(680px,94vw);max-height:80vh;padding:0}
+#book::backdrop{background:#101914bb}#book header{position:sticky;top:0;z-index:1}
+#entries{padding:15px;display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px}
+#entries article{display:grid;justify-items:center;gap:5px;text-align:center;font-size:12px}#entries .portrait{width:92px;height:92px}
+#detail{position:absolute;top:58px;left:10px;background:#1f2d26f4;border:1px solid #b1986c;padding:7px}
+#unitInfo{display:flex;align-items:center;gap:9px;margin-bottom:5px}#unitInfo img{width:38px;height:38px}
+#forms{display:flex;gap:3px}#forms button{font-size:12px;padding:6px}#settings{max-height:75vh;overflow:auto}
+#dock{max-width:90vw}#cards{overscroll-behavior:contain}#dock nav{overflow:auto}
+@media(max-width:700px){#dock{max-width:100%}.painting #art{height:clamp(225px,37vh,370px)}.title h1{font-size:43px}.title strong{font-size:17px}
+#detail{top:43px;left:4px;max-width:77%}#cards .portrait{width:48px;height:48px}#entries{grid-template-columns:repeat(3,1fr);padding:7px;gap:7px}#entries .portrait{width:74px;height:74px}}
+
+#battle button[aria-pressed=true]{background:#75613b;border-color:#e0c790}#battle button:disabled{opacity:.55;cursor:default}

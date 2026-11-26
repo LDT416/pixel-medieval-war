@@ -64,7 +64,7 @@ export class VfxPool {
             if (e.type === 'death' && e.kind) {
                 const sample = spritePalette(e.kind, e.faction ?? 0);
                 const cloth = e.faction === 1 ? '#b82424' : '#2556b0';
-                const armor = sample.includes('#697778') || e.kind === 'plate_knight' || e.kind === 'halberdier' || e.kind === 'heavy_lancer' ? '#cfd8e0' : cloth;
+                const armor = sample.includes('#697778') || e.kind === 'cuirassier' ? '#cfd8e0' : cloth;
                 const colors = ['#9e121c', '#6e0b13', '#dfd2b8', armor, '#d91c28', cloth];
                 // 士兵炸碎肉块（落地全部整像素贴死到地图贴图上）
                 const gibCount = dense ? 14 : 7;
@@ -75,36 +75,36 @@ export class VfxPool {
                 for (let i = 0; i < bloodCount; i++)
                     this.add({ ...e, z: Math.min(12, e.z ?? 6) }, i % 2 ? '#e01b27' : '#8a0f18', 2 + (i % 2), 0, .42, dense ? 7.5 : 4.5, 4 + Math.random() * 5.5);
                 // 脱盔爆帽演出（熊皮帽 / 三角帽 / 银铁盔单独飞落贴地）
-                if (e.kind === 'guard_grenadier' || e.kind === 'musketeer' || e.kind === 'plate_knight' || e.kind === 'halberdier' || e.kind === 'rifleman') {
-                    const hatColor = e.kind === 'plate_knight' || e.kind === 'halberdier' ? '#d4dde6' : e.kind === 'rifleman' ? '#2c4a34' : '#1b1d20';
+                if (e.kind === 'cuirassier' || e.kind === 'guard_grenadier' || e.kind === 'line_infantry' || e.kind === 'rifleman') {
+                    const hatColor = e.kind === 'cuirassier' ? '#d4dde6' : e.kind === 'rifleman' ? '#2c4a34' : '#1b1d20';
                     this.add({ ...e, z: 13 }, hatColor, e.kind === 'guard_grenadier' ? 5 : 4, 11, .52, 5.5, 6.2);
                 }
-                if (e.kind === 'bannerman')
+                if (e.flag)
                     this.add({ ...e, z: 23 }, '#734137', 24, 8, .48, 5, 3);
             }
             else if (e.type === 'trail')
                 this.add(e, '#c41622', dense ? 3 : 2, 0, .55, 1.5, 0);
             else if (e.type === 'hit') {
-                const gunHit = e.kind === 'musketeer' || e.kind === 'guard_grenadier' || e.kind === 'volley_gunner' || e.kind === 'rifleman' || e.kind === 'dragoon';
+                const gunHit = e.kind === 'line_infantry' || e.kind === 'guard_grenadier' || e.kind === 'volley_gunner' || e.kind === 'rifleman' || e.kind === 'dragoon';
                 const n = dense ? (gunHit ? 12 : 6 + (Math.random() * 5 | 0)) : (gunHit ? 7 : 3 + (Math.random() * 4 | 0));
                 for (let i = 0; i < n; i++)
                     this.add(e, i % 2 ? '#e01b27' : '#7a0e17', 2 + (i % 2), 0, .48, gunHit ? 10 : 6, 1.5 + Math.random() * 5.5);
             }
-            else if (e.type === 'fire' && (['musketeer', 'field_cannon', 'siege_mortar', 'organ_gun', 'volley_gunner', 'guard_grenadier', 'rifleman', 'dragoon', 'davinci_tank'].includes(e.kind ?? ''))) {
-                const isCannon = e.kind === 'field_cannon' || e.kind === 'siege_mortar' || e.kind === 'organ_gun' || e.kind === 'davinci_tank';
+            else if (e.type === 'fire' && (['line_infantry', 'field_cannon', 'howitzer', 'horse_artillery', 'volley_gunner', 'guard_grenadier', 'rifleman', 'dragoon', 'rocket_crew','highlander'].includes(e.kind ?? ''))) {
+                const isCannon = e.kind === 'field_cannon' || e.kind === 'howitzer' || e.kind === 'horse_artillery';
                 // 排枪浓密白灰硝烟墙（停留更久、缓慢飘升）
                 const smokeCount = isCannon ? (dense ? 26 : 18) : (dense ? 12 : 7);
                 for (let i = 0; i < smokeCount; i++)
                     this.add({ ...e, x: e.x + (e.dx ?? 1) * 12, y: e.y + (e.dy ?? 0) * 10 }, ['#dde0db', '#f4f4ea', '#c7ccc8'][i % 3], (isCannon ? 6 : 5) + (i % 7), 2, (isCannon ? 1.1 : .85) + Math.random() * .75, isCannon ? 5.5 : 3.2, 1.1 + Math.random() * 1.4);
                 const muzzle = { ...e, x: e.x + (e.dx ?? 1) * 15, y: e.y + (e.dy ?? 0) * 15 };
                 this.add(muzzle, '#ffd366', isCannon ? 18 : 10, 3, .11, 0, 0);
-                if (e.kind === 'volley_gunner' || e.kind === 'organ_gun')
+                if (e.kind === 'volley_gunner' || e.kind === 'horse_artillery')
                     this.add(muzzle, '#f0aa4d', 24, 10, .13, 0, 0);
             }
             else if (e.type === 'impact' || e.type === 'collapse') {
                 if (e.structure?.type !== 'tree') {
                     // 无震屏高爆 2 帧纯白→明黄瞬间闪光冲击环 + 尘浪
-                    this.add({ ...e, z: 2 }, '#fff8d6', 32, 12, .09, 0, 0);
+                    this.add({ ...e, z: 2 }, '#fff8d6', 32, 12, 2.5/30, 0, 0);
                     this.add({ ...e, z: 0 }, '#c4965e', 34, 7, .48, 0, 0);
                 }
                 const dust = dense ? 24 : 16;
@@ -161,7 +161,7 @@ export class VfxPool {
             const x = Math.round(p.x), y = Math.round(p.y - p.z);
             if (p.mode === 12) {
                 // 高爆瞬间 2 帧纯白/明黄冲击闪环
-                const r = 10 + p.size * (1 - p.life / .09);
+                const r = 10 + p.size * (1 - p.life / .1);
                 c.fillStyle = p.life > .045 ? '#ffffff' : '#ffcf54';
                 c.globalAlpha = .85;
                 c.beginPath();

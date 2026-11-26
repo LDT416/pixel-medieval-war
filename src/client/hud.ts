@@ -1,29 +1,32 @@
 import { portrait } from './portraits';
 import { banner } from './banners';
-import { batchSize, KINDS, UNITS } from '../sim/config';
+import { batchSize, strength,KINDS, UNITS } from '../sim/config';
 import type { Faction, Kind } from '../sim/types';
 export const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-export const categories = ['步兵', '火枪', '骑兵', '重炮机械', '仪仗'];
+export const categories = ['线列与近卫', '轻步火器', '骑兵', '炮兵', '后勤'];
+export function categoryOf(k:Kind){if(['line_infantry','guard_grenadier','highlander'].includes(k))return categories[0];
+    if(UNITS[k].traits.includes('mount'))return categories[2];if(UNITS[k].traits.includes('siege'))return categories[3];
+    return ['peasant','sapper','supply_wagon'].includes(k)?categories[4]:categories[1];}
 const btn = (id: string, label: string) => '<button id="' + id + '">' + label + '</button>';
 export function mount() {
     el('app').innerHTML = `<main id="cover">
         <div class="folio">
-        <header><b>⚜　千军战记</b><span>GOTHIC RENAISSANCE　 /　 v4.0</span>
+        <header><b>战役图册　·　一八一五</b><span>ÉDITION V　 /　 5.2</span>
         </header>
         <div class="painting">
-        <canvas id="art" aria-label="日照下英法要塞与火枪军团对峙的像素画"></canvas>
-        <div class="title"><small>ANGLO-FRENCH LINE &amp; GOTHIC SIEGE</small><h1>血战千军</h1><strong>─　哥特文艺复兴　─</strong></div></div>
+        <img id="art" width="1280" height="720">
+        <div class="title"><small>CAMPAGNE DE BELGIQUE　 /　 JUIN 1815</small><h1>拿破仑 1815</h1><strong>线列全面战争</strong></div></div>
         <section class="parchment">
         <div class="campaign"><h2>选择阵营</h2>
         <div id="nations"></div></div>
         <div class="setup">
         <label>战场地图<select id="maps">
-        <option value="darkwood">幽暗密林古道</option>
-        <option value="gorge">铁血大草原</option>
-        <option value="twin">双桥血河与林谷</option></select></label>
+        <option value="gorge">滑铁卢乡间高地</option>
+        <option value="darkwood">阿登自然古林</option>
+        <option value="twin">双桥血河与农庄</option></select></label>
         <label>领主难度<select id="difficulty">
         <option value="easy">新兵领主（简单）</option>
-        <option value="normal" selected>铁血公爵（普通 · 推荐）</option>
+        <option value="normal" selected>老兵（普通）</option>
         <option value="brutal">战争暴君（残酷）</option></select></label></div>
         <div class="starts">
             ${btn('lord', '⚔　开始领主征战') + btn('sandbox', '⚗　自由沙盒演武')}</div>
@@ -34,7 +37,9 @@ export function mount() {
         <div id="top"><b id="forces"><span id="fr"></span><span id="gb"></span></b><span id="resources"></span>
             ${btn('policy', '自动平衡') + btn('menu', '☰ 菜单')}</div>
         <aside id="settings" hidden>
-            ${btn('music', '军歌 开') + btn('sound', '音效 开') + btn('gore', '🩸 炼狱血海') + btn('pause', '暂停') + btn('speed', '1×') + btn('side', '切换布阵方') + btn('place', '沙盒放置') + btn('save', '保存布阵') + btn('restore', '恢复布阵') + btn('workshop', '建军事工坊') + btn('bridge', '架浮桥') + btn('stakes', '筑拒马') + btn('back', '返回封面')}</aside>
+            ${btn('music', '军歌 开') + btn('sound', '音效 开') + btn('gore', '🩸 炼狱血海') + btn('pause', '暂停') + btn('speed', '1×') + btn('side', '切换布阵方') + btn('place', '沙盒放置') + btn('save', '保存布阵') + btn('restore', '恢复布阵') + btn('workshop', '重炮铸造厂') + btn('academy','陆军学院') + btn('barracks','近卫军营') + btn('redoubt','构筑前线阵地') + btn('lowwall','修筑石墙胸墙') + btn('powder','速装训练 · −18%') + btn('steel','三棱刺刀 · +30%') + btn('grape','精制葡萄弹 · ×2') + btn('codex','兵种图鉴') + btn('bridge', '架浮桥') + btn('stakes', '筑拒马') + btn('back', '返回封面')}</aside>
+        <dialog id="book"><header><b>军团图鉴</b><button id="closeBook">关闭</button></header><div id="entries"></div></dialog>
+        <aside id="detail" hidden><div id="unitInfo"></div><div id="forms"></div></aside>
         <canvas id="mini"></canvas>
         <div id="orders">
             ${btn('charge', '⚔ 全军冲锋')}<small id="phase"></small>
@@ -60,7 +65,7 @@ export function mount() {
         b.id = 'nation' + f;
         b.className = 'nation';
         b.setAttribute('aria-pressed', String(f === 1));
-        b.innerHTML = '<span><b>' + (f ? '英格兰王国' : '法兰西王国') + '</b><small>' + (f ? '红衫军 · 大不列颠掷弹兵' : '蓝衫军 · 洋葱之歌') + '</small></span><i>✓</i>';
+        b.innerHTML = '<span><b>' + (f ? '大不列颠王国' : '法兰西第一帝国') + '</b><small>' + (f ? '红衫军 · 大不列颠掷弹兵' : '蓝衫军 · 洋葱之歌') + '</small></span><i>✓</i>';
         const flag = document.createElement('canvas');
         flag.width = 42;
         flag.height = 30;
@@ -69,18 +74,18 @@ export function mount() {
         el('nations').append(b);
     }
 }
-export function roster(category: string, f: Faction, auto: Set<Kind>, recruit: (k: Kind) => void, repeat: (k: Kind) => void) {
+export function roster(category: string, f: Faction, auto: Set<Kind>, recruit: (k: Kind) => void, repeat: (k: Kind) => void, full:(k:Kind)=>void) {
     const panel = el('cards');
     panel.replaceChildren();
-    if (category === '重炮机械') {
+    if (category === '炮兵') {
         const w = document.createElement('button');
         w.id = 'quick-workshop';
-        w.title = '一键在要塞腹地自动建造军事工坊（解锁重炮与达芬奇战车）';
-        w.innerHTML = '<div style="width:48px;height:48px;display:grid;place-items:center;font-size:24px;background:#26292e;border:1px solid #91774a;color:#e5c57e">⚙</div><span>建军事工坊</span><small>解锁重炮机械</small>';
+        w.title = '一键在要塞腹地自动建造重炮铸造厂（解锁三种炮兵）';
+        w.innerHTML = '<div style="width:48px;height:48px;display:grid;place-items:center;font-size:24px;background:#26292e;border:1px solid #91774a;color:#e5c57e">⚙</div><span>建重炮铸造厂</span><small>解锁重炮机械</small>';
         w.onclick = () => el('workshop').click();
         panel.append(w);
     }
-    for (const k of KINDS.filter(k => UNITS[k].role === category)) {
+    for (const k of KINDS.filter(k => k!=='supply_wagon'&&categoryOf(k)===category)) {
         const b = document.createElement('button');
         b.dataset.kind = k;
         b.title = '点击征召，长按切换持续产兵';
@@ -97,6 +102,8 @@ export function roster(category: string, f: Faction, auto: Set<Kind>, recruit: (
         b.onpointerup = b.onpointercancel = b.onlostpointercapture = () => clearTimeout(timer);
         b.onclick = () => { if (!held)
             recruit(k); held = false; };
-        panel.append(b);
+        const pair=document.createElement('div');pair.className='unitCard';pair.append(b);
+        if(strength[k]>1){const all=document.createElement('button');all.textContent='整团 ×'+strength[k];all.onclick=()=>full(k);pair.append(all);}
+        panel.append(pair);
     }
 }

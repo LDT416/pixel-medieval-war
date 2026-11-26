@@ -1,3 +1,4 @@
+import {artRevision} from './artLoader';
 import {banner} from './banners';
 import {BUILDINGS} from '../sim/buildings';
 import {UNITS} from '../sim/config';
@@ -7,7 +8,7 @@ import { VfxPool } from './vfxPool';
 import { sprite } from './spriteBaker';
 import { drawStructure } from './scenery';
 import { bakeTerrain } from './terrain';
-import { HEIGHT, WIDTH } from '../sim/maps';
+import { HEIGHT, WIDTH,supplyBend } from '../sim/maps';
 import { indexAt } from '../sim/grid';
 import { SimWorld } from '../sim/world';
 import type { BuildType, Faction, Point, Unit } from '../sim/types';
@@ -30,6 +31,7 @@ export class Renderer {
     vfx = new VfxPool(this.decals);
     ground?: HTMLCanvasElement;
     private landscape = document.createElement('canvas');
+    private artVersion=-1;
     private fixedRevision = -1;
     private fixedWorld?: SimWorld;
     private miniTerrain = document.createElement('canvas');
@@ -57,30 +59,38 @@ export class Renderer {
         ctx.imageSmoothingEnabled = false;
         this.ground=bakeTerrain(w.map);
         ctx.drawImage(this.ground, 0, 0);
-        for(const f of [0,1]){
-            const x=f?3655:745,y=1134;
-            ctx.fillStyle='#9a8b68';ctx.fillRect(x,y,400,182);
-            ctx.fillStyle='#bcad87';ctx.fillRect(x+3,y+3,394,170);
-            for(let j=0;j<4;j++)for(let i=0;i<19;i++){
-                ctx.fillStyle=(i+j)%2?'#b0a07d':'#c5b58c';ctx.fillRect(x+5+i*21,y+6+j*41,19,38);
+        for(const farm of w.structures)if(farm.type==='house'&&farm.hp>0&&farm.faction!==-1){
+            const keep=w.keep(farm.faction);if(!keep)continue;
+            const bend=supplyBend(farm,keep);
+            ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+            for(const [width,color] of [[18,'#8c795d'],[13,'#afa080']] as const){
+                ctx.lineWidth=width;ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(farm.x,farm.y+24);
+                ctx.lineTo(bend.x,bend.y);ctx.lineTo(keep.x,keep.y);ctx.stroke();
             }
-            for(let i=0;i<17;i++){ctx.fillStyle='#89795d';ctx.fillRect(x+6+i*23,y+166,21,9);ctx.fillStyle='#d3bf96';ctx.fillRect(x+7+i*23,y+166,19,5);}
+            ctx.restore();
+        }
+        const shade=ctx.createRadialGradient(0,0,0,0,0,70);
+        shade.addColorStop(0,'#23302160');shade.addColorStop(1,'#29382000');
+        for(const t of w.structures)if(t.type==='tree'&&t.hp>0){
+            ctx.save();ctx.translate(t.x,t.y);ctx.scale(1,.73);ctx.fillStyle=shade;ctx.fillRect(-70,-70,140,140);ctx.restore();
         }
         const ordered = [...w.structures].sort((a, b) => a.y - b.y);
         for (const s of ordered)
-            if (!['keep', 'tower', 'outpost'].includes(s.type))
+            if (!['keep', 'tower', 'redoubt','windmill','farmhouse'].includes(s.type))
                 drawStructure(ctx, s, 0);
         const mini = this.miniTerrain.getContext('2d')!;
         mini.imageSmoothingEnabled = false;
         mini.drawImage(this.landscape, 0, 0, 216, 112);
         ctx.drawImage(this.decals.canvas,0,0);
         this.decals.composite=ctx;
+        this.artVersion=artRevision;
         this.fixedRevision = w.revision;
         this.fixedWorld = w;
     }
     private unit(u: Unit, tick: number, selected: boolean, now: number) {
         const c = this.c, isSiege = UNITS[u.kind].traits.includes('siege');
-        const frame = u.swing > 0 ? 2 : u.gun&&!u.moving?0:Math.floor((tick + u.id) / 6) % 2, art = sprite(u.kind, u.faction, frame, (this.vfx.flashes.get(u.id) ?? 0) > now), scale = isSiege ? 2.55 : u.tower ? 1.6 : 1.95;
+        const frame=u.squareSide===1?'braceSouth':u.squareSide===3?'braceNorth':u.gun?(u.swing?'reload':u.pose):u.kind==='sapper'&&u.swing?'bayonet':u.pose;
+        const art=sprite(u.kind,u.faction,frame,(this.vfx.flashes.get(u.id)??0)>now),scale=isSiege?1.7:1.26;
         const wid = art.width * scale, h = art.height * scale, x = Math.round(u.x), y = Math.round(u.y);
         c.fillStyle = '#141a1544';
         c.fillRect(x - wid * .42, y - 2, wid * .84, 5);
@@ -103,23 +113,17 @@ export class Renderer {
             if(!u.crew)c.filter='brightness(.45)';
         }
         c.drawImage(art, -wid / 2, -h, wid, h);
-        if (u.kind === 'halberdier' && u.formation === 'phalanx' && u.z < 1) {
-            const thrust = u.swing > 0 ? 5 : 0;
-            c.fillStyle = '#65523a';
-            c.fillRect(1, -10, 21 + thrust, 2);
-            c.fillStyle = '#8f9aa8';
-            c.fillRect(16 + thrust, -13, 7, 4);
-            c.fillStyle = '#d6dde6';
-            c.fillRect(21 + thrust, -12, 6, 2);
-            c.fillRect(16 + thrust, -15, 3, 3);
+        if(u.kind==='horse_artillery'&&u.moving){
+            c.drawImage(sprite('dragoon',u.faction,frame),15,-20,24,20);
+            c.fillStyle='#8c7655';c.fillRect(6,-6,18,1);
         }
         if(u.gun){
             c.fillStyle='#b9a580';c.fillRect(0,-12+(u.swing?3:0),16,2);c.fillStyle='#ece8dc';c.fillRect(13,-14+(u.swing?3:0),5,5);
         }
         if(u.cargo){c.fillStyle=u.resource==='gold'?'#907442':'#775735';c.fillRect(-9,-17,8,10);c.fillStyle=u.resource==='gold'?'#c3a564':'#a08760';c.fillRect(-9,-17,7,3);}
-        if(u.kind==='bannerman') c.drawImage(banner(u.faction,Math.floor(tick/7)),0,-70,40,70);
+        if(u.commandRole==='flag') c.drawImage(banner(u.faction,Math.floor(tick/7)),0,-70,40,70);
         const beat=Math.floor(tick/8)%2;
-        if(u.escort==='drum'){
+        if(u.commandRole==='drum'){
             c.fillStyle='#493122';c.fillRect(0,-16,14,12);c.fillStyle='#c09a51';c.fillRect(0,-17,14,3);c.fillRect(0,-7,14,2);
             for(let i=0;i<3;i++){c.fillStyle='#957146';c.fillRect(i*5+1,-14,2,7);}
             c.fillStyle='#dbbf88';c.fillRect(1,-22+beat*4,8,2);c.fillRect(10,-18-beat*4,7,2);
@@ -153,7 +157,7 @@ export class Renderer {
     }
     draw(w: SimWorld, o: Overlay, redrawMini: boolean) {
         this.resize();
-        if (this.fixedRevision !== w.revision || this.fixedWorld !== w)
+        if (this.fixedRevision !== w.revision || this.fixedWorld !== w || this.artVersion!==artRevision)
             this.bake(w);
         const cam = this.camera, c = this.c, s = cam.zoom, top = cam.world(0, 0);
         c.setTransform(1, 0, 0, 1, 0, 0);
@@ -176,7 +180,7 @@ export class Renderer {
         for(const d of w.drops){c.fillStyle=d.resource==='gold'?'#b8994a':'#926d43';c.fillRect(d.x-3,d.y-2,7,4);}
 
         for (const t of w.structures)
-            if (t.hp > 0 && ['keep', 'tower', 'outpost'].includes(t.type))
+            if (t.hp > 0 && ['keep', 'tower', 'redoubt','windmill','farmhouse'].includes(t.type))
                 drawStructure(c, t, w.tick);
         // 残血要塞/箭塔/农舍升腾高空战火黑烟柱与跳动橘红火舌
         for (const t of w.structures) {
@@ -207,7 +211,16 @@ export class Renderer {
         for (const u of w.units) {
             if (u.x < top.x - 65 || u.x > top.x + cw + 65 || u.y < top.y - 65 || u.y - u.z > top.y + ch + 65)
                 continue;
-            if(!u.hp)continue;
+            if(u.hp<=0)continue;
+            if(u.tower){
+                if(w.tick-(u.firedAt??-99)<6){
+                    const position=Math.round(u.y-u.z);
+                    c.fillStyle=colors[u.faction];c.fillRect(u.x-2,position-2,5,3);
+                    c.fillStyle='#d9b288';c.fillRect(u.x+u.face*2,position-4,3,2);
+                    c.fillStyle='#6d6051';c.fillRect(u.face>0?u.x+3:u.x-12,position,10,2);
+                }
+                continue;
+            }
             this.unit(u, w.tick, o.selected.has(u.id), now);
         }
         for (const p of w.projectiles) {
@@ -265,6 +278,10 @@ export class Renderer {
         if (cam.zoom < cam.base * 1.7)
             for(const t of w.structures) if(t.hp>0&&(t.type==='bridge'||t.type==='pontoon'))
                 this.plaque(t.x,t.y-100,t.type==='pontoon'?'临时浮桥':t.y<1080?'北境石桥':'南境石桥',0,true);
+        for(const t of w.structures)if(t.hp>0&&['farmhouse','windmill','redoubt'].includes(t.type)){
+            const n=w.units.filter(u=>u.tower===t.id).length;
+            this.plaque(t.x,t.y+t.h*.52,(t.type==='farmhouse'?'拉海圣农庄':t.type==='windmill'?'高地风车':'沙袋炮台')+(n?' · '+n+'/60':''),t.faction,true);
+        }
         if(o.hover){
             const t=w.byStructure.get(w.grid.blockers[indexAt(o.hover.x,o.hover.y)]);
             if(t&&t.hp>0&&(t.type==='mine'||t.type in BUILDINGS))this.plaque(t.x,t.y-t.h-18,t.type==='mine'?'金矿余量 '+t.stock:BUILDINGS[t.type as BuildType][0]+' · '+Math.ceil(t.hp)+' HP',0,true);

@@ -106,23 +106,25 @@ export class BattleAudio {
         const a = this.ctx;
         if (!a || !this.bus || this.muted || a.state !== 'running')
             return;
+        const volleyLayers=new Map<string,number>();
         for (const e of events) {
             const key = e.type === 'fire' ? e.kind : e.type;
             if (!key || this.voices >= 10)
                 continue;
-            const heavy = key === 'field_cannon' || key === 'siege_mortar' || key === 'collapse' || key === 'impact';
+            const heavy = key === 'field_cannon' || key === 'howitzer' || key === 'collapse' || key === 'impact';
             const music = key === 'drum' || key === 'horn';
-            const gun = ['musketeer', 'guard_grenadier', 'rifleman', 'dragoon', 'volley_gunner', 'organ_gun', 'davinci_tank'].includes(key), metal = key === 'slash' || key === 'block';
+            const gun = ['line_infantry', 'guard_grenadier', 'rifleman', 'dragoon', 'volley_gunner', 'horse_artillery', 'rocket_crew','highlander'].includes(key), metal = key === 'slash' || key === 'block';
             const goreDeath = key === 'death';
             if (!(music || heavy || gun || metal || key === 'hit' || goreDeath))
                 continue;
             const now = a.currentTime;
             const minGap = heavy ? .14 : gun ? .042 : goreDeath ? .07 : .085;
-            if (now - (this.last.get(key) ?? -1) < minGap)
-                continue;
+            const layer=gun?(volleyLayers.get(key)??0):0;
+            if(layer>=4||layer===0&&now-(this.last.get(key)??-1)<minGap)continue;
+            if(gun)volleyLayers.set(key,layer+1);
             this.last.set(key, now);
             // 排枪微错峰齐鸣（制造几十支火枪同时轰隆-噼啪的层次感）
-            const startAt = gun ? now + Math.random() * .035 : now;
+            const startAt = gun ? now + layer*.012 + Math.random()*.012 : now;
             const env = a.createGain(), filter = a.createBiquadFilter(), time = key === 'horn' ? .65 : key === 'drum' ? .28 : heavy ? .46 : gun ? .19 : goreDeath ? .11 : .09;
             let src: AudioBufferSourceNode | OscillatorNode;
             if (music || metal || key === 'hit' || goreDeath) {
@@ -151,10 +153,10 @@ export class BattleAudio {
             src.start(startAt);
             src.stop(startAt + time + .01);
             // 重炮破空呼啸声（Incoming Shell Whistle）
-            if ((key === 'siege_mortar' || key === 'field_cannon') && this.voices < 10) {
+            if ((key === 'howitzer' || key === 'field_cannon' || key === 'rocket_crew' || key === 'horse_artillery') && this.voices < 10) {
                 const w = a.createOscillator(), wg = a.createGain();
                 w.type = 'sine';
-                w.frequency.setValueAtTime(key === 'siege_mortar' ? 760 : 540, now + .08);
+                w.frequency.setValueAtTime(key === 'howitzer' ? 760 : 540, now + .08);
                 w.frequency.exponentialRampToValueAtTime(160, now + .46);
                 wg.gain.setValueAtTime(.001, now + .08);
                 wg.gain.linearRampToValueAtTime(.09, now + .18);

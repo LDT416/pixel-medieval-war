@@ -1,10 +1,11 @@
+import {resolveCollisions,faceToward} from './physics';
 import {BUILDINGS,newRealm,pay} from './buildings';
 import {civicCommand,economyTick,work} from './economy';
 import {lordCommands} from './aiDirector';
-import {environmentTick,supportTick} from './environment';
+import {environmentTick} from './environment';
 import type {MapId,Mode,Difficulty,FireCell,Barrel,Drop} from './types';
-import {strategyTick, strategyMove, issueWave} from './strategy';
-import { UNITS, KINDS, crews } from './config';
+import {strategyTick, moveSlot, regimentSlot, artillery, assignSlots, issueWave} from './strategy';
+import { UNITS, KINDS, crews,rankFire,shelter,canGarrison,strength,formationSize } from './config';
 import { attack, distanceTo, hit, kill, launch, updateProjectiles } from './combat';
 import { Grid, indexAt } from './grid';
 import { FlowField } from './flowField';
@@ -22,7 +23,7 @@ export class SimWorld {
     difficulty:Difficulty='normal';
     realms=[newRealm(),newRealm()];
     fires:FireCell[]=[]; barrels:Barrel[]=[]; drops:Drop[]=[];
-    news='法兰西与英格兰结下百年弑君灭族之仇。两军不受降。';
+    news='滑铁卢战役 · 两军正在集结';
     tick = 0;
     next = 10000;
     scenario = 0;
@@ -49,8 +50,9 @@ export class SimWorld {
     constructor(index = 0) { this.reset(index); }
     reset(index: number,map:MapId=this.map,mode:Mode=this.mode,difficulty:Difficulty=this.difficulty) {
         this.map=map; this.mode=mode; this.difficulty=difficulty;
+        this.fronts=[{x:972,y:880,breached:false},{x:3828,y:880,breached:false}];
         this.grid=new Grid(map); this.realms=[newRealm(),newRealm()]; this.fires=[]; this.barrels=[];this.drops=[];
-        this.news='法兰西与英格兰结下百年弑君灭族之仇。寸土不让，绝不受降。';
+        this.news='滑铁卢战役 · 两军正在集结';
         
         this.tick = 0;
         this.next = 10000;
@@ -76,34 +78,41 @@ export class SimWorld {
         for(const f of [0,1] as const){
             const base=this.keep(f)!,d=f?-1:1,p={x:base.x+370*d,y:880};
             this.spawn(f,'peasant',6,{x:base.x-120*d,y:738},'line');
-            this.honorGuard(f,p);
-            this.spawn(f,'shieldman',15,{x:p.x+100*d,y:p.y},'phalanx');
-            this.spawn(f,'halberdier',10,{x:p.x+68*d,y:p.y},'phalanx');
-            this.spawn(f,'musketeer',30,{x:p.x-58*d,y:p.y},'line');
-            this.spawn(f,'scout_cavalry',5,{x:p.x-135*d,y:p.y-210},'skirmish');
-            this.spawn(f,'heavy_lancer',5,{x:p.x-135*d,y:p.y+210},'skirmish');
+            this.spawn(f,'line_infantry',mode==='sandbox'?120:30,p,'line');
+            this.spawn(f,'sapper',3,{x:p.x-d*85,y:1110},'line');
+            this.spawn(f,'hussar',8,{x:p.x+d*92,y:1190},'line');
         }
         this.hash.rebuild(this.units);
     }
     keep(f:Faction) {return this.structures.find(s=>s.type==='keep'&&s.faction===f&&s.hp>0);}
-    honorGuard(f:Faction,p:Point) {
-        const leader=this.spawn(f,'bannerman',1,p,'line')[0], troops=[leader], d=f===0?1:-1;
-        for(const [role,dx,dy] of [['drum',-8,-24],['horn',-8,24],['guard',27,-15],['guard',27,15]] as const){
-            const u=this.spawn(f,'halberdier',1,{x:p.x+dx*d,y:p.y+dy},'phalanx')[0];
-            u.leader=leader.id; u.escort=role;u.guardSide=Math.sign(dy);troops.push(u);
+    reinforce(f:Faction,kind:Kind,count:number,p:Point){
+        const troops=this.spawn(f,kind,count,p,'line');
+        if(strength[kind]<=1)return troops;
+        const fresh=this.groups.get(troops[0].group)!;
+        const groups=new Map<number,Unit[]>();
+        for(const u of this.units)if(u.group!==fresh.id&&u.hp>0&&u.kind===kind&&u.faction===f&&!u.tower&&!u.gun){
+            const a=groups.get(u.group)??[];a.push(u);groups.set(u.group,a);
         }
+        const remaining=troops.slice();
+        for(const [id,a] of groups){
+            const g=this.groups.get(id)!;
+            if(a.length!==this.units.filter(n=>n.hp>0&&n.group===id).length||g.resting&&(g.restTick===undefined||this.tick-g.restTick<90))continue;
+            const n=Math.min(remaining.length,strength[kind]-a.length);
+            if(n<=0)continue;
+            const recruits=remaining.splice(0,n);
+            for(const recruit of recruits)recruit.formation=a[0].formation;
+            assignSlots(g,[...a,...recruits]);g.resting=false;g.restTick=undefined;
+        }
+        if(remaining.length)assignSlots(fresh,remaining);else this.groups.delete(fresh.id);
         return troops;
     }
-    finishBuilding(s:Structure) {
-        this.dirty=true;
-        if(s.type==='outpost') this.garrison(s,2);
-    }
-    approach(u:Unit,p:Point,speed=UNITS[u.kind].speed) {
+    finishBuilding() { this.dirty=true; }
+    approach(u:Unit,p:Point,speed=UNITS[u.kind].speed,pathTarget=p) {
         const f=u.faction;
         let dx=p.x-u.x, dy=p.y-u.y;
         const distance=Math.hypot(dx,dy);
         if(distance>0&&!this.grid.walk(u.x+dx/distance*12,u.y+dy/distance*12,f)){
-            const dir=this.field(f,p).direction(indexAt(u.x,u.y));
+            const dir=this.field(f,pathTarget).direction(indexAt(u.x,u.y));
             if(dir.x||dir.y){dx=dir.x;dy=dir.y;}
         }
         const length=Math.hypot(dx,dy)||1;
@@ -112,12 +121,12 @@ export class SimWorld {
         const x=clamp(u.x+dx/length*speed,WIDTH),y=clamp(u.y+dy/length*speed,HEIGHT);
         if(this.grid.walk(x,u.y,f)) u.x=x;
         if(this.grid.walk(u.x,y,f)) u.y=y;
-        if(dx) u.face=dx>0?1:-1;
+
     }
     private garrison(s: Structure, n: number) {
         if (s.faction < 0)
             return;
-        const troops = this.spawn(s.faction as Faction, 'musketeer', n, s, 'line', s.id);
+        const troops = this.spawn(s.faction as Faction, 'line_infantry', n, s, 'line', s.id);
         troops.forEach((u, i) => { u.x = s.x + (i - (n - 1) / 2) * 13; u.y = s.y - 6; u.z = s.type === 'tower' ? 48 : 38; });
     }
     private rebuild() { this.grid.rebuild(this.structures); this.fields.clear(); this.dirty = false; this.revision++; }
@@ -135,16 +144,17 @@ export class SimWorld {
     }
     spawn(f: Faction, kind: Kind, count: number, c: Point, formation: Formation, tower = 0) {
         const group = this.next++, n = Math.min(600, Math.max(1, Math.floor(count))), added: Unit[] = [];
-        this.groups.set(group, { id: group, count: n, point: null, targetId: 0, anchor: { ...c } });
+        this.groups.set(group, { id: group, count: n, point: null, targetId: 0, anchor: { x:c.x,y:c.y } });
         for (let slot = 0; slot < n; slot++) {
-            const o = slotOffset(slot, n, formation, f), p0 = { x: clamp(c.x + o.x, WIDTH), y: clamp(c.y + o.y, HEIGHT) }, p = tower ? p0 : this.nearby(p0, f);
+            const o = slotOffset(slot, n, formation, f,formationSize(kind)), p0 = { x: clamp(c.x + o.x, WIDTH), y: clamp(c.y + o.y, HEIGHT) }, p = tower ? p0 : this.nearby(p0, f);
             const u: Unit = {
-                ...p, id: this.next++, z: 0, vx: 0, vy: 0, vz: 0, face: f === 0 ? 1 : -1, formation, slot, group, faction: f, kind, hp: UNITS[kind].hp, cooldown: this.rng.int(0, 28), swing: 0, charge: 0, tower, target: 0, lastAttacker: 1 - f, crew:crews[kind],morale:kind==='guard_grenadier'?100:75,lastKind: 'shieldman', lethalFall: false
+                ...p, id: this.next++, z: 0, vx: 0, vy: 0, vz: 0, face: f === 0 ? 1 : -1, formation, slot, faceLock:0,rankIndex:0,pose:"march1", group, faction: f, kind, hp: UNITS[kind].hp, cooldown: this.rng.int(0, 28), swing: 0, charge: 0, tower, target: 0, lastAttacker: 1 - f, crew:crews[kind],morale:kind==='guard_grenadier'?100:75,lastKind: kind, lethalFall: false
             };
             this.units.push(u);
             this.byUnit.set(u.id, u);
             added.push(u);
         }
+        assignSlots(this.groups.get(group)!,added);
         if(crews[kind])for(const gun of added){
             const team=this.spawn(f,'sapper',crews[kind]!,gun,'line');
             team.forEach((man,i)=>{man.gun=gun.id;man.slot=i;});
@@ -169,7 +179,7 @@ export class SimWorld {
         const overlap = this.structures.some(a => a.hp > 0 && Math.abs(a.x - x) < (a.w + w) / 2 && Math.abs(a.y - y) < (a.h + h) / 2);
         const occupied = kind !== 'pontoon' && this.units.some(u => u.hp > 0 && !u.tower && u.z < 10 && Math.abs(u.x - x) < w / 2 + 4 && Math.abs(u.y - y) < h / 2 + 4);
         const legalTerrain = kind === 'pontoon' ? water(p.x, p.y,this.map) : !occupied && [-1, 0, 1].every(i => [-1, 0, 1].every(j => !water(x + i * w / 2, y + j * h / 2,this.map)));
-        return { structure: s, valid: fits && !overlap && legalTerrain && (kind !== 'outpost' || this.structures.filter(a => a.hp > 0 && a.type === 'outpost' && a.faction === f).length < 4) };
+        return { structure: s, valid: fits && !overlap && legalTerrain && (kind !== 'redoubt' || this.structures.filter(a => a.hp > 0 && a.type === 'redoubt' && a.faction === f).length < 4) };
     }
     private apply(c: Command) {
         if(c.type==='charge'||c.type==='recall'){issueWave(this,c.faction,c.type==='charge');return;}
@@ -190,67 +200,62 @@ export class SimWorld {
         }
         if(c.type==='garrison'){
             const tower=this.byStructure.get(c.payload.tower),ids=new Set(c.payload.ids);
-            if(tower&&tower.faction===c.faction&&tower.hp>0&&!tower.needed&&['outpost','tower'].includes(tower.type)){
-                for(const u of this.units)if(ids.has(u.id)&&u.faction===c.faction&&!u.tower&&u.kind==='musketeer') u.enterTower=tower.id;
+            if(tower&&(tower.faction===c.faction||tower.faction===-1)&&tower.hp>0&&!tower.needed&&shelter(tower.type)){
+                for(const u of this.units)if(ids.has(u.id)&&u.faction===c.faction&&!u.tower&&!u.gun&&canGarrison(u.kind)) u.enterTower=tower.id;
             }
             return;
         }
-        if(c.type==='train'||c.type==='age'||c.type==='rally'||c.type==='gather'||c.type==='guard'||c.type==='research'){civicCommand(this,c);return;}
+        if(c.type==='train'||c.type==='age'||c.type==='rally'||c.type==='gather'||c.type==='research'){civicCommand(this,c);return;}
         if (c.type === 'spawn') {
             const p = c.payload;
             if(this.mode!=='sandbox') return;
-            if(p.kind==='bannerman'){this.honorGuard(c.faction,p);return;}
-            if(p.kind==='davinci_tank'){const remaining=2-this.units.filter(u=>u.faction===c.faction&&u.kind===p.kind).length;if(remaining>0)this.spawn(c.faction,p.kind,Math.min(remaining,p.count),p,p.formation);return;}
-            this.spawn(c.faction, p.kind, p.count, p, p.formation);
+            let remaining=Math.max(1,Math.min(600,Math.floor(p.count)));
+            while(remaining>0){const part=Math.min(remaining,strength[p.kind]);this.spawn(c.faction,p.kind,part,p,p.formation);remaining-=part;}
             return;
         }
         if (c.type === 'build') {
             const p = c.payload, b = this.blueprint(p.kind, p, c.faction);
+            if(p.kind==='redoubt'&&!this.fronts[c.faction].breached&&!this.structures.some(s=>s.type==='farmhouse'&&s.hp>0&&s.faction===c.faction)){this.news='推进越过中线或占领拉海圣后可修筑炮台';return;}
             if (!b.valid)
                 return;
             const s = b.structure;
             if(this.mode==='lord'){
-                if(!this.units.some(u=>u.hp>0&&u.faction===c.faction&&(u.kind==='sapper'||u.kind==='peasant'))||!pay(this.realms[c.faction],BUILDINGS[p.kind][1],BUILDINGS[p.kind][2])){
-                    if(c.faction===this.player) this.news='建造受阻：需要存活的工人及足够的木材、黄金。';return;
+                const builders=this.units.filter(u=>u.hp>0&&!u.gun&&!u.tower&&u.faction===c.faction&&(u.kind==='sapper'||u.kind==='peasant')).sort((a,b)=>Number(b.kind==='sapper')-Number(a.kind==='sapper')||distanceTo(a,s)-distanceTo(b,s));
+                if(!builders.length||!pay(this.realms[c.faction],BUILDINGS[p.kind][1],BUILDINGS[p.kind][2])){
+                    if(c.faction===this.player) this.news='建造受阻：需要存活的工人及足够的木材、军粮。';return;
                 }
                 s.work=0;s.needed=135;s.hp=s.maxHp*.1;
-                const worker=this.units.filter(u=>u.faction===c.faction&&u.hp>0&&(u.kind==='peasant'||u.kind==='sapper')).sort((a,b)=>distanceTo(a,s)-distanceTo(b,s))[0];
-                worker.job=s.id;
+                builders[0].job=s.id;
             }
             s.id = this.next++;
             this.structures.push(s);
             this.byStructure.set(s.id, s);
             this.rebuild();
-            if(!s.needed && s.type==='outpost') this.garrison(s,2);
+
             return;
         }
         if(c.type!=='formation'&&c.type!=='order') return;
         const p = c.payload, ids = p.ids ? new Set(p.ids) : null;
-        const troops = this.units.filter(u => !u.tower && u.hp > 0 && u.faction === c.faction && (!ids || ids.has(u.id)) && (!p.kind || u.kind === p.kind));
-        // Preserve independent deployment groups for global orders; a local selection forms its own squad.
-        const partitions = new Map<number, Unit[]>();
-        for (const u of troops) {
-            const k = ids ? 0 : u.group;
-            let part = partitions.get(k);
-            if (!part) {
-                part = [];
-                partitions.set(k, part);
+        const groups=new Set(this.units.filter(u=>u.hp>0&&u.faction===c.faction&&(!ids||ids.has(u.id))&&(!p.kind||u.kind===p.kind)).map(u=>u.group));
+        for(const id of groups){
+            const g=this.groups.get(id)!;
+            g.firingLine=undefined;g.contactTick=undefined;g.reformUntil=this.tick+420;g.reform=c.type==='formation'?{...g.anchor}:undefined;
+            if(c.type==='order'){g.point=c.payload.point;g.targetId=c.payload.structureId??0;}
+            g.volleyStart=undefined;
+            for(const u of this.units)if(u.group===id){
+                if(c.type==='formation')u.formation=c.payload.formation;
+                else{
+                    u.manual=true;u.enterTower=undefined;
+                    if(u.tower){const site=this.byStructure.get(u.tower)!;u.tower=0;u.z=0;const exit=this.nearby({x:site.x+site.w/2+15,y:site.y},u.faction);u.x=exit.x;u.y=exit.y;}
+                }
             }
-            part.push(u);
-        }
-        for(const u of troops) if(c.type==='order') u.enterTower=undefined;
-        for (const part of partitions.values()) {
-            const id = this.next++, old = this.groups.get(part[0].group)!;
-            this.groups.set(id, { id, count: part.length, anchor: { ...old.anchor }, point: c.type === 'order' ? c.payload.point : old.point, targetId: c.type === 'order' ? c.payload.structureId ?? 0 : old.targetId });
-            part.forEach((u, i) => { u.manual=c.type==='order'; u.group = id; u.slot = i; u.target = 0; if (c.type === 'formation')
-                u.formation = c.payload.formation; });
         }
     }
     damageStructure(s: Structure, amount: number, f: Faction, k: Kind) {
         if (s.hp <= 0)
             return;
         if(s.type==='rock'||s.type==='mine') return;
-        if(this.realms[f].powder&&(UNITS[k].traits.includes('powder')||UNITS[k].traits.includes('siege'))) amount*=1.2;
+        if(shelter(s.type)&&(k==='field_cannon'||k==='howitzer'))amount*=3;
         this.stats[f][k].damage += Math.min(s.hp, amount);
         s.hp = Math.max(0, s.hp - amount);
         if (s.hp)
@@ -264,20 +269,21 @@ export class SimWorld {
         this.dirty = true;
         const side=s.faction===0?'法军':'英军';
         if(bridge) this.news=(s.type==='bridge'?'石桥':'木桥')+'轰塌！桥上死敌坠河溺毙！';
-        else if(s.type==='tower'||s.type==='outpost') this.news='箭塔倾覆，驻塔死敌坠地摔成肉泥！';
-        else if(s.type==='keep') this.news=s.faction===1?'百年血仇终结——英军主堡沦为尸山焦土，屠城大胜！':'法军主堡陷落，全军惨遭血洗！';
+        else if(s.type==='tower'||s.type==='redoubt') this.news='城防炮楼坍塌，守军撤离。';
+        else if(s.type==='keep') this.news=side+'星堡陷落，战役结束。';
         else if(s.type in BUILDINGS) this.news='火焚敌营！'+side+BUILDINGS[s.type as BuildType][0]+'已化作焦土！';
+        if(s.type==='redoubt'||s.type==='farmhouse'||s.type==='windmill')this.news='据点坍塌，幸存守军已撤出。';
         if (s.type === 'keep' && this.winner === null)
             this.winner = s.faction===0?1:0;
+        let deaths=Math.floor(this.units.filter(u=>u.hp>0&&u.tower===s.id).length/2);
         for (const u of this.units) {
             if (u.hp <= 0)
                 continue;
             if (u.tower === s.id) {
                 u.tower = 0;
-                u.lethalFall = true;
-                u.lastAttacker = f;
-                u.lastKind = k;
-                launch(this, u, this.rng.next() * 2 - 1, this.rng.next() * 2 - 1, 9);
+                u.z=0;
+                if(deaths-->0)kill(this,u,f,k);
+                else{const exit=this.nearby({x:s.x+(u.id%2?1:-1)*(s.w/2+22),y:s.y+(u.slot%7-3)*16},u.faction);u.x=exit.x;u.y=exit.y;u.morale=25;}
             }
             else if (!bridge&&s.type!=='tree'&&!u.tower&&distanceTo(u,s)<22){
                 const len=Math.hypot(u.x-s.x,u.y-s.y)||1;u.lastAttacker=f;u.lastKind=k;launch(this,u,(u.x-s.x)/len,(u.y-s.y)/len,9);
@@ -325,153 +331,66 @@ export class SimWorld {
             }
             return;
         }
+        if(u.gun){
+            const gun=this.byUnit.get(u.gun);
+            if(gun&&gun.hp>0){const x=gun.x+(u.slot%2?1:-1)*30,y=gun.y+(u.slot<2?13:-13);
+                if(Math.hypot(x-u.x,y-u.y)>2)this.approach(u,{x,y},3.8,gun);
+                u.swing=!gun.moving&&gun.cooldown%35<8?3:0;return;}
+            u.gun=undefined;
+        }
         if(u.enterTower){
-            const tower=this.byStructure.get(u.enterTower), seats=tower?.type==='outpost'?2:3;
-            const occupied=this.units.filter(n=>n.tower===u.enterTower&&n.hp>0);
-            if(tower&&tower.hp>0&&occupied.length<seats){
-                if(distanceTo(u,tower)>25){this.approach(u,tower);return;}
-                const seat=Array.from({length:seats},(_,i)=>tower.x+(i-(seats-1)/2)*13).find(x=>!occupied.some(n=>Math.abs(n.x-x)<1));
-                u.tower=tower.id;u.x=seat??tower.x;u.y=tower.y-6;u.z=tower.type==='tower'?48:38;
+            const site=this.byStructure.get(u.enterTower);
+            if(site&&site.hp>0&&(site.faction===-1||site.faction===u.faction)){
+                const occupants=this.units.filter(n=>n.hp>0&&n.tower===site.id);
+                if(occupants.length<(site.type==='tower'?8:60)){
+                    if(distanceTo(u,site)>22){this.approach(u,site);return;}
+                    const seat=occupants.length;
+                    u.tower=site.id;site.faction=u.faction;u.z=18;
+                    u.x=site.x+((seat%6)/5-.5)*site.w*.85;u.y=site.y+(seat%2?.22:-.16)*site.h;
+                }
             }
             u.enterTower=undefined;
         }
-        if(u.gun){const gun=this.byUnit.get(u.gun);if(gun&&gun.hp>0){u.x=gun.x+(u.slot%2?15:-15);u.y=gun.y+(u.slot<2?8:-8);u.face=gun.face;u.moving=gun.moving;u.swing=!gun.moving&&gun.cooldown%35<8?3:0;return;}u.gun=undefined;}
-        if(work(this,u)||supportTick(this,u)||strategyMove(this,u)) return;
-        const def = UNITS[u.kind], group = this.groups.get(u.group)!, f = u.faction, goal = objectives[f], range = def.range + (u.tower ? 130 : 0);
-        let foe = this.byUnit.get(u.target);
-        if(foe?.crew===0)foe=undefined;
-        if (foe && (foe.hp <= 0 || Math.hypot(foe.x - u.x, foe.y - u.y) > range + 110 || (foe.tower && range < 60)))
-            foe = undefined;
-        if ((this.tick + u.id) % 12 === 0 || !foe&&u.target!==0) {
-            let score = Infinity;
-            const flank = u.kind==='rifleman'||def.traits.includes('flank');
-            this.hash.visit(u.x, u.y, range + (flank ? 185 : 50), n => {
-                if (n.faction === f || n.hp <= 0 || n.crew===0 || (n.tower && range < 60))
-                    return;
-                let d = Math.hypot(n.x - u.x, n.y - u.y);
-                if(flank && (n.kind==='peasant'||n.kind==='bannerman'||UNITS[n.kind].traits.includes('siege'))) d*=.11;
-                else if (flank && UNITS[n.kind].range > 60)
-                    d *= .23;
-                if((n.gun||n.kind==='plate_knight')&&u.kind==='rifleman')d*=.08;
-                if (d < score) {
-                    foe = n;
-                    score = d;
-                }
-            });
-            u.target = foe?.id ?? 0;
-        }
-        const ordered=this.byStructure.get(group.targetId);
-        let designated=ordered&&ordered.hp>0?ordered:undefined;
-        if(!designated&&(u.kind==='sapper'||def.traits.includes('flank')&&!foe)){
-            let nearest=115;
-            for(const s of this.structures){
-                if(s.hp<=0||s.faction===f||s.faction===-1&&!['bridge','pontoon'].includes(s.type)) continue;
-                if((s.type==='bridge'||s.type==='pontoon')&&u.kind!=='sapper')continue;
-                const d=distanceTo(u,s);if(d<nearest){nearest=d;designated=s;}
-            }
-        }
-        let target: Structure | Unit | undefined = designated ?? foe;
-        if (!target && !group.point)
-            target = goal;
-        if (target && distanceTo(u, target) <= range) {
-            if(!u.tower&&def.role==='火枪'&&distanceTo(u,target)>34){
-                let blocked=false;const dx=target.x-u.x,dy=target.y-u.y,len=Math.hypot(dx,dy)||1;
-                this.hash.visit(u.x,u.y,Math.min(len,110),n=>{const x=n.x-u.x,y=n.y-u.y;
-                    if(n.faction===f&&n.id!==u.id&&x*dx+y*dy>0&&Math.abs(x*dy-y*dx)/len<8)blocked=true;});
-                if(blocked){
-                    const dir=u.y>1710?-1:u.y<50?1:u.y>=880?1:-1;
-                    const y=clamp(u.y+dir*def.speed,HEIGHT);
-                    if(this.grid.walk(u.x,y,f))u.y=y;else this.approach(u,{x:u.x-u.face*28,y:clamp(u.y-dir*55,HEIGHT)});
-                    return;
-                }
-            }
-            if (u.cooldown <= 0) attack(this,u,target);
-            if(foe && u.kind==='dragoon' && distanceTo(u,foe)>34 && distanceTo(u,foe)<range*.84) {
-                const len=Math.hypot(u.x-foe.x,u.y-foe.y)||1;
-                const x=clamp(u.x+(u.x-foe.x)/len*def.speed,WIDTH), y=clamp(u.y+(u.y-foe.y)/len*def.speed,HEIGHT);
-                if(this.grid.walk(x,y,f)){u.x=x;u.y=y;}
-            }
-            return;
-        }
-        if (u.tower)
-            return;
-        const point = designated ?? group.point ?? goal;
-        if (!point)
-            return;
-        const off = slotOffset(u.slot, group.count, u.formation, f), dest = { x: point.x + (group.point ? off.x : 0), y: point.y + (group.point ? off.y : 0) };
-        let dx = 0, dy = 0;
-        let tx = foe && !designated ? foe.x : dest.x, ty = foe && !designated ? foe.y : dest.y;
-        if (foe && !designated && def.traits.includes('flank') && UNITS[foe.kind].range > 60) {
-            const forward = f === 0 ? 1 : -1;
-            if ((foe.x - u.x) * forward > 34) {
-                tx += forward * 28;
-                ty += u.slot % 2 ? 58 : -58;
-            }
-        }
-        const dist = Math.hypot(tx - u.x, ty - u.y);
-        if (dist < 4 && group.point)
-            return;
-        const near = foe !== undefined || dist < 120 || !!group.point && Math.hypot(u.x - point.x, u.y - point.y) < 85;
-        if (near) {
-            dx = tx - u.x;
-            dy = ty - u.y;
-        }
-        else {
-            const dir = this.field(f, point).direction(indexAt(u.x, u.y));
-            dx = dir.x;
-            dy = dir.y;
-        }
-        const norm = Math.hypot(dx, dy) || 1;
-        dx /= norm;
-        dy /= norm;
-        const gap = u.formation === 'skirmish' ? 15 : u.formation === 'line' ? 12 : 9;
-        let sx = 0, sy = 0;
-        this.hash.visit(u.x, u.y, gap, n => {
-            if (n.id === u.id || n.tower || n.z > 3)
-                return;
-            const ax = u.x - n.x, ay = u.y - n.y, r = Math.hypot(ax, ay);
-            if (r > .01) {
-                sx += ax / r * (1 - r / gap);
-                sy += ay / r * (1 - r / gap);
-            }
-            else {
-                sx += u.id % 2 ? .6 : -.6;
-                sy += u.id % 3 ? .4 : -.4;
-            }
+        const g=this.groups.get(u.group)!,def=UNITS[u.kind],f=u.faction;
+        if(g.resting&&!u.tower&&!crews[u.kind]&&u.kind!=='peasant'&&u.kind!=='supply_wagon'){moveSlot(this,u,g);return;}
+        if(!u.tower&&work(this,u))return;
+        if(crews[u.kind]){artillery(this,u);return;}
+        if(u.manual&&g.point&&!g.targetId&&!u.tower&&Math.hypot(g.anchor.x-g.point.x,g.anchor.y-g.point.y)>100){moveSlot(this,u,g);return;}
+        if(u.commandRole==='drum'&&(this.tick+u.id)%48===0)this.events.push({type:'drum',x:u.x,y:u.y,faction:f});
+        const melee=u.formation==='melee'&&!u.tower,range=(melee?35:def.range)+(u.tower?130:0);
+        let target:Unit|Structure|undefined,best=Infinity;
+        this.hash.visit(u.x,u.y,range+4,n=>{
+            if(n.faction===f||n.hp<=0||n.crew===0||n.tower&&def.traits.includes('mount')&&u.kind!=='dragoon')return;
+            const dist=distanceTo(u,n);if(dist>range)return;
+            const raid=def.traits.includes('flank')&&(n.kind==='supply_wagon'||n.gun||n.kind==='peasant');
+            const score=dist*(raid?.08:u.kind==='rifleman'&&(n.gun||n.commandRole==='flag')?.12:1);
+            if(score<best){best=score;target=n.tower?(this.byStructure.get(n.tower)??n):n;}
         });
-        if (!foe && !group.point) {
-            sx += Math.max(-.7, Math.min(.7, (group.anchor.x + off.x - u.x) * .023));
-            sy += Math.max(-.7, Math.min(.7, (group.anchor.y + off.y - u.y) * .023));
+        const ordered=this.byStructure.get(g.targetId);
+        if(ordered&&ordered.hp>0&&distanceTo(u,ordered)<=range)target=ordered;
+        if(!target&&(!g.point||g.targetId)){const goal=objectives[f];if(goal&&distanceTo(u,goal)<=range)target=goal;}
+        if(g.reform&&!u.tower&&(!target||distanceTo(u,target)>=36)){
+            const slot=regimentSlot(u,g);
+            if(Math.hypot(u.x-g.reform.x-slot.x,u.y-g.reform.y-slot.y)>18){moveSlot(this,u,g);return;}
         }
-        const speed = def.speed * ((u.morale??75)<40?.90:1) * ((u.auraUntil??-1)>=this.tick?1.2:1) * (this.grid.shallows[indexAt(u.x,u.y)] ? 0.58 : 1) * (u.formation === 'phalanx' ? .7 : 1), mx = (dx + sx * .92) * speed, my = (dy + sy * .92) * speed;
-        let moved = false;
-        if (this.grid.walk(u.x + mx, u.y, f)) {
-            u.x = clamp(u.x + mx, WIDTH);
-            moved = Math.abs(mx) > .08;
-        }
-        if (this.grid.walk(u.x, u.y + my, f)) {
-            u.y = clamp(u.y + my, HEIGHT);
-            moved = moved || Math.abs(my) > .08;
-        }
-        if (!moved || near && !this.grid.walk(u.x + dx * 13, u.y + dy * 13, f)) {
-            const obstacle = this.byStructure.get(this.grid.blockers[indexAt(u.x + dx * 14, u.y + dy * 14)]);
-            if (obstacle && obstacle.hp > 0 && obstacle.faction !== f && !['bridge', 'pontoon'].includes(obstacle.type) && u.cooldown <= 0)
-                attack(this, u, obstacle);
-            else {
-                const dir = this.field(f, point).direction(indexAt(u.x, u.y));
-                if (this.grid.walk(u.x + dir.x * speed, u.y + dir.y * speed, f)) {
-                    u.x += dir.x * speed;
-                    u.y += dir.y * speed;
-                }
+        if(target){
+            const dist=distanceTo(u,target),close=dist<36&&!u.tower;
+            const formed=!close&&!u.tower&&rankFire(u.kind)&&u.formation==='line'&&g.count>=12;
+            if(formed){
+                if(!g.firingLine)g.lineFacing=Math.sign(target.x-g.anchor.x)||(f?-1:1);
+                g.contactTick=this.tick;g.firingLine??={...g.anchor};g.volleyStart??=this.tick;
+                const period=this.realms[f].powder?79:96,phase=(this.tick-g.volleyStart)%period,fire=Math.round(u.rankIndex*period/3);
+                if(phase===fire)attack(this,u,target);
+                const elapsed=this.tick-(u.firedAt??-1000);
+                u.pose=elapsed===0?'aim':elapsed<period-5?(u.rankIndex===0?'kneel':'reload'):'aim';
+            }else{
+                u.pose=close||melee?'bayonet':'aim';
+                if(u.cooldown<=0||close&&u.cooldown>25)attack(this,u,target);
             }
+            if(u.squareSide===undefined)faceToward(u,formed?g.lineFacing!:target.x-u.x);
+            return;
         }
-        if (moved) {
-            if(this.grid.shallows[indexAt(u.x,u.y)] && (this.tick+u.id)%18===0)
-                this.events.push({type:'wade',x:u.x,y:u.y});
-            if (Math.abs(dx) > .15)
-                u.face = dx > 0 ? 1 : -1;
-            u.charge = Math.min(70, u.charge + 1);
-        }
+        if(!u.tower)moveSlot(this,u,g);
     }
     step(commands: Command[], advance = true): SimEvent[] {
         this.events = [];
@@ -481,45 +400,40 @@ export class SimWorld {
                 this.apply(c);
         if (this.dirty)
             this.rebuild();
-        if (!advance)
+        if (!advance){
+            if(commands.some(c=>c.type==='spawn'||c.type==='order'))resolveCollisions(this);
             return this.events;
+        }
         for(const command of lordCommands(this)) this.apply(command);
         economyTick(this);
         strategyTick(this);
         this.hash.rebuild(this.units);
         environmentTick(this);
-        const active = new Map<number, {
-            x: number;
-            y: number;
-            n: number;
-        }>();
-        for (const u of this.units) {
-            if (u.tower || u.hp <= 0)
-                continue;
-            let a = active.get(u.group);
-            if (!a) {
-                a = { x: 0, y: 0, n: 0 };
-                active.set(u.group, a);
-            }
-            a.x += u.x;
-            a.y += u.y;
-            a.n++;
-        }
-        for (const [id, a] of active)
-            this.groups.get(id)!.anchor = { x: a.x / a.n, y: a.y / a.n };
         const goals = [0, 1].map(f => this.structures.find(s => s.faction !== f && s.faction !== -1 && s.type === 'gate' && s.hp > 0) ?? this.structures.find(s => s.faction !== f && s.faction !== -1 && s.type === 'keep' && s.hp > 0));
-        for (const u of this.units)
-            this.advance(u, goals);
+        for (const u of this.units){
+            const oldX=u.x,oldY=u.y;u.faceLock=Math.max(0,u.faceLock-1);
+            const group=this.groups.get(u.group);
+            u.squareSide=u.formation==='square'&&group&&group.count>=8&&!u.commandRole?Math.floor(u.slot*4/group.count):undefined;
+            u.pose=u.formation==='melee'||u.squareSide!==undefined?'bayonet':Math.floor(this.tick/7)%2?'march2':'march1';
+            this.advance(u,goals);
+            u.moving=Math.hypot(u.x-oldX,u.y-oldY)>.12;
+            if(u.moving&&UNITS[u.kind].traits.includes('mount'))u.charge=Math.min(70,u.charge+1);
+            if(u.moving&&Math.abs(u.x-oldX)>.65){
+                const forward=u.faction?-1:1,g=this.groups.get(u.group);
+                if(u.squareSide===undefined)faceToward(u,rankFire(u.kind)&&u.formation==='line'&&!g?.resting&&!g?.point?forward:u.x-oldX);
+            }
+        }
+        resolveCollisions(this);
         updateProjectiles(this);
         this.units = this.units.filter(u => { if (u.hp > 0)
             return true; this.byUnit.delete(u.id); return false; });
-        if (this.dirty)
-            this.rebuild();
+        for(const s of this.structures)if((s.type==='farmhouse'||s.type==='windmill')&&s.faction!==-1&&!this.units.some(u=>u.tower===s.id))s.faction=-1;
+        if (this.dirty)this.rebuild();
         this.tick++;
         return this.events;
     }
     snapshot(): Snapshot { return structuredClone({
-        player:this.player,map:this.map,mode:this.mode,difficulty:this.difficulty,realms:this.realms,fires:this.fires,barrels:this.barrels,drops:this.drops,news:this.news,
+        fronts:this.fronts,player:this.player,map:this.map,mode:this.mode,difficulty:this.difficulty,realms:this.realms,fires:this.fires,barrels:this.barrels,drops:this.drops,news:this.news,
         tick: this.tick, seed: this.rng.state, next: this.next, scenario: this.scenario, units: this.units, structures: this.structures, projectiles: this.projectiles, groups: [...this.groups.values()], stats: this.stats, dead: this.dead, launches: this.launches, bridges: this.bridges, buildings: this.buildings, winner: this.winner
     }); }
     restore(state: Snapshot) {
@@ -527,6 +441,7 @@ export class SimWorld {
         this.player=s.player??1;this.map=s.map??'twin';this.mode=s.mode??'sandbox';this.difficulty=s.difficulty??'normal';
         this.realms=s.realms??[newRealm(),newRealm()];this.fires=s.fires??[];this.barrels=s.barrels??[];this.drops=s.drops??[];this.news=s.news??'两军重新列阵。';
         this.grid=new Grid(this.map);
+        this.fronts=s.fronts??[{x:972,y:880,breached:false},{x:3828,y:880,breached:false}];
         this.tick = s.tick;
         this.rng.state = s.seed;
         this.next = s.next;

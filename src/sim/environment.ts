@@ -54,31 +54,3 @@ export function environmentTick(w: SimWorld) {
             return false;
         });
 }
-export function supportTick(w: SimWorld, u: Unit) {
-    const f = u.faction;
-    if(u.kind==='bannerman'&&w.realms[f].phase==='RETREAT_REGROUP')return false;
-    if (u.kind === 'bannerman' && (w.tick + u.id) % 10 === 0)
-        w.hash.visit(u.x, u.y, 155, n => { if (n.faction === f)
-            {n.auraUntil=w.tick+12;n.morale=Math.min(100,(n.morale??75)+8);} });
-    if (u.escort) {
-        if (u.escort !== 'guard' && (w.tick + u.id) % (u.escort === 'drum' ? 46 : 135) === 0)
-            w.events.push({ type: u.escort, x: u.x, y: u.y, faction: f });
-        const leader = w.byUnit.get(u.leader ?? 0);
-        if (leader && leader.hp > 0) {
-            const d = leader.face, target = { x: leader.x + (u.escort === 'guard' ? 26 : -9) * d, y: leader.y + (u.escort === 'drum' ? -23 : u.escort === 'horn' ? 23 : (u.guardSide ?? 1) * 14) };
-            if (Math.hypot(target.x - u.x, target.y - u.y) > 11) {
-                w.approach(u, target, 3.1);
-                return true;
-            }
-            if (u.escort === 'guard' && u.cooldown <= 0) {
-                let foe: Unit | undefined;
-                w.hash.visit(u.x, u.y, UNITS[u.kind].range, n => { if (!foe && n.hp > 0 && n.faction !== f && !n.tower)
-                    foe = n; });
-                if (foe)
-                    attack(w, u, foe);
-            }
-            return true;
-        }
-    }
-    return false;
-}

@@ -1,20 +1,24 @@
-import {portrait} from '../src/client/portraits';
+import {preloaded,artwork} from '../src/client/artLoader';
 import { Renderer, type Overlay } from '../src/client/renderer';
 import { SimWorld } from '../src/sim/world';
 import { KINDS } from '../src/sim/config';
 import { sprite, spritePalette } from '../src/client/spriteBaker';
 import { banner } from '../src/client/banners';
-export function pixelTest() {
-    const portraits=new Set<string>();
+export async function pixelTest() {
+    await preloaded;
+    const portraits=[...artwork.keys()].filter(k=>k.startsWith("portrait_"));
     const images = new Set<string>();
     for (const k of KINDS)
         for (const f of [0, 1] as const) {
-            for (const frame of [0, 1, 2]) {
+            for (const frame of ['march1','march2','aim','kneel','bayonet','reload'] as const) {
                 const c = sprite(k, f, frame);
                 if (c.width < 4 || c.height < 4)
                     throw Error(k);
             }
-            const art=portrait(k,f);if(art.width!==48||art.height!==48)throw Error('portrait size');portraits.add(art.toDataURL());
+            if(k==='line_infantry'){
+                const poses=['march1','march2','aim','kneel','bayonet','reload'] as const;
+                if(new Set(poses.map(p=>sprite(k,f,p).toDataURL())).size!==6)throw Error('indistinguishable poses');
+            }
             images.add(sprite(k, f).toDataURL());
             if (spritePalette(k, f).length < 4)
                 throw Error('精灵色表 ' + k);
@@ -29,7 +33,7 @@ export function pixelTest() {
     cam.y = 920;
     cam.zoom = .75;
     r.draw(w, overlay, false);
-    const e = { x: 1460, y: 920, faction: 0 as const, kind: 'bannerman' as const, type: 'death' as const };
+    const e = { x: 1460, y: 920, faction: 0 as const, kind: 'line_infantry' as const,flag:true, type: 'death' as const };
     r.vfx.consume([e]);
     for (let i = 0; i < 16; i++)
         r.vfx.update(1 / 30);
@@ -61,5 +65,5 @@ export function pixelTest() {
                 impactErrors++;
     }
     canvas.remove();
-    return { portraitCount:portraits.size,spriteCount: images.size, flagFrames: wave.size, marks, panErrors, zoomErrors, impactErrors };
+    return { portraitCount:portraits.length,spriteCount: images.size, flagFrames: wave.size, marks, panErrors, zoomErrors, impactErrors };
 }
