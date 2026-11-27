@@ -1,5 +1,6 @@
 import type {Company,Faction,Formation,Order} from './arenaTypes';
 import {sectorOf,type Layout,type Objective,type Sector} from './maps';
+import {PACE} from './scale';
 import {Rng} from './rng';
 import {formUp} from './strategy';
 import type {Point} from './types';
@@ -210,7 +211,10 @@ export function marchDeployment(w:DeploymentWorld){
     for(const route of active){
         if(route.finished)continue;
         const {c,d,points,march,station}=route,t=clamp((w.tick-route.delay)/(route.stop-route.delay),0,1);
-        const s=t*route.length;let j=1;
+        // 镜头从进场路线末段开始，按兵种步态走完部署路程。
+        const speed=c.kind==='cuirassier'?PACE.horseTrot:c.speed;
+        const shown=Math.min(route.length,(route.stop-route.delay)*speed/30);
+        const s=route.length-shown+t*shown;let j=1;
         while(j<points.length-1&&route.cumulative[j]<s)j++;
         const a=points[j-1],b=points[j],length=Math.max(.001,route.cumulative[j]-route.cumulative[j-1]);
         const u=clamp((s-route.cumulative[j-1])/length,0,1),dx=(b.x-a.x)/length,dy=(b.y-a.y)/length;
@@ -220,10 +224,11 @@ export function marchDeployment(w:DeploymentWorld){
         if(t===1){c.formation=d.formation;c.hx=face;c.hy=0;formUp(c);c.vx=c.vy=0;route.finished=true;}
         for(let k=0;k<c.members.length;k++){
             const unit=c.members[k],front=march[2*k],lateral=march[2*k+1];
-            const offX=(front*dx-lateral*dy)*(1-blend)+station[2*k]*blend;
-            const offY=(front*dy+lateral*dx)*(1-blend)+station[2*k+1]*blend;
+            const offX=front*face*(1-blend)+station[2*k]*blend;
+            const offY=lateral*face*(1-blend)+station[2*k+1]*blend;
             const px=unit.x,py=unit.y;unit.x=clamp(x+offX,3,w.layout.width-3);unit.y=clamp(y+offY,3,w.layout.height-3);
             unit.px=w.tick?px:unit.x;unit.py=w.tick?py:unit.y;unit.vx=t>0&&t<1?(unit.x-px)*30:0;unit.vy=t>0&&t<1?(unit.y-py)*30:0;
+            if(w.tick && t>0 && t<1)unit.stride+=Math.hypot(unit.x-px,unit.y-py);
             unit.face=t===1?face:dx<0?-1:1;unit.moving=t>0&&t<1;unit.pose=unit.moving?'march':'stand';
         }
     }

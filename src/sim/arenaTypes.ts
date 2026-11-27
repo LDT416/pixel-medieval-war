@@ -27,6 +27,7 @@ export interface Company {
     x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;
     sector:0|1|2; brigade:number; corps:number; ammo:number; fatigue:number; smoke:number;
     fireMode:'first'|'rank'|'platoon'|'free'; firingSince:number; nextGroup:number; firstVolleyAt:number;
+    sprintUntil:number; sprintReady:number;
     assaultStage:'idle'|'approach'|'signal'|'rush'|'melee'; assaultUntil:number; assaultReady:number; freshAtStart:boolean;
     cavalryDistances:Map<number,number>; lastHorse:number; leftSquare:number; formedSquareAt:number;
     chargeOpponent:number; lastMelee:number; contactId:number; contactAt:number; blownUntil:number;

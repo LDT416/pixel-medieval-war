@@ -1,0 +1,44 @@
+
+> napoleon-1815@6.0.0 test
+> node tests/phase2.mjs && node tests/pace-probe.mjs
+
+600 52.5s 反法同盟失守两个战区，有序撤退 avg 0.21ms p99 0.99ms
+1200 135.0s 反法同盟失守两个战区，有序撤退 avg 0.30ms p99 0.86ms
+1800 111.0s 反法同盟失守两个战区，有序撤退 avg 0.43ms p99 0.96ms
+seed 31676 61s winner 0 loss 0.345 cannon 0.373 反法同盟失守两个战区，有序撤退
+seed 7919 96s winner 1 loss 0.257 cannon 0.296 法兰西帝国失守两个战区，有序撤退
+seed 63352 73s winner 0 loss 0.232 cannon 0.400 反法同盟失守两个战区，有序撤退
+seed 23757 165s winner 1 loss 0.480 cannon 0.011 法兰西帝国失守两个战区，有序撤退
+seed 15838 182s winner 0 loss 0.460 cannon 0.044 反法同盟失守两个战区，有序撤退
+seed 39595 88s winner 1 loss 0.202 cannon 0.341 法兰西帝国失守两个战区，有序撤退
+seed 95028 107s winner 0 loss 0.352 cannon 0.331 反法同盟失守两个战区，有序撤退
+seed 55433 75s winner 0 loss 0.285 cannon 0.243 反法同盟失守两个战区，有序撤退
+seed 47514 90s winner 0 loss 0.313 cannon 0.236 反法同盟失守两个战区，有序撤退
+seed 71271 106s winner 1 loss 0.445 cannon 0.077 法兰西帝国失守两个战区，有序撤退
+seed 126704 53s winner 0 loss 0.178 cannon 0.195 反法同盟失守两个战区，有序撤退
+seed 87109 81s winner 1 loss 0.400 cannon 0.316 法兰西帝国失守两个战区，有序撤退
+seed 102947 50s winner 1 loss 0.235 cannon 0.529 法兰西帝国失守两个战区，有序撤退
+seed 158380 64s winner 1 loss 0.172 cannon 0.000 法兰西帝国失守两个战区，有序撤退
+seed 79190 110s winner 1 loss 0.393 cannon 0.298 法兰西帝国失守两个战区，有序撤退
+seed 118785 121s winner 0 loss 0.257 cannon 0.053 反法同盟失守两个战区，有序撤退
+seed 190056 87s winner 1 loss 0.158 cannon 0.204 法兰西帝国失守两个战区，有序撤退
+seed 134623 124s winner 0 loss 0.415 cannon 0.319 反法同盟失守两个战区，有序撤退
+seed 150461 43s winner 0 loss 0.307 cannon 0.176 反法同盟失守两个战区，有序撤退
+seed 110866 120s winner 0 loss 0.450 cannon 0.077 反法同盟失守两个战区，有序撤退
+seed 166299 88s winner 0 loss 0.267 cannon 0.237 反法同盟失守两个战区，有序撤退
+seed 182137 137s winner 1 loss 0.365 cannon 0.101 法兰西帝国失守两个战区，有序撤退
+seed 142542 128s winner 1 loss 0.437 cannon 0.178 法兰西帝国失守两个战区，有序撤退
+seed 174218 90s winner 1 loss 0.367 cannon 0.064 法兰西帝国失守两个战区，有序撤退
+{
+  seeds: 24,
+  medianSeconds: 89.75,
+  minSeconds: 42.5,
+  maxSeconds: 181.5,
+  loserLossFraction: 0.32375000000000004,
+  generalDeathFraction: 0.08333333333333333,
+  wins: [ 12, 12 ],
+  cannonShare: 0.2124590088709902,
+  pooledCannonShare: 0.1800385993934381
+}
+Battle assertions passed.
+{"seed":23757,"frames":4950,"firstGun":14.133333333333333,"firstCasualty":31.6,"idleFraction":0.07333333333333333,"movement":{"line_infantry":{"count":1244425,"mean":68.9608570781034,"max":163.21004928328517},"field_cannon":{"count":19194,"mean":59.769012187437,"max":61.68935641135505},"bannerman":{"count":70206,"mean":69.57550146523334,"max":117.37171975762936},"cuirassier":{"count":155066,"mean":134.29413378865172,"max":241.05314643485966},"guard_grenadier":{"count":205430,"mean":70.1067694336883,"max":90.00000000001663},"footRush":{"count":103020,"mean":93.64286289498726,"max":114.00000000002707},"horseSprint":{"count":2752,"mean":208.97935601150712,"max":230.78762500000462}}}

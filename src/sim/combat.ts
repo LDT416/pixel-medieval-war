@@ -2,8 +2,9 @@ import type { Soldier, BattleEvent, Company, Round } from './arenaTypes';
 import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, coverAt, behindCrest, inRect, layout } from './maps';
 
-export const MUSKET = 230, CANISTER = 320;
-export const gunRange = (w: SimWorld) => w.weather === 'fog' ? 1350 : 2480;
+import {RANGE} from './scale';
+export const MUSKET=RANGE.effective,CANISTER=RANGE.scatter;
+export const gunRange = (w: SimWorld) => w.weather === 'fog' ? 1350 : RANGE.round;
 export const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export function emit(w: SimWorld, type: BattleEvent['type'], u: Soldier, dx: number, dy: number, explosive: boolean, x = u.x, y = u.y) {

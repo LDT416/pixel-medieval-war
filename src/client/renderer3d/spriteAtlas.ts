@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {PACE} from '../../sim/scale';
 import type {Company,Soldier} from '../../sim/arenaTypes';
 import {toX,toZ,terrainHeight} from './terrain3d';
 import {loadSoldiers,groupKey,type Sheet,type Motion} from './soldierSheets';
@@ -73,7 +74,7 @@ export class Standees {
             }
             const motion:Motion=u.hp<=0?'die':c.status==='rout'?'flee':u.pose as Motion;
             if(motion==='kneel'){if(state.kneelAt<0)state.kneelAt=tick;}else state.kneelAt=-1;
-            const phase=motion==='kneel'?Math.min(3,(tick-state.kneelAt)/2):motion==='die'?(tick-u.diedAt)/2:u.moving?u.stride/4:motion==='load'||motion==='kneelLoad'?(tick-u.firedAt)/8:
+            const phase=motion==='kneel'?Math.min(3,(tick-state.kneelAt)/2):motion==='die'?(tick-u.diedAt)/2:(motion==='march'||motion==='run'||motion==='flee')?u.stride*sheet.counts[motion]/PACE.strideLength:motion==='load'||motion==='kneelLoad'?(tick-u.firedAt)/8:
                 motion==='recoil'?(tick-u.firedAt)/2:(tick+u.id)/5;
             const fr=Math.max(0,Math.floor(phase))%sheet.counts[motion];
             // 相机北向固定，溃逃与白刃用运动朝向；阵列其余时候保持团朝向。

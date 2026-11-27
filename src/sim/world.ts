@@ -19,12 +19,12 @@ const GENERALS: { name: string; title: string; trait: Trait }[][] = [
      { name: '希尔', title: '勋爵', trait: 'cautious' }, { name: '布吕歇尔', title: '元帅', trait: 'cunning' }]
 ];
 const HP: Record<Kind, number> = { line_infantry: 100, guard_grenadier: 116, cuirassier: 135, bannerman: 90, field_cannon: 230 };
-const SPEED: Record<Kind, number> = { line_infantry: 64, guard_grenadier: 66, cuirassier: 125, bannerman: 64, field_cannon: 40 };
+import {marchSpeed as SPEED, PACE} from './scale';
 const VALUE: Record<Kind, number> = { line_infantry: 1, guard_grenadier: 1.55, cuirassier: 1.35, bannerman: .6, field_cannon: 9 };
 export const TIMEOUT = 36000, PURSUIT = 210;
 
 export class SimWorld {
-    readonly deployEnd=1350;
+    readonly deployEnd=PACE.deploymentTicks;
     rearGuard:[number|null,number|null]=[null,null];
     plans!: [BattlePlan,BattlePlan];
     private legacy?: LegacyDirector;
@@ -94,7 +94,7 @@ export class SimWorld {
         if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
         if (line === 5) base = 100;
         const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
-            x,y,sector:Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))) as 0|1|2,brigade:Math.floor(this.companies.length/4),corps:f*3+Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))),ammo:0,fatigue:0,smoke:0,fireMode:'first',firingSince:-1,nextGroup:0,firstVolleyAt:-999,assaultStage:'idle',assaultUntil:0,assaultReady:0,freshAtStart:false,cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
+            x,y,sector:Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))) as 0|1|2,brigade:Math.floor(this.companies.length/4),corps:f*3+Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))),ammo:0,fatigue:0,smoke:0,fireMode:'first',firingSince:-1,nextGroup:0,firstVolleyAt:-999,sprintUntil:0,sprintReady:0,assaultStage:'idle',assaultUntil:0,assaultReady:0,freshAtStart:false,cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
             engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);

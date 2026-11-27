@@ -35,8 +35,8 @@ const w=new SimWorld(1200,7919),l=w.logistics;
 const c=w.companies.find(c=>c.line===0&&c.faction===0),hq=w.generals[0].unit;
 hq.x=1000;hq.y=1000;c.x=1300;c.y=1000;c.order='hold';
 const advance=n=>{for(let i=0;i<n;i++){w.tick++;l.step(w);}};
-const order=l.dispatch(w,c,'advance');assert.equal(l.dispatch(w,c,'advance'),order);advance(29);assert.equal(c.order,'hold');advance(1);assert.equal(c.order,'advance');
-report.deliveryTicks=30;report.deliveryPixels=300;
+const order=l.dispatch(w,c,'advance');assert.equal(l.dispatch(w,c,'advance'),order);advance(44);assert.equal(c.order,'hold');advance(1);assert.equal(c.order,'advance');
+report.deliveryTicks=45;report.deliveryPixels=300;
 const enemy=w.units.find(u=>u.faction===1&&u.kind==='cuirassier'&&!u.staff);
 enemy.x=1150;enemy.y=1000;w.hash.rebuild(w.units);
 l.dispatch(w,c,'reserve');advance(30);assert.equal(c.order,'advance');assert.equal(l.lost,1);report.intercepted=l.lost;
@@ -66,4 +66,4 @@ front.x=front.homeX;front.y=front.homeY;
 for(let i=0;i<30;i++){g.tick++;s.step(g);}
 assert.equal(front.homeX,depot.x);assert.equal(front.homeY,depot.y);
 report.rotation={front:front.id,reserve:reserve.id,deliveries:s.delivered,distance:s.handovers[0].distance};
-const dir='docs/shots/W1';mkdirSync(dir,{recursive:true});writeFileSync(dir+'/logistics.json',JSON.stringify(report,null,2));console.log(report);
+const dir='docs/shots/T9';mkdirSync(dir,{recursive:true});writeFileSync(dir+'/logistics.json',JSON.stringify(report,null,2));console.log(report);

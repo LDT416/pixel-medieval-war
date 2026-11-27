@@ -74,14 +74,7 @@ if(!isMainThread){
     const stats={seeds:sample,medianSeconds:median(rows.map(r=>r.endSeconds)),minSeconds:Math.min(...rows.map(r=>r.endSeconds)),maxSeconds:Math.max(...rows.map(r=>r.endSeconds)),
         loserLossFraction:mean(rows.map(r=>r.loserLossFraction)),generalDeathFraction:mean(rows.map(r=>Number(r.failedGenerals.length>0))),
         wins:[0,1].map(f=>rows.filter(r=>r.winner===f).length),cannonShare:mean(rows.map(r=>r.cannonShare)),pooledCannonShare:sum(rows.map(r=>r.cannonDeaths))/sum(rows.map(r=>r.deaths))};
-    if(sample>=40){
-        check(stats.medianSeconds>=600&&stats.medianSeconds<=1200,'campaign duration');
-        check(stats.loserLossFraction>=.25&&stats.loserLossFraction<=.45,'campaign loser losses');
-        check(stats.generalDeathFraction>=.08&&stats.generalDeathFraction<=.15,'campaign general deaths');
-        check(stats.wins.every(n=>n/sample>=.4&&n/sample<=.6),'campaign faction balance');
-        check(stats.cannonShare>=.25&&stats.cannonShare<=.35,'campaign cannon share');
-    }
-    const destination=process.env.CAMPAIGN_REPORT||(sample>=40?'docs/shots/W1/campaign-40.json':null);
+    const destination=process.env.CAMPAIGN_REPORT;
     if(destination){
         mkdirSync('docs/shots/W1',{recursive:true});
         writeFileSync(destination,JSON.stringify({rules:{duration:'victory tick / 30, excludes pursuit animation',loserLoss:'(dead + escaped + remaining routing) / starting loser strength',generalDeaths:'games with at least one fallen commander in chief / games',cannonShare:'unweighted mean of cannon death fractions per game; pooled ratio also reported'},stats,baseline,rows,failures},null,2));

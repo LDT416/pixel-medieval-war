@@ -37,13 +37,25 @@ async function start(){
     const miniMap=new TacticalMiniMap(document.querySelector('#hud')!,arena);
     arena.tracers.installControl();const sound=new BattleSound(arena);
     const companyFollow=new CompanyFollow(world,arena,canvas);
-    function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
+    const skipDeployment=document.createElement('button');
+    skipDeployment.type='button';skipDeployment.className='labeled';skipDeployment.textContent='跳过部署';
+    document.querySelector('#hud nav.controls')?.append(skipDeployment);
+    let deploymentPlayback=false;
+    skipDeployment.onclick=()=>{
+        if(hud.intelOpen || world.tick>=world.deployEnd)return;
+        while(world.tick<world.deployEnd)world.step();
+        deploymentPlayback=false;accumulator=0;controls();
+    };
+    function controls(){
+        skipDeployment.hidden=hud.intelOpen || world.tick>=world.deployEnd;
+        hud.controls(world.scale,arena.lighting,paused,deploymentPlayback?4:speed,auto,purse,bet);
+    }
     function reset(scale:Scale,seed:number){
-        skipping=false;world.reset(scale,seed);arena.reset();
+        deploymentPlayback=false;skipping=false;world.reset(scale,seed);arena.reset();
         arena.setLighting(world.weather==='rain'?'storm':world.weather==='fog'?'fog':'golden');
         paused=true;slowmo=accumulator=0;settled=false;priority=0;follow=-1;slowUntil=0;queue.length=0;document.body.classList.remove('commander-down');bet=null;lastFocusNews=0;focusUntil=0;
         const p=world.frontline();hotX=p.x;hotY=p.y;arena.focus(p.x,p.y,330);
-        history.replaceState(null,'','?seed='+seed);
+        const url=new URL(location.href);url.searchParams.set('seed',String(seed));history.replaceState(null,'',url);
         hud.intel(world,purse);controls();hud.update(world,performance.now());
     }
     function placeBet(side:Faction|-1,stake:number){
@@ -54,7 +66,7 @@ async function start(){
         if(innerWidth<=600 && innerHeight>innerWidth && !sessionStorage.getItem('1815-orientation')){
             sessionStorage.setItem('1815-orientation','1');const tip=document.createElement('div');tip.className='orientation-tip glass';tip.textContent='横屏观战效果更佳';document.body.append(tip);setTimeout(()=>tip.remove(),3200);
         }
-        paused=false;arena.focus(hotX,hotY,210);controls();
+        deploymentPlayback=world.tick<world.deployEnd;paused=false;arena.focus(hotX,hotY,210);controls();
     }
     function settle(){
         if(settled||world.winner===null)return;settled=true;
@@ -72,7 +84,7 @@ async function start(){
     function cycleLighting(){arena.setLighting(lightings[(lightings.indexOf(arena.lighting)+1)%lightings.length]);controls();}
     function setLighting(mode:Lighting){if(lightings.includes(mode)){arena.setLighting(mode);controls();}}
     function setScale(n:number){if(scales.includes(n as Scale))reset(n as Scale,world.seed);}
-    function setSpeed(n:number){skipping=false;if(n===0){paused=true;controls();return;}if([.25,1,2,4,8,16].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
+    function setSpeed(n:number){deploymentPlayback=false;skipping=false;if(n===0){paused=true;controls();return;}if([.25,1,2,4,8,16].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
     window.addEventListener('keydown',e=>{
         if(e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
         if(e.code==='Space'){e.preventDefault();if(hud.intelOpen)placeBet(-1,0);else toggle();}
@@ -116,13 +128,14 @@ async function start(){
     let last=performance.now();
     function frame(now:number){
         const elapsed=Math.max(0,(now-last)/1000);last=now;
-        const real=Math.min(.2,elapsed);let dt=paused?0:real*speed;
+        const real=Math.min(.2,elapsed);let dt=paused?0:real*(deploymentPlayback?4:speed);
         if(world.winner!==null && !world.ended && !paused){slowmo+=elapsed;if(slowmo<1.8)dt=real*.3;}
         if(now<slowUntil && !paused)dt=real*.3;else document.body.classList.remove("commander-down");
         if(!world.ended){
             accumulator+=dt*TICKS;
             let steps=0;
             while(accumulator>=1 && !world.ended && steps<96){world.step();arena.events(world);sound.step(world);director(now);accumulator--;steps++;
+                if(world.tick===world.deployEnd){deploymentPlayback=false;accumulator=0;controls();break;}
                 if(skipping && world.news.length>skipFrom){
                     const event=world.news.slice(skipFrom).find(n=>n.weight>=2);skipFrom=world.news.length;
                     if(event){setSpeed(1);arena.focus(event.x,event.y,110);accumulator=0;break;}

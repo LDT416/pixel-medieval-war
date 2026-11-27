@@ -47,6 +47,10 @@ function fallbackSheet(){
 }
 export function loadSoldiers(){
     if(!shared)shared=(async()=>{
+        if(new URLSearchParams(location.search).get('sprites')!=='baked'){
+            current=fallbackSheet();
+            return current;
+        }
         try{
             const [data,tex]=await Promise.all([
                 fetch('./art/soldiers/regiments.json').then(r=>{if(!r.ok)throw Error(String(r.status));return r.json() as Promise<Manifest>}),

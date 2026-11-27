@@ -3,6 +3,8 @@ import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, movementAt, behindCrest, inWoods, inRect, layout } from './maps';
 import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, impact, gunFire } from './combat';
 
+import {PACE} from './scale';
+
 const SPACING: Record<Formation, [number, number]> = {
     line: [13, 15], column: [13, 14], square: [13, 13], battery: [62, 0], wedge: [25, 32], staff: [22, 18]
 };
@@ -68,7 +70,7 @@ function faceToward(u:Soldier, dx:number){
 }
 function flee(w: SimWorld, u: Soldier, c: Company) {
     const away = u.faction ? 1 : -1;
-    const ok = moveToward(w, u, u.x + away * 200, u.y + u.jy * 3 + Math.sin((w.tick + u.id * 37) * .02) * 60, u.speed * (u.kind === 'cuirassier' ? 1.05 : 1.3));
+    const ok = moveToward(w, u, u.x + away * 200, u.y + u.jy * 3 + Math.sin((w.tick + u.id * 37) * .02) * 60, u.kind==='cuirassier'?PACE.horseTrot:PACE.footFlee);
     u.pose = 'run'; faceToward(u,away);
     if (ok && (u.x <= 4 || u.x >= WIDTH - 4)) {
         c.ammo-=u.ammo;u.escaped=true;u.hp = 0; u.moving = false;
@@ -121,9 +123,10 @@ export function advance(w: SimWorld, u: Soldier) {
     const [lat, dep] = slotOffset(c,u.slot);
     let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
     if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
-    const far = Math.abs(tx - u.x) + Math.abs(ty - u.y) > 30;
+    
     const charging = c.order === 'charge' || (c.order === 'assault' && dist(c, w.companies[c.target] ?? c) < 320);
-    const moved = moveToward(w, u, tx, ty, u.speed * (far ? 1.3 : 1.1) * (charging ? 1.45 : 1));
+    const gait=c.sprintUntil>w.tick?PACE.horseSprint:c.assaultStage==='rush'?PACE.footRush:u.speed;
+    const moved=moveToward(w,u,tx,ty,gait*(1-PACE.maxFatiguePenalty*c.fatigue));
     faceToward(u,c.hx);
     if (moved) {
         u.marchUntil=w.tick+12;
@@ -345,10 +348,10 @@ export function updateCompany(w: SimWorld, c: Company) {
             for(const p of w.companies)if(p.faction===c.faction && p.line===0 && p.alive && p.status!=='rout'){sum+=p.x;count++;}
             const front=sum/count, face=c.faction?-1:1;
             if(count && (front-c.initialFront)*face>600){
-                c.homeX=front-face*170; c.limbered=true; c.relocated=true;
+                c.homeX=front-face*170; c.limbered=true; c.relocated=true;c.deployUntil=w.tick+PACE.limberTicks;
             }
         }else if(c.limbered && Math.hypot(c.x-c.homeX,c.y-c.homeY)<2){
-            c.limbered=false;c.deployUntil=w.tick+90;
+            c.limbered=false;c.deployUntil=w.tick+PACE.limberTicks;
         }
     }
     let gx = c.homeX, gy = c.homeY;
@@ -378,11 +381,16 @@ export function updateCompany(w: SimWorld, c: Company) {
     for (const u of c.members) { mx += u.x; my += u.y; }
     mx /= c.members.length; my /= c.members.length;
     lag = Math.hypot(mx - c.x, my - c.y);
-    let speed = c.speed * (c.formation === 'column' ? 1.05 : c.formation === 'square' ? .3 : c.formation === 'line' ? .85 : 1) * (c.status === 'shaken' ? .75 : 1);
-    speed*=movementAt(c.x,c.y)*(1-.35*c.fatigue);
-    if(w.layout.width>=12000 && c.line!==5 && c.order!=='rally' && c.assaultStage!=='rush' && c.order!=='charge')speed*=w.logistics.isRelieving(c)?1:c.kind==='cuirassier'?.42:.135;
-    if(c.limbered)speed*=.7;
-    if(c.order==='charge')speed*=1.35;else if(c.assaultStage==='rush')speed*=1.8;
+    const mounted=c.kind==='cuirassier';
+    if(mounted && c.order==='charge' && d<250 && c.fatigue<.7 && w.tick>=c.sprintReady){
+        c.sprintUntil=w.tick+PACE.sprintTicks;c.sprintReady=c.sprintUntil+450;
+        c.fatigue=Math.min(1,c.fatigue+.12);
+    }
+    if(c.order!=='charge')c.sprintUntil=0;
+    let speed=c.sprintUntil>w.tick?PACE.horseSprint:c.assaultStage==='rush'?PACE.footRush:c.speed;
+    if(c.formation==='square')speed*=.55;
+    speed*=movementAt(c.x,c.y)*(1-PACE.maxFatiguePenalty*c.fatigue);
+    if(c.limbered && w.tick<c.deployUntil)speed=0;
     if (c.formUntil > w.tick && c.formation !== 'column') speed *= .3;
     const gd = Math.hypot(gx - c.x, gy - c.y);
     if (gd > 1 && lag < 55) {

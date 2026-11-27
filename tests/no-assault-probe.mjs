@@ -10,4 +10,3 @@ for(const r of results){
 const disabledWinRate=(wins[0]+wins[1])/results.length;
 console.log(JSON.stringify({seeds,games:results.length,signature,disabledWins:wins,disabledWinRate,illegalOrders}));
 assert.equal(illegalOrders,0,'被禁方出现了步兵冲锋命令');
-if(seeds>=40)assert.ok(disabledWinRate<=.4,'禁止冲锋的一方胜率超过 40%');

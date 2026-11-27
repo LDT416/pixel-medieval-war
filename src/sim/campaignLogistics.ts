@@ -5,7 +5,8 @@ import type {SimWorld} from './world';
 
 const SECTORS=[0,1,2] as const;
 const FACTIONS=[0,1] as const;
-const COURIER_SPEED=300;
+import {PACE} from './scale';
+const COURIER_SPEED=PACE.courier;
 const rifle=(c:Company)=>c.kind==='line_infantry'||c.kind==='guard_grenadier';
 const present=(c:Company)=>c.alive>0&&c.status!=='rout'&&c.status!=='gone';
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
