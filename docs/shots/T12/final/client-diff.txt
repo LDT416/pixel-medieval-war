@@ -1,0 +1,15 @@
+ src/client/hud.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/src/client/hud.ts b/src/client/hud.ts
+index 2a87c55..68f67a5 100644
+--- a/src/client/hud.ts
++++ b/src/client/hud.ts
+@@ -58,7 +58,7 @@ export class Hud{
+         <nav class="controls glass" aria-label="战场控制">
+         <div class="controlrow"><div class="segments" aria-label="总兵力">${scales.map(n=>`<button data-scale="${n}" title="总兵力 ${n}">${n}</button>`).join('')}</div>
+         <button id="light" class="labeled"></button></div>
+-        <div class="controlrow playback"><button id="pause" class="square" aria-label="暂停"></button><div class="speeds">${[.25,1,2,4,8,16].map(n=>`<button data-speed="${n}">${n}×</button>`).join('')}</div><button id="restart" class="labeled" title="随机新战局 (R)">${icon('restart')}新战局</button></div>
++        <div class="controlrow playback"><button id="pause" class="square" aria-label="暂停"></button><div class="speeds">${[.25,1,2,4].map(n=>`<button data-speed="${n}">${n}×</button>`).join('')}</div><button id="restart" class="labeled" title="随机新战局 (R)">${icon('restart')}新战局</button></div>
+         <div class="controlrow"><button id="next-event" class="labeled">跳至大事 »</button><button id="auto" class="labeled" title="自动导播：镜头跟随冲锋、溃败等关键时刻">${icon('camera')}<span></span></button><span id="purse" class="purse"></span></div></nav>
+         <div id="headline" class="headline" hidden></div>
+         <button id="major" class="major glass" aria-pressed="false">只看大事</button><div id="labels"></div><ol id="ticker" class="ticker" aria-live="polite"></ol>

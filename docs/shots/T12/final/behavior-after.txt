@@ -1,0 +1,25 @@
+seed 7919: 1200s winner=0 dead=149,412 fled=10,2 parapet={"musket":1,"scatter":0,"round":2}
+seed 15838: 297s winner=0 dead=355,468 fled=11,16 parapet={"musket":5,"scatter":0,"round":161}
+seed 23757: 273s winner=0 dead=453,400 fled=20,16 parapet={"musket":3,"scatter":0,"round":229}
+seed 31676: 209s winner=0 dead=243,334 fled=5,17 parapet={"musket":0,"scatter":0,"round":30}
+seed 39595: 665s winner=1 dead=394,415 fled=16,20 parapet={"musket":10,"scatter":0,"round":0}
+seed 47514: 227s winner=0 dead=457,462 fled=7,0 parapet={"musket":0,"scatter":0,"round":86}
+seed 55433: 235s winner=0 dead=376,524 fled=11,44 parapet={"musket":0,"scatter":0,"round":0}
+seed 63352: 1200s winner=1 dead=602,400 fled=45,6 parapet={"musket":0,"scatter":0,"round":107}
+seed 71271: 1200s winner=0 dead=333,259 fled=37,5 parapet={"musket":0,"scatter":0,"round":2}
+seed 79190: 509s winner=1 dead=591,125 fled=20,0 parapet={"musket":0,"scatter":0,"round":512}
+seed 87109: 191s winner=0 dead=351,378 fled=8,5 parapet={"musket":0,"scatter":0,"round":27}
+seed 95028: 241s winner=1 dead=561,496 fled=16,0 parapet={"musket":0,"scatter":0,"round":121}
+seed 102947: 1200s winner=0 dead=296,397 fled=2,22 parapet={"musket":3,"scatter":0,"round":8}
+seed 110866: 158s winner=0 dead=452,406 fled=10,1 parapet={"musket":1,"scatter":0,"round":93}
+seed 118785: 213s winner=0 dead=279,449 fled=0,20 parapet={"musket":3,"scatter":0,"round":8}
+seed 126704: 600s winner=1 dead=301,237 fled=27,8 parapet={"musket":0,"scatter":0,"round":0}
+seed 134623: 156s winner=1 dead=486,194 fled=7,0 parapet={"musket":2,"scatter":0,"round":10}
+seed 142542: 258s winner=0 dead=481,460 fled=11,38 parapet={"musket":28,"scatter":0,"round":11}
+seed 150461: 146s winner=0 dead=349,440 fled=10,14 parapet={"musket":4,"scatter":0,"round":58}
+seed 158380: 1200s winner=0 dead=224,253 fled=11,16 parapet={"musket":0,"scatter":0,"round":0}
+seed 166299: 195s winner=0 dead=344,528 fled=8,30 parapet={"musket":9,"scatter":0,"round":132}
+seed 174218: 1200s winner=1 dead=448,393 fled=34,40 parapet={"musket":1,"scatter":0,"round":133}
+seed 182137: 1200s winner=1 dead=567,499 fled=45,15 parapet={"musket":27,"scatter":0,"round":48}
+seed 190056: 600s winner=1 dead=173,156 fled=5,6 parapet={"musket":0,"scatter":0,"round":4}
+{"musketHitRate":"8.2%","musketFriendly":"2.4%","roundShots":8454,"roundKills":6129,"killsPerBall":"0.72","roundFriendly":"2.8%","canisterHits":998,"canisterFriendly":"0.8%","why":"{\"sameCompany\":20,\"otherCompany\":13,\"nearSum\":2420.075214722596,\"victimKneeling\":0,\"shooterInMelee\":0}","avgShotRange":"230","cannonShare":"36.6%","heldFire":219997,"ignored":91,"laneChecks":38200,"generalsDead":5,"parapetAbsorbed":{"musket":97,"scatter":0,"round":1782},"avgSec":565,"p99":["5.69","4.30","2.84","2.39","2.12","1.85","2.09","1.99","2.72","2.97","3.06","2.20","3.25","2.58","2.57","3.14","2.65","4.43","5.75","6.65","2.11","1.88","5.09","5.28"]}

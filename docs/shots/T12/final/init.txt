@@ -1,0 +1,3 @@
+{"scale":20000,"seed":1815,"units":20000,"initMs":394.6039}
+{"scale":6000,"seed":1815,"units":6000,"initMs":59.2097}
+{"scale":10000,"seed":1815,"units":10000,"initMs":54.59029999999996}

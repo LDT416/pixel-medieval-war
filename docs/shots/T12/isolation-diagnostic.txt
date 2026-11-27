@@ -1,0 +1,6 @@
+{"scale":3600,"tick":1,"alive":3600,"isolated":306,"percent":8.5}
+{"scale":3600,"tick":360,"alive":3600,"isolated":276,"percent":7.666666666666667}
+{"scale":3600,"tick":900,"alive":3474,"isolated":220,"percent":6.332757628094416}
+{"scale":20000,"tick":1,"alive":20000,"isolated":73,"percent":0.365}
+{"scale":20000,"tick":360,"alive":20000,"isolated":73,"percent":0.365}
+{"scale":20000,"tick":900,"alive":19213,"isolated":92,"percent":0.47884245042419193}

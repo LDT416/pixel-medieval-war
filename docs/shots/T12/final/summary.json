@@ -1,0 +1,147 @@
+{
+  "browserTicks": 1248,
+  "browserSimSeconds": 41.6,
+  "baseline": {
+    "1200": {
+      "scale": 1200,
+      "worstP99": 2.14,
+      "meanMs": 1.13
+    },
+    "2400": {
+      "scale": 2400,
+      "worstP99": 4.23,
+      "meanMs": 2.3
+    },
+    "3600": {
+      "scale": 3600,
+      "worstP99": 13.04,
+      "meanMs": 4.59
+    }
+  },
+  "performance": {
+    "3600": {
+      "scale": 3600,
+      "worstP99": 9.67,
+      "meanMs": 2.84
+    },
+    "10000": {
+      "scale": 10000,
+      "worstP99": 30.58,
+      "meanMs": 14.08
+    },
+    "20000": {
+      "scale": 20000,
+      "worstP99": 74.78,
+      "meanMs": 32.13
+    }
+  },
+  "pairedFirstEight": {
+    "worstP99": 8.11,
+    "meanMs": 2.21875
+  },
+  "serialBaseline": {
+    "scale": 3600,
+    "worstP99": 11.44,
+    "meanMs": 4.96
+  },
+  "initialP99ReductionPct": 25.84355828220859,
+  "serialP99ReductionPct": 15.472027972027968,
+  "phaseEstimatedMs": {
+    "companies": 115270.37999999999,
+    "crowd": 640829.265,
+    "director": 3902.955,
+    "hash+logistics": 105636.48000000001,
+    "rounds": 1672.1699999999998,
+    "soldiers": 275126.82
+  },
+  "crowdPct": 56.09312940700584,
+  "before": {
+    "hit": 8.2,
+    "friendly": 2.4,
+    "art": 36.6,
+    "duration": 565,
+    "wins": 15
+  },
+  "after": {
+    "hit": 8.2,
+    "friendly": 2.4,
+    "art": 36.6,
+    "duration": 565,
+    "wins": 15
+  },
+  "delta": {
+    "hit": 0.0,
+    "friendly": 0.0,
+    "art": 0.0,
+    "duration": 0,
+    "wins": 0
+  },
+  "durationChangePct": 0.0,
+  "identicalSeedDurationAndWinner": 24,
+  "checks": {
+    "F1": false,
+    "F2": false,
+    "F3": false,
+    "F4": false,
+    "F5": false,
+    "F6": true,
+    "F7": true,
+    "F8": true,
+    "F9": true,
+    "F10": true,
+    "F11": true,
+    "F12": true
+  },
+  "init20000Ms": 394.6039,
+  "browser": [
+    {
+      "browser": "158.0.8127.88",
+      "site": "http://127.0.0.1:4184/?seed=15838",
+      "viewport": [
+        1280,
+        800
+      ]
+    },
+    {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Laptop GPU (0x000027E0) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    {
+      "speed": [
+        0.25,
+        1,
+        2,
+        4
+      ],
+      "scale": [
+        1200,
+        2400,
+        3600
+      ],
+      "active": 4
+    },
+    {
+      "smoke": {
+        "tick": 9195,
+        "ended": true,
+        "winner": 0
+      },
+      "errors": []
+    },
+    {
+      "rafFrames": 872,
+      "elapsedMs": 60050,
+      "maxMs": 200.10000000000036,
+      "maxSteps": 3,
+      "above250ms": 0,
+      "errors": []
+    }
+  ],
+  "repeatBrowser": {
+    "rafFrames": 1065,
+    "elapsedMs": 60016.5,
+    "maxMs": 183.60000000000036,
+    "maxSteps": 3,
+    "above250ms": 0,
+    "errors": []
+  }
+}
