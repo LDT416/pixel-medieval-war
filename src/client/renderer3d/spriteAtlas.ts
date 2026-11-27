@@ -1,3 +1,9 @@
+import type {Variant} from '../../sim/units/roster';
+
+const uniformTint:Record<Variant,readonly [number,number,number]>={
+    voltigeur:[1,.99,.84],rifles:[.62,.88,.65],lancer:[1,.85,.88],
+    hussar:[.85,.91,1],horse_battery:[1,.94,.82],howitzer:[.81,.86,.91]
+};
 import * as T from 'three';
 import {PACE} from '../../sim/scale';
 import type {Company,Soldier} from '../../sim/arenaTypes';
@@ -86,7 +92,8 @@ export class Standees {
             const [sx,sy,w,hp,fx,fy]=sheet.data.tiles[i],sheetW=sheet.data.width,sheetH=sheet.data.height;
             this.uv.setXYZW(n,sx/sheetW,1-(sy+hp)/sheetH,w/sheetW,hp/sheetH);
             const tint=.91+(u.id*17%10)*.01;
-            this.tint.setXYZ(n,tint,tint,tint*.99);
+            const color=c.variant && u.kind===c.kind?uniformTint[c.variant]:null;
+            this.tint.setXYZ(n,tint*(color?.[0]??1),tint*(color?.[1]??1),tint*(color?.[2]??.99));
             this.flip.setXY(n,Number(flip),Math.max(0,1-(tick-u.hitAt)/4));
             const px=(sheet.fallback?.083:.074)*(u.general?1.22:1);
             const rise=(fy-hp/2)*px;

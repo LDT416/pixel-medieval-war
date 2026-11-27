@@ -1,0 +1,2 @@
+{"seed":23757,"gameTicks":7785,"boardActions":{"musket":{"sent":1061,"hits":358,"friendly":127},"round":{"sent":52,"hits":14,"friendly":10},"scatter":{"sent":12,"hits":9,"friendly":0}}}
+Delayed cell: friendly occupant affected once; empty cell missed.

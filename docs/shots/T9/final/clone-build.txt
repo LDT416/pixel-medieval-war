@@ -1,0 +1,18 @@
+
+> napoleon-1815@6.0.0 build
+> tsc --noEmit && vite build
+
+vite v7.3.8 building client environment for production...
+transforming...
+✓ 54 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                 855.28 kB │ gzip: 244.34 kB
+dist/assets/index-Ds5l_xrm.css   19.02 kB │ gzip:   5.38 kB
+dist/assets/index-8HwtqExh.js   835.69 kB │ gzip: 238.67 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.76s

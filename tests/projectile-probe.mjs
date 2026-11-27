@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+const built=await build({stdin:{contents:"export {SimWorld} from './src/sim/world'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',write:false});
+const {SimWorld}=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text).toString('base64'));
+const w=new SimWorld(1200,Number(process.argv[2]??23757));
+while(w.winner===null)w.step();
+console.log(JSON.stringify({seed:w.seed,gameTicks:w.tick,boardActions:w.boardShots.stats}));
+const sent=Object.values(w.boardShots.stats).reduce((s,r)=>s+r.sent,0);assert.ok(sent>0);
+w.reset(600,42);
+const shooter=w.units[0],other=w.units.find(u=>u.faction===shooter.faction&&!u.general&&u.id!==shooter.id);
+other.x=528;other.y=528;w.hash.rebuild([other]);
+const hp=other.hp;w.boardShots.place(w,shooter,'musket',528,528,3);
+w.tick=2;w.boardShots.step(w);assert.equal(other.hp,hp);
+w.tick=3;w.boardShots.step(w);assert.ok(other.hp<hp);assert.equal(w.boardShots.stats.musket.friendly,1);
+const after=other.hp;w.tick++;w.boardShots.step(w);assert.equal(other.hp,after);
+other.x+=64;w.hash.rebuild([other]);w.boardShots.place(w,shooter,'musket',528,528,4);w.boardShots.step(w);assert.equal(other.hp,after);
+console.log('Delayed cell: friendly occupant affected once; empty cell missed.');

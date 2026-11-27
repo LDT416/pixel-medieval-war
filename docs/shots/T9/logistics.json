@@ -1,0 +1,15 @@
+{
+  "maps": 80,
+  "deployed": 45,
+  "deliveryTicks": 45,
+  "deliveryPixels": 300,
+  "intercepted": 1,
+  "supplyRound": 4,
+  "wagonsRaided": 1,
+  "rotation": {
+    "front": 0,
+    "reserve": 3,
+    "deliveries": 2,
+    "distance": 34
+  }
+}

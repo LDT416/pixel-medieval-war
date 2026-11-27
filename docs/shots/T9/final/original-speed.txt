@@ -1,0 +1,1 @@
+{"infMovingSpeed":"61.7","cavMovingSpeed":"109.7","movingShare":"0.22","firstCasualtySec":"26","width":16000}

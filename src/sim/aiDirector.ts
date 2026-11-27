@@ -1,3 +1,4 @@
+import {artillery as isArtillery, guard as isGuard, lineTroop as isLineTroop, mounted as isMounted} from './units/abilities';
 import type { Company, Faction } from './arenaTypes';
 import type { SimWorld } from './world';
 import { inRect, inWoods, layout, WIDTH } from './maps';
@@ -48,28 +49,28 @@ export class Director {
         }
         // 攻方：重整好的连队再次投入进攻。
         if (attack && this.advanced[f] && !this.secondWave[f] && w.tick % 150 === 1)
-            for (const c of own) if (free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && c.kind !== 'cuirassier') w.logistics.dispatch(w,c,'advance');
+            for (const c of own) if (free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && !isMounted(c)) w.logistics.dispatch(w,c,'advance');
         // 守方：敌军疲态尽显时转入全线反击。
         if (!attack && w.tick > 3600 && w.tick % 90 === 1) {
             const e = (1 - f) as Faction;
             if (w.armyMorale(e) < 38 || w.effective(f) > w.effective(e) * 1.35 || w.tick > 16500) {
                 w.posture[f] = 'attack'; this.advanced[f] = true;
-                for (const c of own) if (free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && c.kind !== 'cuirassier' && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
+                for (const c of own) if (free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && !isMounted(c) && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
                 w.say(f ? `${leader}挥舞帽子：全线前进！` : `${leader}下令：全线反击！`, f, w.frontline().x, w.frontline().y, 3);
             }
         }
         // ---- 刺刀冲锋 ----
         for (const c of own) {
-            if (c.status !== 'steady' || (c.kind !== 'line_infantry' && c.kind !== 'guard_grenadier') || c.line === 6) continue;
+            if (c.status !== 'steady' || (!isLineTroop(c) && !isGuard(c)) || c.line === 6) continue;
             if((!free(c) && c.order!=='advance' && (c.order==='reserve' || dist(c,w.companies[c.target]??c)>260)) || w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
             if (c.order !== 'advance' && c.order !== 'hold') continue;
             const current=w.companies[c.target];
-            const viable=(o:Company)=>o.faction!==f && o.alive>0 && o.line!==5 && o.kind!=='cuirassier' && o.status!=='rout' && o.status!=='gone';
+            const viable=(o:Company)=>o.faction!==f && o.alive>0 && o.line!==5 && !isMounted(o) && o.status!=='rout' && o.status!=='gone';
             const reach=w.weather==='fog'?1300:2250;
             const t=current && viable(current)?current:w.companies.filter(o=>viable(o)&&dist(o,c)<reach)
                 .sort((a,b)=>dist(a,c)-dist(b,c))[0];
             if(!t)continue;
-            let limit = ASSAULT[trait] - (attack ? 0 : 10) + (c.kind === 'guard_grenadier' && plan.reserveAt!==null ? 22 : 0);
+            let limit = ASSAULT[trait] - (attack ? 0 : 10) + (isGuard(c) && plan.reserveAt!==null ? 22 : 0);
             if (inRect(layout.farm, t.x, t.y, 20)) limit -= 14;
             const d = dist(c, t);
             const support=own.some(o=>o!==c && o.line!==5 && o.status==='steady' && dist(o,c)<480);
@@ -83,13 +84,13 @@ export class Director {
             if ((d<reach && (fresh || designated) && (c.id%3!==2 || attack)) || (d<MUSKET+40 && (t.morale<limit || t.alive<c.alive*.45 || window || lowAmmo || (worn && (support || c.kills>=1.2*Math.max(1,c.losses)))))) {
                 c.order = 'assault'; c.forced = t.id;
                 c.freshAtStart=fresh;c.charges++;
-                if (c.kind === 'guard_grenadier' || w.rng.next() < .22) w.say(`${c.name}上刺刀，冲锋！`, f, c.x, c.y, c.kind === 'guard_grenadier' ? 2 : 1);
+                if (isGuard(c) || w.rng.next() < .22) w.say(`${c.name}上刺刀，冲锋！`, f, c.x, c.y, isGuard(c) ? 2 : 1);
             }
         }
         // ---- 骑兵寻找战机 ----
         if (w.tick > (attack ? this.cannonadeEnd[f] + 150 : 800)) {
             for (const c of own) {
-                if (c.kind !== 'cuirassier' || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52 || w.tick<c.blownUntil) continue;
+                if (!isMounted(c) || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52 || w.tick<c.blownUntil) continue;
                 if (w.rng.next() > .4) continue;
                 let best: Company | undefined, bs = 0;
                 for (const o of w.companies) {
@@ -98,14 +99,14 @@ export class Director {
                     if (d > 1600 || inWoods(o.x, o.y, 30) || inRect(layout.farm, o.x, o.y, 40)) continue;
                     if (o.formation === 'square' && o.formUntil <= w.tick) continue;
                     let s = o.status === 'shaken' ? 2 : o.formUntil > w.tick && o.formation!=='square' && w.tick-o.leftSquare>300 ? 2.4 : 0;
-                    if (o.kind === 'field_cannon' && !w.companies.some(p => p.faction === o.faction && p.kind !== 'field_cannon' && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
+                    if (isArtillery(o) && !w.companies.some(p => p.faction === o.faction && !isArtillery(p) && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
                     if(o.line===5){
                         const cover=own.length && w.companies.some(p=>p.faction===o.faction && p.line!==5 && p.status==='steady' && p.alive>=6 && dist(p,o)<580);
                         if(cover || d>1150 || !w.generals[o.faction].alive)continue;
                         s=2.8;
                     }
-                    if (o.kind === 'line_infantry' && o.formation === 'line' && w.tick - o.reloadAt > -40 && w.tick < o.reloadAt) s = Math.max(s, 1.15);
-                    if (o.kind === 'cuirassier' && o.order === 'charge' && d < 700) s = Math.max(s, 1.8);
+                    if (isLineTroop(o) && o.formation === 'line' && w.tick - o.reloadAt > -40 && w.tick < o.reloadAt) s = Math.max(s, 1.15);
+                    if (isMounted(o) && o.order === 'charge' && d < 700) s = Math.max(s, 1.8);
                     s *= 1 - d / 2200;
                     if (s > bs) { bs = s; best = o; }
                 }

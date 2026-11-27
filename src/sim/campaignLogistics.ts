@@ -1,3 +1,5 @@
+import {supportOptions} from './units/support';
+import {guard as isGuard, lineTroop as isLineTroop, mounted as isMounted, standard as isStandard} from './units/abilities';
 import type {Company,Faction,Order} from './arenaTypes';
 import {sectorOf,type Sector} from './maps';
 import type {Point} from './types';
@@ -7,7 +9,7 @@ const SECTORS=[0,1,2] as const;
 const FACTIONS=[0,1] as const;
 import {PACE} from './scale';
 const COURIER_SPEED=PACE.courier;
-const rifle=(c:Company)=>c.kind==='line_infantry'||c.kind==='guard_grenadier';
+const rifle=(c:Company)=>isLineTroop(c)||isGuard(c);
 const present=(c:Company)=>c.alive>0&&c.status!=='rout'&&c.status!=='gone';
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
 interface Corps {id:number;faction:Faction;sector:Sector;commanderId:number}
@@ -25,11 +27,12 @@ export class CampaignLogistics{
     handovers:{tick:number;front:number;reserve:number;distance:number;x:number;y:number}[]=[];
     private relieving=new Map<number,{front:number;since:number;active:boolean;retireSent:number}>();
     private returningVia=new Map<number,Point>();
+    readonly support=new Map<number,ReturnType<typeof supportOptions>>();
     private resting=new Map<number,number>();
     private reliefCooldown=new Map<number,number>();
 
     reset(w:SimWorld){
-        this.handovers=[];this.relieving.clear();this.returningVia.clear();this.resting.clear();this.reliefCooldown.clear();this.couriers=[];this.wagons=[];this.corps=[];this.brigades=[];
+        this.support.clear();this.handovers=[];this.relieving.clear();this.returningVia.clear();this.resting.clear();this.reliefCooldown.clear();this.couriers=[];this.wagons=[];this.corps=[];this.brigades=[];
         this.delivered=this.lost=this.issued=this.resupplied=this.rotations=0;
         this.sync(w);
         for(const corps of this.corps){
@@ -116,7 +119,7 @@ export class CampaignLogistics{
     private intercepted(w:SimWorld,p:Point,faction:Faction,radius:number,horseOnly:boolean){
         let hit=false;
         w.hash.visit(p.x,p.y,radius,u=>{
-            if(u.faction!==faction&&!u.staff&&(!horseOnly||u.kind==='cuirassier')&&present(w.companies[u.company]))hit=true;
+            if(u.faction!==faction&&!u.staff&&(!horseOnly||isMounted(u))&&present(w.companies[u.company]))hit=true;
         });
         return hit;
     }
@@ -205,7 +208,7 @@ export class CampaignLogistics{
             }
             if(!moving&&!c.engaged&&wagon&&distance(c,wagon)<170){
                 for(const u of c.members){
-                    if(u.hp<=0||u.escaped||u.kind==='bannerman')continue;
+                    if(u.hp<=0||u.escaped||isStandard(u))continue;
                     const add=Math.min(4,40-u.ammo,wagon.stock);
                     u.ammo+=add;c.ammo+=add;wagon.stock-=add;this.resupplied+=add;
                 }
@@ -214,7 +217,7 @@ export class CampaignLogistics{
                     if(c.fatigue<.30&&c.ammo>=c.alive*18&&w.tick-rest>300)this.resting.delete(c.id);
                 }
             }
-            if(w.tick%150===0&&c.line===0&&(c.morale<42||c.ammo<c.alive*6||c.losses>c.peak*.2&&c.morale<c.base*.72))this.requestRelief(w,c);
+
         }
     }
     step(w:SimWorld){
@@ -233,6 +236,12 @@ export class CampaignLogistics{
             if(d<=COURIER_SPEED/30){
                 this.couriers.splice(i,1);this.delivered++;this.deliver(w,m,c);
             }
+        }
+        for(let i=w.tick%6;i<w.companies.length;i+=6){
+            const c=w.companies[i];if(!present(c)||c.line===5)continue;
+            const canRotate=!this.isCommitted(c)&&w.tick>=(this.reliefCooldown.get(c.id)??0);
+            const choices=supportOptions(c,canRotate);this.support.set(c.id,choices);
+            if(choices[0].action==='rotate'&&w.tick%30<6)this.requestRelief(w,c);
         }
         if(w.tick%6===0)this.advanceReliefs(w);
         if(w.tick%30===0)this.supply(w);

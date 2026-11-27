@@ -1,3 +1,4 @@
+import {artillery as isArtillery, guard as isGuard, lineTroop as isLineTroop, mounted as isMounted} from './units/abilities';
 import type {Company,Faction,Formation,Order} from './arenaTypes';
 import {sectorOf,type Layout,type Objective,type Sector} from './maps';
 import {PACE} from './scale';
@@ -20,7 +21,7 @@ const routes=new WeakMap<SimWorld,Route[]>();
 const zones=[0,1,2] as const,zoneNames=['左翼','中央','右翼'];
 const dist=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.y-b.y);
 const clamp=(v:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,v));
-const foot=(c:Company)=>c.kind==='line_infantry'||c.kind==='guard_grenadier';
+const foot=(c:Company)=>isLineTroop(c)||isGuard(c);
 const center=(s:Sector,l:Layout)=>(s+.5)*l.height/3;
 
 function evaluate(w:SimWorld,f:Faction,r:Rng):SectorIntel[]{
@@ -57,7 +58,7 @@ function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Object
         for(const c of own)add(c,c.homeX,c.homeY,c.line===5?'staff':c.line===4?'battery':c.line===3?'horse':c.line===6?'garrison':c.line===1||c.line===2?'reserve':'front',c.formation);
         return plan;
     }
-    const companies=own.filter(foot),guns=own.filter(c=>c.kind==='field_cannon'),horses=own.filter(c=>c.kind==='cuirassier'&&c.line!==5);
+    const companies=own.filter(foot),guns=own.filter(c=>isArtillery(c)),horses=own.filter(c=>isMounted(c)&&c.line!==5);
     // 所有选位读取部署前的样本。分派完成后再改变实体坐标。
     if(attacking){
         const soldiers=companies.reduce((s,c)=>s+c.alive,0);
@@ -83,7 +84,7 @@ function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Object
             const y=center(sector,l)+(i-(guns.length-1)/2)*105;add(c,frontX(y)-face*160,y,'battery','battery');
         });
     }else{
-        const line=companies.filter(c=>c.kind==='line_infantry'),guards=companies.filter(c=>c.kind==='guard_grenadier');
+        const line=companies.filter(c=>isLineTroop(c)),guards=companies.filter(c=>isGuard(c));
         const positions=l.objectives.filter(p=>p.kind==='farm'||p.kind==='bridge');
         const unused=[...line,...guards];
         for(const p of positions){
@@ -95,7 +96,7 @@ function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Object
         if(cover&&unused.length>4){
             const c=unused.shift()!;add(c,cover.x,cover.y,'woods','line');
         }
-        const front=unused.filter(c=>c.kind!=='guard_grenadier'),reserve=unused.filter(c=>c.kind==='guard_grenadier');
+        const front=unused.filter(c=>!isGuard(c)),reserve=unused.filter(c=>isGuard(c));
         front.forEach((c,i)=>{
             const y=center(mainEffort,l)+(i-(front.length-1)/2)*Math.min(226,l.height/(3*Math.max(front.length,1)));
             const depth=front.length>=3&&i%4===1;
@@ -165,14 +166,14 @@ function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Rou
             if(c.line!==6&&d.objectiveId!==undefined&&w.layout.objectives[d.objectiveId].kind==='farm'){c.base+=8;c.morale+=8;}
             c.line=6;c.order='hold';
         }else if(foot(c)){
-            c.line=d.role==='reserve'?(c.kind==='guard_grenadier'?2:1):0;c.order=d.role==='reserve'?'reserve':'hold';
+            c.line=d.role==='reserve'?(isGuard(c)?2:1):0;c.order=d.role==='reserve'?'reserve':'hold';
             c.name=c.name.replace('（农庄守军）','');
         }
     }
     c.formation=d.formation;formUp(c);
     const station=new Float32Array(c.members.length*2),march=new Float32Array(station.length);
     for(const [k,u] of c.members.entries()){station[2*k]=u.x-d.x;station[2*k+1]=u.y-d.y;}
-    const finalLine=c.line;c.line=0;c.formation=c.kind==='field_cannon'?'battery':finalLine===5?'staff':'column';formUp(c);c.line=finalLine;
+    const finalLine=c.line;c.line=0;c.formation=isArtillery(c)?'battery':finalLine===5?'staff':'column';formUp(c);c.line=finalLine;
     for(const [k,u] of c.members.entries()){march[2*k]=(u.x-d.x)*face;march[2*k+1]=(u.y-d.y)*face;}
     const end=w.deployEnd??1350;
     return {c,d,points,cumulative,length:cumulative[cumulative.length-1],delay:(i%8)*15,stop:end-(i%5)*11,march,station,finished:false};
@@ -181,7 +182,7 @@ function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Rou
 function detachBridgeGuns(w:DeploymentWorld){
     const posts=new Map<number,Objective>(),f=w.layout.ridgeOwner;
     if(f<0||w.legacySide===f)return posts;
-    const batteries=w.companies.filter(c=>c.faction===f&&c.kind==='field_cannon');
+    const batteries=w.companies.filter(c=>c.faction===f&&isArtillery(c));
     for(const p of w.layout.objectives.filter(o=>o.kind==='bridge')){
         const source=[...batteries].sort((a,b)=>b.members.length-a.members.length)[0];
         if(!source||source.members.length<2)break;
@@ -212,7 +213,7 @@ export function marchDeployment(w:DeploymentWorld){
         if(route.finished)continue;
         const {c,d,points,march,station}=route,t=clamp((w.tick-route.delay)/(route.stop-route.delay),0,1);
         // 镜头从进场路线末段开始，按兵种步态走完部署路程。
-        const speed=c.kind==='cuirassier'?PACE.horseTrot:c.speed;
+        const speed=isMounted(c)?PACE.horseTrot:c.speed;
         const shown=Math.min(route.length,(route.stop-route.delay)*speed/30);
         const s=route.length-shown+t*shown;let j=1;
         while(j<points.length-1&&route.cumulative[j]<s)j++;

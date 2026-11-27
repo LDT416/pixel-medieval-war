@@ -1,0 +1,1 @@
+{"samples":247,"mean":0,"peak":0,"steadySamples":243,"steadyMean":0,"jitter":{"flipsPerSec":0.0027433026717120974,"poseTogglesPerSec":0.015706954770742573,"slotSwapsPerDeath":1.16580310880829}}

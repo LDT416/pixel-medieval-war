@@ -1,3 +1,4 @@
+import {artillery as isArtillery, guard as isGuard, lineTroop as isLineTroop, mounted as isMounted} from './units/abilities';
 import type { Company, Faction } from './arenaTypes';
 import type { Sector } from './maps';
 import type { SimWorld } from './world';
@@ -5,7 +6,7 @@ import {dist} from './combat';
 
 const names=['左翼','中央','右翼'];
 const sectors=[0,1,2] as const;
-const foot=(c:Company)=>c.kind==='line_infantry'||c.kind==='guard_grenadier';
+const foot=(c:Company)=>isLineTroop(c)||isGuard(c);
 const active=(c:Company)=>c.alive>0 && c.status!=='rout' && c.status!=='gone';
 type Task={until:number; purpose:'point'|'reserve'|'screen'};
 
@@ -45,8 +46,8 @@ export class CommandPlan {
             const phase=plan.phases[stage++];
             w.say(w.generals[f].name+'开始'+phase.name+'，主攻方向为'+names[plan.mainEffort],f,target?.x??w.layout.width/2,(plan.mainEffort+.5)*w.layout.height/3,2);
             if(phase.orders==='charge'){
-                const vulnerable=enemy.filter(c=>c.kind==='field_cannon'||c.status==='shaken');
-                for(const horse of available.filter(c=>c.kind==='cuirassier' && w.tick>=c.blownUntil && c.order==='hold')){
+                const vulnerable=enemy.filter(c=>isArtillery(c)||c.status==='shaken');
+                for(const horse of available.filter(c=>isMounted(c) && w.tick>=c.blownUntil && c.order==='hold')){
                     const mark=vulnerable.filter(c=>c.sector===horse.sector && dist(horse,c)<1650)
                         .sort((a,b)=>dist(horse,a)-dist(horse,b))[0];
                     if(mark)this.assign(w,horse,'screen','charge',mark.id);
@@ -69,13 +70,13 @@ export class CommandPlan {
             }
         }
         if(target){
-            const batteries=troops.filter(c=>c.kind==='field_cannon');
-            for(const c of available.filter(c=>c.kind==='field_cannon'&&c.sector===plan.mainEffort)){
+            const batteries=troops.filter(c=>isArtillery(c));
+            for(const c of available.filter(c=>isArtillery(c)&&c.sector===plan.mainEffort)){
                 const aim=batteries.length>1?batteries.reduce((a,b)=>dist(c,a)<dist(c,b)?a:b):target;
                 if(c.forced!==aim.id && dist(c,aim)<2450)w.logistics.dispatch(w,c,'hold',aim.id);
             }
         }
-        for(const horse of available.filter(c=>c.kind==='cuirassier' && c.order==='hold' && w.tick>=c.blownUntil)){
+        for(const horse of available.filter(c=>isMounted(c) && c.order==='hold' && w.tick>=c.blownUntil)){
             const escort=friendly.filter(c=>foot(c) && c.sector===horse.sector && (c.order==='advance'||c.order==='assault'))
                 .sort((a,b)=>dist(horse,a)-dist(horse,b))[0];
             if(!escort || dist(horse,escort)<600 || enemy.some(e=>dist(e,horse)<450))continue;
@@ -83,7 +84,7 @@ export class CommandPlan {
             this.assign(w,horse,'screen','hold',-1,point);
         }
         for(const sector of sectors){
-            const horse=enemy.filter(c=>c.kind==='cuirassier' && c.sector===sector && c.order==='charge');
+            const horse=enemy.filter(c=>isMounted(c) && c.sector===sector && c.order==='charge');
             if(horse.length)for(const c of friendly.filter(c=>c.line===1 && c.sector===sector && c.id%2===0)){
                 if(horse.some(h=>dist(h,c)<480))this.squareUntil.set(c.id,w.tick+310);
             }

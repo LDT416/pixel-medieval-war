@@ -1,0 +1,60 @@
+{
+  "scale": 1200,
+  "defaultSheet": 0,
+  "focus": {
+    "volley": {
+      "tick": 774,
+      "x": 8028.688419579834,
+      "y": 2007.7844597399232
+    },
+    "battery": {
+      "shots": [
+        {
+          "tick": 424,
+          "x": 8126.008963727326,
+          "y": 2018.716258794069,
+          "id": 1169
+        },
+        {
+          "tick": 694,
+          "x": 8126.008963727326,
+          "y": 2018.716258794069,
+          "id": 1169
+        },
+        {
+          "tick": 940,
+          "x": 8126.008963727326,
+          "y": 2018.716258794069,
+          "id": 1169
+        },
+        {
+          "tick": 995,
+          "x": 8703.322491161369,
+          "y": 6110.00208479166,
+          "id": 1175
+        }
+      ]
+    }
+  },
+  "volley": {
+    "frames": 120,
+    "fps": 12,
+    "seconds": 10,
+    "segments": 7,
+    "maxLength": 1.2000000000000002,
+    "framesWithTraces": 34
+  },
+  "battery": {
+    "frames": 120,
+    "fps": 12,
+    "seconds": 10,
+    "segments": 2,
+    "maxLength": 1.2000000000000002,
+    "framesWithTraces": 54
+  },
+  "bakedResources": [
+    "/art/soldiers/regiments.json",
+    "/art/soldiers/regiments.png"
+  ],
+  "errors": []
+}

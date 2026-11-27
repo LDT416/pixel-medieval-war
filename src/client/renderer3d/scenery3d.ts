@@ -1,6 +1,5 @@
 import * as T from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {Rng} from '../../sim/rng';
 import {treesFor} from '../../sim/sceneryLayout';
 import {layout} from '../../sim/maps';
 import {toX,toZ,SCALE,terrainHeight} from './terrain3d';
@@ -33,7 +32,6 @@ class FlatScenery {
     }
     rebuild(){
         this.group.clear();
-        const rng=new Rng(Math.floor(layout.seed*1000)+7);
         for(const f of layout.farms){
             const x=toX(f.x),z=toZ(f.y);
             this.put('farmhouse',x,z-1,f.w*SCALE*.95);
@@ -41,17 +39,10 @@ class FlatScenery {
             this.put('haystack',x-f.w*SCALE*.6,z+3.2,2.4,true);
             for(let i=-2;i<=2;i++)this.put('hedge',x+i*f.w*SCALE*.24,z+f.h*SCALE*.62,1.3,i%2===0);
         }
-        const kinds:Art[]=['oak','beech','spruce','oak','bush'];
-        for(const g of layout.woods){
-            const n=Math.round(g.r*g.r/2300);
-            const list:{x:number;z:number;h:number;a:Art}[]=[];
-            for(let i=0;i<n;i++){
-                const a=rng.next()*Math.PI*2,r=Math.sqrt(rng.next())*g.r;
-                list.push({x:toX(g.x+Math.cos(a)*r),z:toZ(g.y+Math.sin(a)*r*.9),h:5.5+rng.next()*4,a:kinds[rng.int(0,kinds.length-1)]});
-            }
-            list.sort((p,q)=>p.z-q.z);
-            for(const t of list)this.put(t.a,t.x,t.z,t.a==='bush'?t.h*.45:t.h,rng.next()<.5);
-        }
+        const species:Art[]=['oak','beech','spruce'];
+        for(const t of treesFor(layout).sort((a,b)=>a.y-b.y))
+            this.put(species[t.crown],toX(t.x),toZ(t.y),7*t.size,t.yaw>Math.PI);
+
     }
 }
 

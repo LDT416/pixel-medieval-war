@@ -1,7 +1,9 @@
+import {guard as isGuard,lineTroop as isLineTroop,artillery as isArtillery,standard as isStandard} from './units/abilities';
 import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type General,
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
+import {BoardShots} from './projectiles';
 import {Crowd} from './crowd';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
@@ -19,9 +21,9 @@ const GENERALS: { name: string; title: string; trait: Trait }[][] = [
     [{ name: '威灵顿', title: '公爵', trait: 'steadfast' }, { name: '乌克斯布里奇', title: '伯爵', trait: 'aggressive' },
      { name: '希尔', title: '勋爵', trait: 'cautious' }, { name: '布吕歇尔', title: '元帅', trait: 'cunning' }]
 ];
-const HP: Record<Kind, number> = { line_infantry: 100, guard_grenadier: 116, cuirassier: 135, bannerman: 90, field_cannon: 230 };
-import {marchSpeed as SPEED, PACE} from './scale';
-const VALUE: Record<Kind, number> = { line_infantry: 1, guard_grenadier: 1.55, cuirassier: 1.35, bannerman: .6, field_cannon: 9 };
+import {PACE} from './scale';
+import {footprints,unitTypes} from './units/unitTypes';
+import {selectVariant,variants} from './units/roster';
 export const TIMEOUT = 36000, PURSUIT = 210;
 
 export class SimWorld {
@@ -39,6 +41,7 @@ export class SimWorld {
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
+    boardShots=new BoardShots();
     crowd=new Crowd(); hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
     get jitter(){
@@ -52,7 +55,7 @@ export class SimWorld {
 
     reset(scale: Scale = this.scale, seed = this.seed) {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
-        this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
+        this.boardShots=new BoardShots();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
         this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
@@ -91,24 +94,29 @@ export class SimWorld {
     }
     private company(f: Faction, kind: Kind, name: string, line: number, n: number, x: number, y: number, formation: Formation, order: Order, ranks: number) {
         const trait = this.generals[f].trait, face = f ? -1 : 1;
-        let base = { line_infantry: 66, guard_grenadier: 92, cuirassier: 76, bannerman: 66, field_cannon: 72 }[kind] + this.rng.int(-7, 7);
+        const type=unitTypes[kind];
+        const ordinal=this.companies.filter(c=>c.faction===f && c.kind===kind).length;
+        const variant=selectVariant(kind,f,line,ordinal);
+        const pace=variant?variants[variant].pace:1;
+        if(variant)name+=' · '+variants[variant].name[f];
+        let base = type.morale + this.rng.int(-7, 7);
         if (trait === 'aggressive') base += 4;
-        if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
+        if (trait === 'steadfast' && type.group!=='mounted') base += 9;
         if (line === 5) base = 100;
-        const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
+        const c: Company = { id: this.companies.length, faction: f, kind, variant, name, members: [], alive: 0, peak: 0,
             x,y,sector:Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))) as 0|1|2,brigade:Math.floor(this.companies.length/4),corps:f*3+Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))),ammo:0,fatigue:0,smoke:0,fireMode:'first',firingSince:-1,nextGroup:0,firstVolleyAt:-999,sprintUntil:0,sprintReady:0,assaultStage:'idle',assaultUntil:0,assaultReady:0,freshAtStart:false,cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
-            order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
-            engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
+            order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0,
+            engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: type.speed * pace * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
         for (let i = 0; i < n; i++) this.soldier(c, kind);
         return c;
     }
     private soldier(c: Company, kind: Kind) {
-        const u: Soldier = { id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
-            ammo:kind==='line_infantry'||kind==='guard_grenadier'?40:0,shotsFired:0,loadedAt:0,shotTarget:-1,chance:0,kneelUntil:0,hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
-            stride: this.rng.int(0, 15), speed: SPEED[kind] * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
+        const u: Soldier = { body:footprints[unitTypes[kind].frame], id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
+            ammo:isLineTroop({kind})||isGuard({kind})?40:0,shotsFired:0,loadedAt:0,shotTarget:-1,kneelUntil:0,hp: unitTypes[kind].hp, face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
+            stride: this.rng.int(0, 15), speed: unitTypes[kind].speed * (c.variant && c.kind===kind?variants[c.variant].pace:1) * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
             aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, staff:c.line===5, officer:c.members.length===0 && c.line!==5, diedAt:-999, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
-        if (kind === 'bannerman') c.colors++;
+        if (isStandard(u)) c.colors++;
         c.ammo+=u.ammo;c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;
         return u;
@@ -129,7 +137,7 @@ export class SimWorld {
         const split = (count: number, size: number) => { const k = Math.max(1, Math.round(count / size)); return Array.from({ length: k }, (_, i) => Math.floor(count * (i + 1) / k) - Math.floor(count * i / k)); };
         const infantry: Company[] = [];
         // 战列步兵：六成上一线，其余作二线。
-        const lineSizes = split(line, 32), firstN = Math.ceil(lineSizes.length * .6), secondN = lineSizes.length - firstN;
+        const lineSizes = split(line, unitTypes.line_infantry.capacity), firstN = Math.ceil(lineSizes.length * .6), secondN = lineSizes.length - firstN;
         const band = HEIGHT*.78;
         lineSizes.forEach((n, i) => {
             const first = i < firstN, k = first ? i : i - firstN, m = first ? firstN : secondN;
@@ -145,14 +153,14 @@ export class SimWorld {
             best.line = 6; best.x = best.homeX = farm.x; best.y = best.homeY = farm.y; best.name += '（农庄守军）'; best.base += 8; best.morale += 8;
         }
         // 近卫预备队
-        split(guard, 30).forEach((n, i, all) => {
+        split(guard, unitTypes.guard_grenadier.capacity).forEach((n, i, all) => {
             const y = CY + (i - (all.length - 1) / 2) * 200;
             const c = this.company(f, 'guard_grenadier', f ? `第${i + 1}近卫步兵团` : `老近卫军第${i + 1}掷弹兵团`, 2, n, frontX(y) - face * 700, y, 'column', 'reserve', ranks);
             infantry.push(c);
         });
         // 骑兵分列两翼
         let cavNum = this.rng.int(1, 9);
-        split(cav, 22).forEach((n, i) => {
+        split(cav, unitTypes.cuirassier.capacity).forEach((n, i) => {
             const wing = i % 2 ? 1 : -1, row = Math.floor(i / 2);
             const y = CY + wing * (band / 2 + 160 + (row % 2) * 120);
             const x = frontX(CY) - face * (560 + row * 140);
@@ -160,7 +168,7 @@ export class SimWorld {
         });
         // 炮兵部署在阵前或山脊顶
         const letters = 'ABCDEFGHIJKLMN';
-        split(guns, 5).forEach((n, i, all) => {
+        split(guns, unitTypes.field_cannon.capacity).forEach((n, i, all) => {
             const y = CY + (i - (all.length - 1) / 2) * Math.min(520, band / all.length);
             const x = frontX(y) - face * 170;
             this.company(f, 'field_cannon', f ? `皇家炮兵${letters[i]}连` : `第${i + 1}近卫炮兵连`, 4, n, x, y, 'battery', 'hold', 1);
@@ -172,7 +180,7 @@ export class SimWorld {
         hq.members[0].general = true; g.unit = hq.members[0]; g.company = hq.id; g.alive = true;
         for (const c of this.companies) if (c.faction === f) {
             // 旗手排在连队最后，不占火力位置。
-            c.members.sort((a, b) => Number(a.kind === 'bannerman') - Number(b.kind === 'bannerman'));
+            c.members.sort((a, b) => Number(isStandard(a)) - Number(isStandard(b)));
             formUp(c);
         }
         this.start[f] = total;
@@ -219,7 +227,7 @@ export class SimWorld {
         }
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
-        resolveRounds(this);
+        resolveRounds(this);this.boardShots.step(this);
         const n = this.units.length, start = this.tick % 2 * (n >> 1);
         for (let i = 0; i < n; i++) {
             const u = this.units[(i + start) % n];
@@ -290,7 +298,7 @@ export class SimWorld {
         if (this.broken[f]) return;
         this.broken[f] = true;
         const field=this.companies.filter(c=>c.faction===f && c.status!=='rout' && c.alive>0);
-        const screen=field.filter(c=>c.line!==5 && c.kind!=='field_cannon' && c.morale>40)
+        const screen=field.filter(c=>c.line!==5 && !isArtillery(c) && c.morale>40)
             .sort((a,b)=>(f?1:-1)*(a.x-b.x))[0];
         this.rearGuard[f]=screen?.id??null;
         for(const c of field){
@@ -334,7 +342,7 @@ export class SimWorld {
     private power(f: Faction) {
         let p = 0;
         for (const c of this.companies) if (c.faction === f && c.line !== 5 && c.status !== 'rout' && c.status !== 'gone')
-            p += c.alive * VALUE[c.kind] * (.35 + c.morale / 100) * (c.line === 6 ? 1.5 : 1);
+            p += c.alive * unitTypes[c.kind].value * (.35 + c.morale / 100) * (c.line === 6 ? 1.5 : 1);
         if (this.generals[f].alive) p *= 1.05;
         if (this.layout.ridgeOwner === f) p *= 1.12;
         const rf = this.reinforcement;

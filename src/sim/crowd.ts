@@ -1,3 +1,4 @@
+import {artillery as isArtillery} from './units/abilities';
 import type {Soldier,Company} from './arenaTypes';
 import type {SimWorld} from './world';
 import type {Layout} from './maps';
@@ -5,15 +6,14 @@ import {treesFor} from './sceneryLayout';
 
 const CELL=40,MAX_PUSH=1.5;
 type Obstacle={x:number;y:number;halfX:number;halfY:number;round:boolean};
-export const shapes={foot:{a:4.5,b:4.5,mass:1},horse:{a:11,b:5.5,mass:6},gun:{a:14,b:14,mass:10}};
-const shape=(u:Soldier)=>u.kind==='field_cannon'?shapes.gun:u.kind==='cuirassier'?shapes.horse:shapes.foot;
+import {footprints as shapes} from './units/unitTypes';
 function extent(u:Soldier,c:Company,nx:number,ny:number){
-    const {a,b}=shape(u);
+    const {a,b}=u.body;
     if(a===b)return a;
     const dot=nx*c.hx+ny*c.hy;
     return a*b/Math.sqrt(a*a+(b*b-a*a)*Math.min(1,dot*dot));
 }
-function weight(u:Soldier,c:Company){return u.kind==='field_cannon'&&!c.limbered?0:1/shape(u).mass;}
+function weight(u:Soldier,c:Company){return isArtillery(u)&&!c.limbered?0:1/u.body.mass;}
 export class Crowd {
     private scenery=new Map<number,Obstacle[]>();
     private bins=new Map<number,Soldier[]>();
@@ -88,16 +88,18 @@ export class Crowd {
         bin.push(u);
     }
     private clearance(w:SimWorld,u:Soldier,x:number,y:number){
-        const radius=shape(u).a+14;
+        const ua=u.body.a,ub=u.body.b,radius=ua+14;
         let clearance=1;
         const rows=Math.floor((y+radius)/CELL),cols=Math.floor((x+radius)/CELL);
         for(let j=Math.floor((y-radius)/CELL);j<=rows;j++)for(let i=Math.floor((x-radius)/CELL);i<=cols;i++){
             const bin=this.bins.get(j*this.columns+i);if(!bin)continue;
             for(const v of bin){
                 if(v===u)continue;
-                const dx=x-v.x,dy=y-v.y,limit=shape(u).a+shape(v).a,d2=dx*dx+dy*dy;
+                const dx=x-v.x,dy=y-v.y,limit=ua+v.body.a,d2=dx*dx+dy*dy;
                 if(d2>=limit*limit)continue;
-                const d=Math.sqrt(d2),nx=d?dx/d:1,ny=d?dy/d:0;
+                const d=Math.sqrt(d2);
+                if(ua===ub && v.body.a===v.body.b){clearance=Math.min(clearance,d-limit);continue;}
+                const nx=d?dx/d:1,ny=d?dy/d:0;
                 clearance=Math.min(clearance,d-extent(u,w.companies[u.company],nx,ny)-extent(v,w.companies[v.company],nx,ny));
             }
         }
@@ -128,8 +130,8 @@ export class Crowd {
             const x=u.x,y=u.y,k=this.key(x,y),c=w.companies[u.company];
             const dx=goalX[u.id]-x,dy=goalY[u.id]-y;
             // 部署路径是动画的理想位置；排队时也只能按本地步态追赶。
-            const parked=w.tick>w.deployEnd && shape(u)===shapes.gun && !c.limbered && c.status!=='rout';
-            if(parked || (!dx && !dy && shape(u).a===shape(u).b)){
+            const parked=w.tick>w.deployEnd && u.body===shapes.gun && !c.limbered && c.status!=='rout';
+            if(parked || (!dx && !dy && u.body.a===u.body.b)){
                 if(u.moving)u.stride-=Math.hypot(dx,dy);
                 if(parked)u.moving=false;
                 u.px=x;u.py=y;u.vx=0;u.vy=0;continue;
@@ -176,7 +178,7 @@ export class Crowd {
         let count=0;this.fill(w);
         this.pairs((a,b)=>{
             const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
-            if(d>=shape(a).a+shape(b).a)return;
+            if(d>=a.body.a+b.body.a)return;
             const nx=d?dx/d:1,ny=d?dy/d:0;
             const x=extent(a,w.companies[a.company],nx,ny),y=extent(b,w.companies[b.company],nx,ny);
             if(x+y-d>.30*Math.min(x,y)){count++;inspect?.(a,b);}

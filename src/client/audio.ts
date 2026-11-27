@@ -1,5 +1,5 @@
 import type { SimEvent } from '../sim/types';
-type SoundEvent={type:SimEvent['type']|'bounce'|'hoof';x:number;y:number;kind?:string};
+type SoundEvent={type:SimEvent['type']|'bounce'|'hoof'|'tileImpact';x:number;y:number;kind?:string};
 type Listener={x:number;y:number;distance:number};
 export class BattleAudio {
     muted = false;

@@ -1,3 +1,4 @@
+import {artillery as isArtillery} from './units/abilities';
 import type {Faction} from './arenaTypes';
 import type {SimWorld} from './world';
 
@@ -14,7 +15,7 @@ export class CampaignObjectives {
         const {objectives,farm}=w.layout;
         for(const p of objectives){
             const radius=p.kind==='ridge'?230:p.kind==='bridge'?135:158;
-            const nearby=w.companies.filter(c=>c.line!==5&&c.kind!=='field_cannon'&&c.status!=='gone'&&c.status!=='rout'&&c.alive>0&&
+            const nearby=w.companies.filter(c=>c.line!==5&&!isArtillery(c)&&c.status!=='gone'&&c.status!=='rout'&&c.alive>0&&
                 (c.x-p.x)**2+(c.y-p.y)**2<radius*radius);
             const present=[nearby.some(c=>c.faction===0),nearby.some(c=>c.faction===1)];
             if(present[0]!==present[1]){

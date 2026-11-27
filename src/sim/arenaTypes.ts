@@ -14,15 +14,17 @@ export type Weather = 'clear'|'rain'|'fog';
 export type Posture = 'attack'|'defend';
 
 export interface Soldier {
+    body: {readonly a:number;readonly b:number;readonly mass:number};
     id: number; faction: Faction; kind: Kind; company: number; slot: number;
     x: number; y: number; vx: number; vy: number; hp: number;
     face: number; moving: boolean; pose: Action; hitAt: number; firedAt: number; fireAt: number;
-    ammo:number; shotsFired:number; loadedAt:number; shotTarget:number; chance:number; kneelUntil:number;
+    ammo:number; shotsFired:number; loadedAt:number; shotTarget:number; kneelUntil:number;
     stride: number; speed: number; cooldown: number; foe: number;
     aimTarget:number; aimX:number; aimY:number; rangeError:number; shotsOnTarget:number;
     px:number; py:number; turnFrames:number; marchUntil:number; staff:boolean; officer:boolean; diedAt:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
+    variant:import("./units/roster").Variant|null;
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
     x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;
     sector:0|1|2; brigade:number; corps:number; ammo:number; fatigue:number; smoke:number;
@@ -34,7 +36,7 @@ export interface Company {
     relocated:boolean; limbered:boolean; deployUntil:number; initialFront:number;
     vx:number; vy:number; capacity:number; lastShrink:number; margin:number; formation: Formation; formUntil: number; files: number; ranks: number;
     order: Order; status: Status; morale: number; base: number;
-    target: number; forced: number; reloadAt: number; hitChance: number;
+    target: number; forced: number; reloadAt: number;
     engaged: boolean; checkedAt: number; chargeAt: number;
     /** 0 一线 · 1 二线 · 2 近卫预备队 · 3 骑兵 · 4 炮兵 · 5 参谋部 · 6 据点守军 · 7 援军 */
     line: number;
@@ -46,7 +48,7 @@ export interface TurningPoint {tick:number; kind:"decisive"|"swing"; delta:numbe
 export interface News { odds:number; tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
 export interface BattleEvent {
     endX?:number; endY?:number; struck?:boolean;
-    type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash'|'drum';
+    type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash'|'drum'|'tileImpact';
     x: number; y: number; dx: number; dy: number; faction: Faction; kind: Kind;
     explosive: boolean; unitId: number;
 }
@@ -54,7 +56,7 @@ export interface BattleEvent {
 export interface Round {
     x: number; y: number; tx: number; ty: number; dx: number; dy: number;
     age: number; duration: number; roll: number; rolled: number; speed: number;
-    gun: Soldier; faction: Faction; company: number; kills: number; touched: number[];
+    gun: Soldier; faction: Faction; company: number;
 }
 export interface Reinforcement { faction: Faction; tick: number; arrived: boolean; count: number; name: string }
 

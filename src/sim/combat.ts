@@ -1,6 +1,8 @@
+import {boardActions} from './units/weapons';
+import {artillery as isArtillery, guard as isGuard, mounted as isMounted, standard as isStandard} from './units/abilities';
 import type { Soldier, BattleEvent, Company, Round } from './arenaTypes';
 import type { SimWorld } from './world';
-import { WIDTH, HEIGHT, coverAt, behindCrest, inRect, layout } from './maps';
+import { WIDTH, HEIGHT, behindCrest } from './maps';
 
 import {RANGE} from './scale';
 export const MUSKET=RANGE.effective,CANISTER=RANGE.scatter;
@@ -18,8 +20,8 @@ export function shake(c: Company, amount: number) {
 }
 export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: number, explosive: boolean, by: Company | null) {
     if (u.hp <= 0) return false;
-    if (u.general && (!by || by.faction===u.faction || !(explosive && by.kind==='field_cannon' || by.kind==='cuirassier' && by.line!==5))) return false;
-    if (explosive && w.companies[u.company].formation==='column') amount*=1.4;
+
+
     u.hp = Math.max(0, u.hp - amount); u.hitAt = w.tick;
     emit(w, 'hit', u, dx, dy, explosive);
     if (u.hp > 0) return false;
@@ -29,23 +31,14 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
     const c = w.companies[u.company];
     c.ammo-=u.ammo;c.alive--;c.losses++;if(!c.alive){c.order='hold';c.forced=-1;}
     const lost = 1 - c.alive / c.peak;
-    shake(c, (c.kind === 'field_cannon' ? 70 : c.kind === 'guard_grenadier' ? 62 : 95) / Math.max(6, c.peak) * (1 + lost * 1.4));
-    if (u.kind === 'bannerman' && --c.colors === 0 && c.alive > 3) {
+    shake(c, (isArtillery(c) ? 70 : isGuard(c) ? 62 : 95) / Math.max(6, c.peak) * (1 + lost * 1.4));
+    if (isStandard(u) && --c.colors === 0 && c.alive > 3) {
         shake(c, 12);
-        if (c.kind === 'guard_grenadier' || (w.tick > 900 && w.rng.next() < .2)) w.say(`${c.name}的军旗倒下了`, c.faction, u.x, u.y, 1);
+        if (isGuard(c) || (w.tick > 900 && w.rng.next() < .2)) w.say(`${c.name}的军旗倒下了`, c.faction, u.x, u.y, 1);
     }
-    if (by) by.kills++;
+    if (by && by.faction!==u.faction) by.kills++;
     if (u.general) w.generalDown(u,explosive?'炮弹':'骑兵');
     return true;
-}
-function victim(w: SimWorld, t: Company, front: number) {
-    const n = t.members.length;
-    for (let i = 0; i < 5; i++) {
-        const v = t.members[w.rng.int(0, Math.max(0, Math.min(n, front) - 1))];
-        if (v && v.hp > 0) return v;
-    }
-    for (const v of t.members) if (v.hp > 0) return v;
-    return null;
 }
 /** 首轮齐射后切换到排或翼射击。每名射手独立保留装填与弹药状态。 */
 export function volley(w:SimWorld,c:Company,t:Company,close=false){
@@ -66,16 +59,12 @@ export function volley(w:SimWorld,c:Company,t:Company,close=false){
     if(!close && !first && mode==='rank' && !shooters.some(u=>groupOf(u)!==group) && c.members.some(u=>u.hp>0 && u.ammo>0 && groupOf(u)!==group && (c.formation!=='column'||u.slot<c.files*2)) && w.tick-c.firstVolleyAt>110){
         c.reloadAt=w.tick+6;return;
     }
-    const d=dist(c,t),p=d<50?.2:d<100?.20-(d-50)*.08/50:d<150?.12-(d-100)*.05/50:.07-Math.min(80,d-150)*.04/80;
-    const base=p*.60*(first?1.6:1)*(close?1.4:1)*(mode==='free'?.7:1)*(c.status==='shaken'?.6:1)
-        *(t.formation==='column'||t.formation==='square'?1.3:1)*coverAt(t.x,t.y)
-        *(1-.45*c.smoke)*(1-.45*t.smoke)*(1-.25*c.fatigue);
-    c.fireMode=mode;c.hitChance=base;c.target=t.id;c.volleys++;
+    c.fireMode=mode;c.target=t.id;c.volleys++;
     if(first){c.firingSince=w.tick;c.firstVolleyAt=w.tick;}
-    const cycle=Math.round(82*(c.kind==='guard_grenadier'?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)));
+    const cycle=Math.round(82*(isGuard(c)?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)));
     for(const u of ready){
         u.fireAt=w.tick+1+(mode==='free'?w.rng.int(0,35):(u.slot%c.files)%5);
-        u.chance=base;u.shotTarget=t.id;
+        u.shotTarget=t.id;
         if(close){u.fireAt=-1;shoot(w,u,c);}
     }
     for(const u of c.members){
@@ -91,55 +80,41 @@ export function shoot(w:SimWorld,u:Soldier,c:Company){
     const t=w.companies[u.shotTarget];
     if(!t || t.status==='gone' || c.status==='rout' || u.moving || u.ammo<=0 || c.assaultStage==='rush')return;
     u.ammo--;c.ammo--;u.shotsFired++;
-    u.loadedAt=w.tick+Math.round(w.rng.int(75,90)*(c.kind==='guard_grenadier'?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)+(u.shotsFired>15?.15:0)));
+    u.loadedAt=w.tick+Math.round(w.rng.int(75,90)*(isGuard(c)?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)+(u.shotsFired>15?.15:0)));
     c.smoke=Math.min(1,c.smoke+.04);
     const dx = t.x - u.x, dy = t.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
     u.firedAt = w.tick; u.pose = 'aim';
     if (w.weather === 'rain' && w.rng.next() < .3) return;
     const fire=emit(w, 'fire', u, dx / d, dy / d, false);
-    if (w.rng.next() < u.chance) {
-        const v = victim(w, t, t.formation === 'line' ? t.files * 2 : t.members.length);
-        if(v){fire.endX=v.x;fire.endY=v.y;fire.struck=true;damage(w,v,w.rng.int(55,130),dx/d,dy/d,false,c);}
-    }
+    // A game action selects a board cell. Its occupant is read only when the marker expires.
+    const at=w.boardShots.place(w,u,'musket',t.x+w.rng.int(-110,110),t.y+w.rng.int(-110,110),w.tick+boardActions.musket.flashTicks);
+    fire.endX=at.x;fire.endY=at.y;
 }
 /** 白刃战一击。骑兵砍阵线如切菜，撞方阵则寸步难行。 */
 export function strike(w: SimWorld, u: Soldier, foe: Soldier) {
     const c = w.companies[u.company], fc = w.companies[foe.company];
     const dx = foe.x - u.x, dy = foe.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
     emit(w, 'slash', u, dx / d, dy / d, false);
-    let dmg = u.kind === 'cuirassier' ? w.rng.int(45, 120) : w.rng.int(28, 78);
-    if (u.kind === 'cuirassier' && fc.formation === 'square' && fc.formUntil <= w.tick && fc.status !== 'rout') dmg *= .28;
+    let dmg = isMounted(u) ? w.rng.int(45, 120) : w.rng.int(28, 78);
+    if (isMounted(u) && fc.formation === 'square' && fc.formUntil <= w.tick && fc.status !== 'rout') dmg *= .28;
     if (fc.status === 'rout') dmg *= 1.6;
-    if (u.kind === 'guard_grenadier') dmg *= 1.2;
+    if (isGuard(u)) dmg *= 1.2;
     if (c.status === 'shaken') dmg *= .75;
     damage(w, foe, dmg, dx / d, dy / d, false, c);
     u.cooldown = w.rng.int(22, 44);
     u.firedAt = w.tick;
 }
-/** 冲击瞬间：骑兵撞上未结阵的步兵会当场撕开缺口。 */
+
 export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     const d = dist(g, t);
-    const blocked=(x:number,y:number,dx:number,dy:number,roll:number)=>w.companies.some(p=>{
-        if(p===c || p.faction!==c.faction || !p.alive) return false;
-        const along=Math.max(0,Math.min(roll,(p.x-x)*dx+(p.y-y)*dy));
-        return Math.abs((p.x-g.x)*dy-(p.y-g.y)*dx)<80 && Math.hypot(p.x-x-along*dx,p.y-y-along*dy)<150;
-    });
-    if(blocked(t.x,t.y,(t.x-g.x)/Math.max(1,d),(t.y-g.y)/Math.max(1,d),0))return;
     g.pose = 'recoil';
     if (d < CANISTER) {
-        // 霰弹：近距离一炮扫倒一片。
-        const dx = (t.x - g.x) / Math.max(1, d), dy = (t.y - g.y) / Math.max(1, d);
-        g.firedAt=w.tick; emit(w, 'fire', g, dx, dy, true);
-        const n = Math.round(w.rng.int(2,4)*(t.formation==='square'?1.5:1));
-        for (let i = 0; i < n; i++) {
-            const v = victim(w, t, t.members.length);
-            if (v) damage(w, v, w.rng.int(70, 160), dx, dy, true, c);
-        }
-        shake(t, 6);
-        g.cooldown = w.rng.int(150,190);
+        g.firedAt=w.tick;emit(w,'fire',g,(t.x-g.x)/Math.max(1,d),(t.y-g.y)/Math.max(1,d),true);
+        w.boardShots.place(w,g,'scatter',t.x+w.rng.int(-48,48),t.y+w.rng.int(-48,48),w.tick+boardActions.scatter.flashTicks);
+        g.cooldown=w.rng.int(210,270);
         return;
     }
-    const aim = victim(w, t, t.members.length) ?? t;
+    const aim = t;
     if(g.aimTarget!==t.id || Math.hypot(t.x-g.aimX,t.y-g.aimY)>150){
         g.aimTarget=t.id;g.aimX=t.x;g.aimY=t.y;g.shotsOnTarget=0;
         g.rangeError=(w.rng.next()<.5?-1:1)*w.rng.int(120,260)*(w.weather==='fog'?2:1);
@@ -154,14 +129,15 @@ export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     const dd=Math.max(1,Math.hypot(ax-g.x,ay-g.y)),dx=(ax-g.x)/dd,dy=(ay-g.y)/dd;
     const tx=ax,ty=ay;
     let roll=(w.weather==='rain'?100:280)*(longMiss?2.2:1);
-    if(blocked(tx,ty,dx,dy,roll))return;
+
     g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
     if (behindCrest(ax, ay, t.faction)){
         roll*=.3;
         if(w.tick-([...w.news].reverse().find(n=>n.text.includes('炮弹砸在山脊'))?.tick??-1000)>900)w.say('炮弹砸在山脊上，没能弹过去',g.faction,ax,ay,1);
     }
+    w.boardShots.place(w,g,'round',tx,ty,w.tick+Math.max(6,Math.ceil(dd/60))-1);
     w.rounds.push({ x: g.x, y: g.y, tx, ty, dx, dy, age: 0, duration: Math.max(6, Math.ceil(dd / 60)), roll, rolled: 0, speed: 24,
-        gun: g, faction: g.faction, company: c.id, kills: 0, touched: [] });
+        gun: g, faction: g.faction, company: c.id });
     emit(w, 'fire', g, dx, dy, true);
     g.cooldown = w.rng.int(210,270);
 }
@@ -183,17 +159,6 @@ export function resolveRounds(w: SimWorld) {
         r.rolled += step; r.speed *= .985;
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
         if(Math.floor(r.rolled/120)>Math.floor((r.rolled-step)/120))emit(w,'bounce',r.gun,r.dx,r.dy,true,px,py);
-        const source = w.companies[r.company];
-        if (r.kills < 5) w.hash.visit(px, py, 12, u => {
-            if (u.faction === r.faction || r.kills >= (w.companies[u.company].formation==='square'?5:3)) return;
-            // 坐骑的像素轮廓比站立角色宽。所有骑手（包括参谋）共享同一个碰撞范围。
-            const radius=u.kind==='cuirassier'?12:4.8;
-            if((u.x-px)**2+(u.y-py)**2>radius*radius)return;
-            if (inRect(layout.farm, u.x, u.y, 8) && w.rng.next() < .7) { r.roll = 0; return; }
-            damage(w, u, 190, r.dx, r.dy, true, source);
-            r.kills++; r.roll -= 28;
-            if (!r.touched.includes(u.company)) { r.touched.push(u.company); shake(w.companies[u.company], 3.5); }
-        });
         if (r.rolled >= r.roll || r.speed < 5 || px < 0 || py < 0 || px >= WIDTH || py >= HEIGHT) w.rounds.splice(i, 1);
     }
 }
