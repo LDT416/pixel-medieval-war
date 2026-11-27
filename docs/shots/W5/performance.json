@@ -1,0 +1,98 @@
+{
+  "before": {
+    "fps": [
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60
+    ],
+    "drawCalls": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      31,
+      30,
+      32,
+      31,
+      32,
+      31,
+      31,
+      32,
+      31,
+      31,
+      32
+    ],
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Laptop GPU (0x000027E0) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "events": [
+    {
+      "clip": "march",
+      "tick": 481,
+      "company": "第11战列步兵团"
+    },
+    {
+      "clip": "volley",
+      "tick": 1124,
+      "company": "第11战列步兵团"
+    },
+    {
+      "clip": "charge",
+      "tick": 1979,
+      "company": "第49步兵团"
+    }
+  ],
+  "after": {
+    "fps": [
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60
+    ],
+    "drawCalls": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      31,
+      32,
+      32,
+      31,
+      32,
+      31,
+      31,
+      32,
+      29,
+      31,
+      32
+    ],
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Laptop GPU (0x000027E0) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "fpsDrop": 0
+}
