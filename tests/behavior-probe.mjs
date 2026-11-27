@@ -13,15 +13,19 @@ if(isMainThread){
     rows.sort((a,b)=>a.seed-b.seed);assert.equal(rows.length,count);
     for(const row of rows)console.log(JSON.stringify(row));
     const total=key=>rows.reduce((s,r)=>s+r[key],0);
-    console.log(JSON.stringify({games:rows.length,actualHandovers:total('handovers'),refilledRounds:total('refilled'),squareTransitions:total('flips'),within4s:total('quick'),worstPerCompanyIn30s:Math.max(...rows.map(r=>r.worst))}));
+    console.log(JSON.stringify({games:rows.length,engagedToggles:total('engagedToggles'),actualHandovers:total('handovers'),refilledRounds:total('refilled'),squareTransitions:total('flips'),within4s:total('quick'),worstPerCompanyIn30s:Math.max(...rows.map(r=>r.worst))}));
 }else{
     const {SimWorld}=await import('data:text/javascript;base64,'+Buffer.from(workerData.source).toString('base64'));
     for(const ordinal of workerData.seeds){
-        const w=new SimWorld(1200,ordinal*7919),last=new Map(),recent=new Map();let flips=0,quick=0,worst=0;
+        const w=new SimWorld(1200,ordinal*7919),last=new Map(),recent=new Map(),engaged=new Map();let engagedToggles=0,flips=0,quick=0,worst=0;
         while(!w.ended){
             w.step();
             for(const c of w.companies){
                 if(c.status==='gone')continue;
+                if(c.kind!=='cuirassier'){
+                    if(engaged.has(c.id)&&engaged.get(c.id)!==c.engaged)engagedToggles++;
+                    engaged.set(c.id,c.engaged);
+                }
                 const was=last.get(c.id);
                 if(was && was!==c.formation && (was==='square'||c.formation==='square')){
                     const history=(recent.get(c.id)??[]).filter(t=>t>w.tick-900);
@@ -31,6 +35,6 @@ if(isMainThread){
                 last.set(c.id,c.formation);
             }
         }
-        parentPort.postMessage({seed:w.seed,handovers:w.logistics.handovers.length,refilled:w.logistics.resupplied,flips,quick,worst,boardActions:w.boardShots.stats});
+        parentPort.postMessage({seed:w.seed,handovers:w.logistics.handovers.length,refilled:w.logistics.resupplied,engagedToggles,flips,quick,worst,boardActions:w.boardShots.stats});
     }
 }

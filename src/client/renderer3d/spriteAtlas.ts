@@ -1,9 +1,3 @@
-import type {Variant} from '../../sim/units/roster';
-
-const uniformTint:Record<Variant,readonly [number,number,number]>={
-    voltigeur:[1,.99,.84],rifles:[.62,.88,.65],lancer:[1,.85,.88],
-    hussar:[.85,.91,1],horse_battery:[1,.94,.82],howitzer:[.81,.86,.91]
-};
 import * as T from 'three';
 import {PACE} from '../../sim/scale';
 import type {Company,Soldier} from '../../sim/arenaTypes';
@@ -74,7 +68,7 @@ export class Standees {
                 const count=u.kind==='guard_grenadier'||u.kind==='field_cannon'?2:3;
                 // 制服按连队固定，旗鼓分工、帽穗与脚步相位再区分个人。
                 const role=u.general?4:u.kind==='cuirassier' && u.staff?5:u.officer?3:
-                    u.kind==='bannerman'?(u.id%3===0?1:u.faction && u.id%2?2:0):c.id%count;
+                    u.kind==='bannerman'?(u.id%3===0?1:u.faction && u.id%2?2:0):(sheet.fallback?u.id:c.id)%count;
                 state={group:sheet.groups.get(groupKey(u.faction,u.kind,role))!,kneelAt:-1};
                 this.unitGroups.set(u,state);
             }
@@ -87,15 +81,14 @@ export class Standees {
             const free=c.status==='rout'||c.engaged;
             const dx=free?u.face*Math.max(8,Math.abs(u.vx)):c.hx, dz=free?u.vy:c.hy;
             const diagonal=Math.abs(dz)>.54*Math.abs(dx),dir=diagonal?(dz>=0?2:3):(dx>=0?0:1);
-            const flip=sheet.fallback?dx<0:diagonal && dx<0;
+            const flip=sheet.fallback?u.face<0:diagonal && dx<0;
             const i=state.group.frames[sheet.offsets[motion]+fr*4+dir];
             const [sx,sy,w,hp,fx,fy]=sheet.data.tiles[i],sheetW=sheet.data.width,sheetH=sheet.data.height;
             this.uv.setXYZW(n,sx/sheetW,1-(sy+hp)/sheetH,w/sheetW,hp/sheetH);
-            const tint=.91+(u.id*17%10)*.01;
-            const color=c.variant && u.kind===c.kind?uniformTint[c.variant]:null;
-            this.tint.setXYZ(n,tint*(color?.[0]??1),tint*(color?.[1]??1),tint*(color?.[2]??.99));
+            const tint=sheet.fallback?.88+(u.id*17%13)*.01:.91+(u.id*17%10)*.01;
+            this.tint.setXYZ(n,tint,tint,tint*.99);
             this.flip.setXY(n,Number(flip),Math.max(0,1-(tick-u.hitAt)/4));
-            const px=(sheet.fallback?.083:.074)*(u.general?1.22:1);
+            const px=(sheet.fallback?.055:.074)*(u.general?(sheet.fallback?1.3:1.22):1);
             const rise=(fy-hp/2)*px;
             o.position.set(x+(flip?-1:1)*(w/2-fx)*px,h+.045+rise*.99027,z-rise*.13917);
             const stagger=u.hp>0?Math.max(0,1-(tick-u.hitAt)/4)*u.face*.15:0;

@@ -189,6 +189,7 @@ function pickTarget(w: SimWorld, c: Company) {
 }
 function setFormation(w: SimWorld, c: Company, f: Formation) {
     if (c.formation === f) return;
+    if(f==='square' && w.tick-c.leftSquare<120)return;
     c.capacity=c.members.length; c.margin=0; c.lastShrink=w.tick;
     const squareChange=c.formation==='square' || f==='square';
     if(c.formation==='square')c.leftSquare=w.tick;

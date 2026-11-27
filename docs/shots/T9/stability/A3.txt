@@ -1,0 +1,17 @@
+seed 1 posture=defend-attack winner=0 1207s
+seed 2 posture=defend-attack winner=0 1207s
+seed 3 posture=attack-defend winner=1 266s
+seed 4 posture=defend-attack winner=0 139s
+seed 5 posture=defend-attack winner=0 239s
+seed 6 posture=attack-defend winner=1 726s
+seed 7 posture=attack-attack winner=0 188s
+seed 8 posture=attack-defend winner=1 640s
+seed 9 posture=defend-attack winner=1 313s
+seed 10 posture=defend-attack winner=1 193s
+seed 11 posture=attack-attack winner=1 408s
+seed 12 posture=attack-attack winner=0 317s
+seed 13 posture=defend-attack winner=0 244s
+seed 14 posture=attack-defend winner=1 108s
+seed 15 posture=defend-attack winner=1 267s
+seed 16 posture=attack-defend winner=1 1207s
+{"seeds":16,"defenderWinRate":"0.77","defGames":13,"meetingGames":3,"assaultNews":143,"bayonetBreaks":0,"squareLineFlips":197,"flipsWithin4s":0,"worstFlipsOneCompanyIn30s":2,"cavRallyThenRecharge":0,"infantryEngagedToggles":568}
