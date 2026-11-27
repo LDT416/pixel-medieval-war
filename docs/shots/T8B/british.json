@@ -1,0 +1,858 @@
+{
+  "seed": 42,
+  "kind": "british",
+  "company": 36,
+  "name": "第2近卫步兵团",
+  "start": 14901,
+  "end": 15351,
+  "mode": "platoon",
+  "groups": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "shots": [
+    {
+      "tick": 14911,
+      "volley": 62,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        2
+      ],
+      "shots": 8,
+      "alive": 35,
+      "kneeling": 14,
+      "standing": 5
+    },
+    {
+      "tick": 14935,
+      "volley": 63,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        3
+      ],
+      "shots": 5,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 14959,
+      "volley": 64,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        0
+      ],
+      "shots": 4,
+      "alive": 35,
+      "kneeling": 16,
+      "standing": 5
+    },
+    {
+      "tick": 14983,
+      "volley": 65,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        1
+      ],
+      "shots": 7,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15007,
+      "volley": 66,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        2
+      ],
+      "shots": 8,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15031,
+      "volley": 67,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        3
+      ],
+      "shots": 4,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15055,
+      "volley": 68,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        0
+      ],
+      "shots": 8,
+      "alive": 35,
+      "kneeling": 17,
+      "standing": 6
+    },
+    {
+      "tick": 15079,
+      "volley": 69,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        1
+      ],
+      "shots": 6,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15105,
+      "volley": 70,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        2
+      ],
+      "shots": 2,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15127,
+      "volley": 71,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        3
+      ],
+      "shots": 6,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15151,
+      "volley": 72,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        0
+      ],
+      "shots": 4,
+      "alive": 35,
+      "kneeling": 14,
+      "standing": 8
+    },
+    {
+      "tick": 15175,
+      "volley": 73,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        1
+      ],
+      "shots": 5,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15199,
+      "volley": 74,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        2
+      ],
+      "shots": 5,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15223,
+      "volley": 75,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        3
+      ],
+      "shots": 3,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15247,
+      "volley": 76,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        0
+      ],
+      "shots": 7,
+      "alive": 35,
+      "kneeling": 17,
+      "standing": 6
+    },
+    {
+      "tick": 15271,
+      "volley": 77,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        1
+      ],
+      "shots": 5,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15295,
+      "volley": 78,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        2
+      ],
+      "shots": 2,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    },
+    {
+      "tick": 15319,
+      "volley": 79,
+      "target": 6,
+      "mode": "platoon",
+      "distance": 61,
+      "groups": [
+        3
+      ],
+      "shots": 4,
+      "alive": 35,
+      "kneeling": 19,
+      "standing": 0
+    }
+  ],
+  "actualFires": [
+    {
+      "tick": 14911,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14911,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14912,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14913,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14913,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14914,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14915,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14915,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 14935,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 14935,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 14936,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 14937,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 14937,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 14959,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 14959,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 14960,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 14961,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 14983,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14983,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14984,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14984,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14985,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14985,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 14986,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15007,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15008,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15009,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15009,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15010,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15010,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15011,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15011,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15031,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15031,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15032,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15033,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15055,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15055,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15056,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15057,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15057,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15058,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15059,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15059,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15079,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15079,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15080,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15080,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15081,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15082,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15105,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15107,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15127,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15128,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15128,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15129,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15129,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15130,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15151,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15152,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15153,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15154,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15175,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15176,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15176,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15177,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15177,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15199,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15201,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15201,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15202,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15203,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15223,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15224,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15225,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15247,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15248,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15248,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15249,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15249,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15251,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15251,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15271,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15272,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15272,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15274,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15275,
+      "company": 36,
+      "target": 6,
+      "group": 1
+    },
+    {
+      "tick": 15295,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15298,
+      "company": 36,
+      "target": 6,
+      "group": 2
+    },
+    {
+      "tick": 15319,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15320,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15320,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15321,
+      "company": 36,
+      "target": 6,
+      "group": 3
+    },
+    {
+      "tick": 15343,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15345,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    },
+    {
+      "tick": 15347,
+      "company": 36,
+      "target": 6,
+      "group": 0
+    }
+  ],
+  "changes": [],
+  "kneelPeak": 19,
+  "frontStoodAgain": true,
+  "audioTracks": 1,
+  "drumEvents": [],
+  "playedDrums": 0,
+  "tickRange": [
+    14902,
+    15351
+  ],
+  "seconds": 14.99
+}

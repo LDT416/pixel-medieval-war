@@ -1,0 +1,451 @@
+{
+  "seed": 42,
+  "kind": "french",
+  "company": 6,
+  "name": "第29战列步兵团",
+  "start": 14421,
+  "end": 14871,
+  "mode": "rank",
+  "groups": [
+    0,
+    1,
+    2
+  ],
+  "shots": [
+    {
+      "tick": 14431,
+      "volley": 7,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        0
+      ],
+      "shots": 4,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 7
+    },
+    {
+      "tick": 14473,
+      "volley": 8,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        1
+      ],
+      "shots": 6,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14527,
+      "volley": 9,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        2
+      ],
+      "shots": 3,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14569,
+      "volley": 10,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        0
+      ],
+      "shots": 5,
+      "alive": 25,
+      "kneeling": 8,
+      "standing": 7
+    },
+    {
+      "tick": 14629,
+      "volley": 11,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        1
+      ],
+      "shots": 6,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14671,
+      "volley": 12,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        2
+      ],
+      "shots": 3,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14725,
+      "volley": 13,
+      "target": 36,
+      "mode": "rank",
+      "distance": 159,
+      "groups": [
+        0
+      ],
+      "shots": 9,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 7
+    },
+    {
+      "tick": 14773,
+      "volley": 14,
+      "target": 36,
+      "mode": "rank",
+      "distance": 150,
+      "groups": [
+        1
+      ],
+      "shots": 6,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14821,
+      "volley": 15,
+      "target": 36,
+      "mode": "rank",
+      "distance": 75,
+      "groups": [
+        2
+      ],
+      "shots": 2,
+      "alive": 25,
+      "kneeling": 9,
+      "standing": 0
+    },
+    {
+      "tick": 14826,
+      "volley": 16,
+      "target": 36,
+      "mode": "rank",
+      "distance": 59,
+      "groups": [
+        0
+      ],
+      "shots": 3,
+      "alive": 25,
+      "kneeling": 0,
+      "standing": 9
+    }
+  ],
+  "actualFires": [
+    {
+      "tick": 14431,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14432,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14434,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14435,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14473,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14473,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14475,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14475,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14476,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14476,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14527,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14529,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14531,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14569,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14570,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14571,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14572,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14572,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14629,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14629,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14630,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14630,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14631,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14633,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14671,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14673,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14674,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14725,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14725,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14726,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14726,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14727,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14727,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14728,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14728,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14729,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14773,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14773,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14774,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14775,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14775,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14776,
+      "company": 6,
+      "target": 36,
+      "group": 1
+    },
+    {
+      "tick": 14821,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14823,
+      "company": 6,
+      "target": 36,
+      "group": 2
+    },
+    {
+      "tick": 14826,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14826,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    },
+    {
+      "tick": 14826,
+      "company": 6,
+      "target": 36,
+      "group": 0
+    }
+  ],
+  "changes": [],
+  "kneelPeak": 9,
+  "frontStoodAgain": true,
+  "audioTracks": 1,
+  "drumEvents": [],
+  "playedDrums": 1,
+  "tickRange": [
+    14422,
+    14871
+  ],
+  "seconds": 14.99
+}

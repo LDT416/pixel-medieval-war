@@ -1,0 +1,507 @@
+{
+  "seed": 31676,
+  "kind": "charge",
+  "company": 28,
+  "name": "第26步兵团",
+  "target": 12,
+  "defenderName": "第54战列步兵团（农庄守军）",
+  "start": 15314,
+  "end": 15576,
+  "signal": 15418,
+  "rush": 15442,
+  "contact": 15508,
+  "outcome": "melee",
+  "attacker": {
+    "tick": 15359,
+    "volley": 5,
+    "target": 12,
+    "mode": "rank",
+    "distance": 163,
+    "groups": [
+      0
+    ],
+    "shots": 9,
+    "alive": 34,
+    "kneeling": 8,
+    "standing": 7
+  },
+  "defender": {
+    "tick": 15508,
+    "volley": 7,
+    "target": 28,
+    "mode": "rank",
+    "distance": 57,
+    "groups": [
+      0
+    ],
+    "shots": 12,
+    "alive": 34,
+    "kneeling": 12,
+    "standing": 0
+  },
+  "actualFires": [
+    {
+      "tick": 15315,
+      "company": 28,
+      "target": 12,
+      "group": 1
+    },
+    {
+      "tick": 15349,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15349,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15349,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15350,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15350,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15352,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15352,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15359,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15359,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15360,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15360,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15361,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15361,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15362,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15362,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15363,
+      "company": 28,
+      "target": 12,
+      "group": 0
+    },
+    {
+      "tick": 15379,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15379,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15380,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15380,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15381,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15381,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15382,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15382,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15383,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15409,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15409,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15409,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15410,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15410,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15410,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15411,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15411,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15412,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15412,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15413,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15413,
+      "company": 12,
+      "target": 29,
+      "group": 0
+    },
+    {
+      "tick": 15457,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15457,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15457,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15458,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15458,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15458,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15459,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15459,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15460,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15460,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15461,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15461,
+      "company": 12,
+      "target": 29,
+      "group": 1
+    },
+    {
+      "tick": 15487,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15487,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15488,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15488,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15489,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15489,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15490,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15490,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15491,
+      "company": 12,
+      "target": 29,
+      "group": 2
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    },
+    {
+      "tick": 15508,
+      "company": 12,
+      "target": 28,
+      "group": 0
+    }
+  ],
+  "changes": [
+    {
+      "tick": 15315,
+      "stage": "approach"
+    },
+    {
+      "tick": 15418,
+      "stage": "signal"
+    },
+    {
+      "tick": 15442,
+      "stage": "rush"
+    },
+    {
+      "tick": 15508,
+      "stage": "melee"
+    }
+  ],
+  "kneelPeak": 9,
+  "frontStoodAgain": true,
+  "audioTracks": 1,
+  "drumEvents": [
+    15418
+  ],
+  "playedDrums": 1,
+  "charge": {
+    "tick": 15508,
+    "company": 28,
+    "target": 12,
+    "fresh": true,
+    "outcome": "melee"
+  },
+  "tickRange": [
+    15315,
+    15576
+  ],
+  "seconds": 8.73
+}
