@@ -21,11 +21,14 @@ interface Courier extends Point {
 export class CampaignLogistics{
     corps:Corps[]=[];brigades:Brigade[]=[];wagons:Wagon[]=[];couriers:Courier[]=[];
     delivered=0;lost=0;issued=0;resupplied=0;rotations=0;
+    handovers:{tick:number;front:number;reserve:number;distance:number;x:number;y:number}[]=[];
+    private relieving=new Map<number,{front:number;since:number;active:boolean;retireSent:number}>();
+    private returningVia=new Map<number,Point>();
     private resting=new Map<number,number>();
     private reliefCooldown=new Map<number,number>();
 
     reset(w:SimWorld){
-        this.resting.clear();this.reliefCooldown.clear();this.couriers=[];this.wagons=[];this.corps=[];this.brigades=[];
+        this.handovers=[];this.relieving.clear();this.returningVia.clear();this.resting.clear();this.reliefCooldown.clear();this.couriers=[];this.wagons=[];this.corps=[];this.brigades=[];
         this.delivered=this.lost=this.issued=this.resupplied=this.rotations=0;
         this.sync(w);
         for(const corps of this.corps){
@@ -87,6 +90,12 @@ export class CampaignLogistics{
         }
     }
     isResting(c:Company){return this.resting.has(c.id);}
+    isRelieving(c:Company){return this.relieving.get(c.id)?.active===true;}
+    isCommitted(c:Company){
+        if(this.resting.has(c.id)||this.relieving.has(c.id))return true;
+        for(const task of this.relieving.values())if(task.front===c.id)return true;
+        return false;
+    }
     dispatch(w:SimWorld,c:Company,order:Order,target=-1,point?:Point){
         const general=w.generals[c.faction].unit;
         if(!general||general.hp<=0||!present(c)||w.winner!==null||w.broken[c.faction]||w.lostSectors[c.faction][c.sector])return -1;
@@ -115,32 +124,60 @@ export class CampaignLogistics{
             .sort((a,b)=>Number(a.sector!==c.sector)-Number(b.sector!==c.sector)||distance(a,c)-distance(b,c))[0];
     }
     requestRelief(w:SimWorld,front:Company,second?:Company){
-        if(front.line!==0||!present(front)||this.resting.has(front.id)||w.tick<(this.reliefCooldown.get(front.id)??0))return false;
+        if(front.line!==0||!present(front)||this.isCommitted(front)||w.tick<(this.reliefCooldown.get(front.id)??0))return false;
         const wagon=this.wagonFor(front);if(!wagon)return false;
-        const waiting=new Set(this.couriers.map(m=>m.relief?.front));
-        if(waiting.has(front.id))return false;
         const candidates=w.companies.filter(c=>c.faction===front.faction&&c.sector===front.sector&&c.line===1&&rifle(c)&&
-            present(c)&&!c.engaged&&!this.isResting(c)&&c.morale>=42&&c.ammo>c.alive*6&&!this.couriers.some(m=>m.company===c.id));
+            present(c)&&!c.engaged&&!this.isCommitted(c)&&c.morale>=42&&c.ammo>c.alive*6&&!this.couriers.some(m=>m.company===c.id));
         const reserve=second?candidates.find(c=>c===second):candidates.sort((a,b)=>distance(a,front)-distance(b,front))[0];
         if(!reserve)return false;
-        const id=this.dispatch(w,reserve,'hold',-1,{x:front.x,y:front.y});
+        const id=this.dispatch(w,reserve,'reserve',-1,{x:front.x,y:front.y});
         const courier=this.couriers.find(m=>m.id===id);if(!courier)return false;
-        courier.relief={front:front.id,reserve:reserve.id};this.reliefCooldown.set(front.id,w.tick+900);
+        courier.relief={front:front.id,reserve:reserve.id};
+        this.relieving.set(reserve.id,{front:front.id,since:w.tick,active:false,retireSent:-1});
+        this.reliefCooldown.set(front.id,w.tick+900);
         return true;
     }
     private deliver(w:SimWorld,m:Courier,c:Company){
+        if(m.returning){
+            const pending=[...this.relieving].find(([,task])=>task.front===c.id);
+            if(!pending)return;
+            if(distance(c,w.companies[pending[0]])>105){pending[1].retireSent=-1;return;}
+        }
         c.order=m.order;c.forced=m.target;
         if(m.point){c.homeX=m.point.x;c.homeY=m.point.y;}
         if(m.order==='assault'||m.order==='charge')c.chargeAt=w.tick;
-        if(m.returning){c.line=1;this.resting.set(c.id,w.tick);return;}
-        if(!m.relief)return;
-        const front=w.companies[m.relief.front],wagon=this.wagonFor(front);
-        if(!present(front)||front.line!==0||!wagon)return;
-        const id=this.dispatch(w,front,'rally',-1,wagon);
-        const message=this.couriers.find(r=>r.id===id);if(!message)return;
-        message.order='rally';message.target=-1;message.point={x:wagon.x,y:wagon.y};message.returning=true;
-        c.line=0;this.rotations++;
-        w.say(c.name+'接替'+front.name+'的一线阵地',c.faction,c.x,c.y,1);
+        if(m.returning){
+            c.line=1;this.resting.set(c.id,w.tick);
+            if(m.point)this.returningVia.set(c.id,m.point);
+            const pair=[...this.relieving].find(([,task])=>task.front===c.id);
+            if(pair){
+                const [id]=pair,reserve=w.companies[id];reserve.line=0;this.relieving.delete(id);
+                this.rotations++;this.handovers.push({tick:w.tick,front:c.id,reserve:id,distance:distance(reserve,c),x:c.x,y:c.y});
+                w.say(reserve.name+'接替'+c.name+'的一线阵地',c.faction,c.x,c.y,2);
+            }
+        }else if(m.relief){
+            const pair=this.relieving.get(c.id);if(pair)pair.active=true;
+        }
+    }
+    private advanceReliefs(w:SimWorld){
+        for(const [id,task] of this.relieving){
+            const reserve=w.companies[id],front=w.companies[task.front];
+            if(!present(front)||!present(reserve)||w.lostSectors[front.faction][front.sector]||w.tick-task.since>9000){
+                this.relieving.delete(id);
+                this.couriers=this.couriers.filter(m=>!(m.relief?.reserve===id||m.returning&&m.company===front.id));
+                continue;
+            }
+            if(!task.active)continue;
+            // 一线两侧各留通道；二线必须实际到达，前一线才收到撤出通知。
+            const offset=id%2?1:-1;
+            reserve.order='reserve';reserve.forced=-1;reserve.homeX=front.x;reserve.homeY=front.y+offset*34;
+            if(distance(reserve,front)>95)continue;
+            if(task.retireSent>=0&&(this.couriers.some(m=>m.returning&&m.company===front.id)||w.tick-task.retireSent<120))continue;
+            const wagon=this.wagonFor(front);if(!wagon){this.relieving.delete(id);continue;}
+            const via={x:front.x+(front.faction?1:-1)*135,y:front.y-offset*110};
+            const messageId=this.dispatch(w,front,'rally',-1,via);
+            const m=this.couriers.find(r=>r.id===messageId);if(m){m.returning=true;task.retireSent=w.tick;}
+        }
     }
     private supply(w:SimWorld){
         for(const wagon of this.wagons){
@@ -160,7 +197,11 @@ export class CampaignLogistics{
             if(!rifle(c))continue;
             const wagon=this.wagonFor(c),rest=this.resting.get(c.id);
             if(rest!==undefined&&(!wagon||wagon.destroyed)){this.resting.delete(c.id);continue;}
-            if(rest!==undefined&&wagon){c.homeX=wagon.x;c.homeY=wagon.y;}
+            if(rest!==undefined&&wagon){
+                const via=this.returningVia.get(c.id);
+                if(via&&distance(c,via)<46)this.returningVia.delete(c.id);
+                const target=this.returningVia.get(c.id)??wagon;c.order='rally';c.homeX=target.x;c.homeY=target.y;
+            }
             if(!moving&&!c.engaged&&wagon&&distance(c,wagon)<170){
                 for(const u of c.members){
                     if(u.hp<=0||u.escaped||u.kind==='bannerman')continue;
@@ -172,7 +213,7 @@ export class CampaignLogistics{
                     if(c.fatigue<.30&&c.ammo>=c.alive*18&&w.tick-rest>300)this.resting.delete(c.id);
                 }
             }
-            if(w.tick%150===0&&c.line===0&&(c.morale<35||c.ammo<c.alive*5))this.requestRelief(w,c);
+            if(w.tick%150===0&&c.line===0&&(c.morale<42||c.ammo<c.alive*6||c.losses>c.peak*.2&&c.morale<c.base*.72))this.requestRelief(w,c);
         }
     }
     step(w:SimWorld){
@@ -185,13 +226,14 @@ export class CampaignLogistics{
             const dx=c.x-m.x,dy=c.y-m.y,d=Math.hypot(dx,dy),step=Math.min(d,COURIER_SPEED/30);
             if(d){m.dx=dx/d;m.dy=dy/d;m.x+=m.dx*step;m.y+=m.dy*step;}
             if(this.intercepted(w,m,m.faction,21,false)){
-                this.couriers.splice(i,1);this.lost++;
+                this.couriers.splice(i,1);this.lost++;if(m.relief)this.relieving.delete(m.relief.reserve);
                 w.say('通往'+c.name+'的传令兵阵亡，命令丢失',c.faction,m.x,m.y,1);continue;
             }
             if(d<=COURIER_SPEED/30){
                 this.couriers.splice(i,1);this.delivered++;this.deliver(w,m,c);
             }
         }
+        if(w.tick%6===0)this.advanceReliefs(w);
         if(w.tick%30===0)this.supply(w);
     }
 }

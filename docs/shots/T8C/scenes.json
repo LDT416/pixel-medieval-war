@@ -1,0 +1,47 @@
+{
+  "deployment": {
+    "seed": 7919,
+    "company": 23,
+    "name": "第7步兵团",
+    "sector": 2,
+    "end": 1350
+  },
+  "reinforcement": {
+    "seed": 7919,
+    "order": "advance",
+    "target": 36,
+    "company": 8,
+    "name": "第35战列步兵团",
+    "tick": 8551,
+    "x": 5154.691176326035,
+    "y": 4339,
+    "text": "苏尔特投入第35战列步兵团，增援中央",
+    "point": {
+      "id": 0,
+      "name": "磨坊桥",
+      "kind": "bridge",
+      "x": 8277.881287484366,
+      "y": 4184.302753955126,
+      "owner": 0,
+      "sector": 1,
+      "heldTicks": [
+        14310,
+        0
+      ]
+    },
+    "arrived": 8659,
+    "owner": 0
+  },
+  "relief": {
+    "tick": 15665,
+    "front": 23,
+    "reserve": 26,
+    "distance": 34.00000000000182,
+    "x": 7508.644131922312,
+    "y": 6578.249692428483,
+    "seed": 7919,
+    "requested": 14400,
+    "frontName": "第7步兵团",
+    "reserveName": "第15步兵团"
+  }
+}

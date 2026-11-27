@@ -8,7 +8,8 @@
   "wagonsRaided": 1,
   "rotation": {
     "front": 0,
-    "reserve": 11,
-    "deliveries": 2
+    "reserve": 3,
+    "deliveries": 2,
+    "distance": 34
   }
 }

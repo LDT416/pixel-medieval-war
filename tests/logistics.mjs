@@ -50,8 +50,20 @@ const g=new SimWorld(1800,42),s=g.logistics;
 const front=g.companies.find(c=>c.line===0&&g.companies.some(r=>r.faction===c.faction&&r.sector===c.sector&&r.line===1&&r.kind==='line_infantry'));
 const reserve=g.companies.find(r=>r.faction===front.faction&&r.sector===front.sector&&r.line===1&&r.kind==='line_infantry');
 const depot=s.wagons.find(v=>v.id===front.corps);front.ammo=0;for(const u of front.members)u.ammo=0;
+front.x=4000;front.y=3000;reserve.x=4400;reserve.y=3100;
+const chief=g.generals[front.faction].unit;chief.x=4500;chief.y=3100;
 assert.ok(s.requestRelief(g,front,reserve));
-for(let i=0;i<2400&&!s.isResting(front);i++){g.tick++;s.step(g);}
-assert.ok(s.isResting(front));assert.equal(front.line,1);assert.equal(reserve.line,0);assert.equal(front.homeX,depot.x);
-report.rotation={front:front.id,reserve:reserve.id,deliveries:s.delivered};
+for(let i=0;i<150;i++){g.tick++;s.step(g);}
+assert.ok(s.isRelieving(reserve));assert.equal(front.line,0);assert.equal(s.rotations,0,'first line waits for actual relief');
+for(let i=0;i<1800&&!s.isResting(front);i++){
+    g.tick++;s.step(g);
+    const dx=reserve.homeX-reserve.x,dy=reserve.homeY-reserve.y,d=Math.hypot(dx,dy);
+    if(d>0){reserve.x+=dx/d*Math.min(2,d);reserve.y+=dy/d*Math.min(2,d);}
+}
+assert.ok(s.isResting(front));assert.equal(front.line,1);assert.equal(reserve.line,0);assert.equal(s.handovers.length,1);
+assert.ok(s.handovers[0].distance<=105);assert.notEqual(front.homeY,depot.y,'first line exits via a side gap');
+front.x=front.homeX;front.y=front.homeY;
+for(let i=0;i<30;i++){g.tick++;s.step(g);}
+assert.equal(front.homeX,depot.x);assert.equal(front.homeY,depot.y);
+report.rotation={front:front.id,reserve:reserve.id,deliveries:s.delivered,distance:s.handovers[0].distance};
 const dir='docs/shots/W1';mkdirSync(dir,{recursive:true});writeFileSync(dir+'/logistics.json',JSON.stringify(report,null,2));console.log(report);

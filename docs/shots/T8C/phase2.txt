@@ -1,0 +1,59 @@
+
+> napoleon-1815@6.0.0 test
+> node tests/phase2.mjs
+
+600 424.0s 反法同盟失守两个战区，有序撤退 avg 0.13ms p99 0.49ms
+1200 541.0s 反法同盟失守两个战区，有序撤退 avg 0.23ms p99 0.60ms
+1800 641.0s 法兰西帝国失守两个战区，有序撤退 avg 0.36ms p99 0.86ms
+seed 15838 680s winner 0 loss 0.232 cannon 0.036 反法同盟失守两个战区，有序撤退
+seed 31676 606s winner 1 loss 0.465 cannon 0.142 法兰西帝国失守两个战区，有序撤退
+seed 23757 666s winner 0 loss 0.290 cannon 0.137 反法同盟失守两个战区，有序撤退
+seed 7919 742s winner 1 loss 0.288 cannon 0.386 反法同盟持续控制多数战略要点
+seed 55433 411s winner 0 loss 0.315 cannon 0.566 反法同盟失守两个战区，有序撤退
+seed 47514 655s winner 0 loss 0.297 cannon 0.500 反法同盟失守两个战区，有序撤退
+seed 63352 605s winner 0 loss 0.248 cannon 0.290 反法同盟失守两个战区，有序撤退
+seed 39595 619s winner 1 loss 0.372 cannon 0.253 法兰西帝国失守两个战区，有序撤退
+seed 79190 589s winner 1 loss 0.327 cannon 0.490 法兰西帝国失守两个战区，有序撤退
+seed 95028 490s winner 0 loss 0.403 cannon 0.000 反法同盟失守两个战区，有序撤退
+seed 87109 764s winner 0 loss 0.410 cannon 0.595 反法同盟失守两个战区，有序撤退
+seed 71271 551s winner 0 loss 0.212 cannon 0.447 反法同盟失守两个战区，有序撤退
+seed 110866 592s winner 0 loss 0.385 cannon 0.530 反法同盟失守两个战区，有序撤退
+seed 126704 516s winner 0 loss 0.295 cannon 0.250 反法同盟失守两个战区，有序撤退
+seed 118785 588s winner 1 loss 0.252 cannon 0.280 法兰西帝国失守两个战区，有序撤退
+seed 102947 576s winner 1 loss 0.240 cannon 0.366 法兰西帝国失守两个战区，有序撤退
+seed 158380 493s winner 1 loss 0.138 cannon 0.017 法兰西帝国失守两个战区，有序撤退
+seed 150461 389s winner 0 loss 0.342 cannon 0.704 反法同盟失守两个战区，有序撤退
+seed 142542 732s winner 1 loss 0.410 cannon 0.500 法兰西帝国失守两个战区，有序撤退
+seed 134623 622s winner 0 loss 0.447 cannon 0.231 反法同盟失守两个战区，有序撤退
+seed 190056 618s winner 1 loss 0.167 cannon 0.455 法兰西帝国失守两个战区，有序撤退
+seed 174218 453s winner 1 loss 0.357 cannon 0.000 法兰西帝国失守两个战区，有序撤退
+seed 166299 603s winner 0 loss 0.335 cannon 0.518 反法同盟失守两个战区，有序撤退
+seed 182137 950s winner 0 loss 0.377 cannon 0.736 反法同盟失守两个战区，有序撤退
+seed 205894 629s winner 1 loss 0.280 cannon 0.278 法兰西帝国失守两个战区，有序撤退
+seed 221732 764s winner 1 loss 0.417 cannon 0.552 法兰西帝国失守两个战区，有序撤退
+seed 197975 599s winner 1 loss 0.367 cannon 0.286 法兰西帝国失守两个战区，有序撤退
+seed 213813 618s winner 1 loss 0.402 cannon 0.000 法兰西帝国失守两个战区，有序撤退
+seed 253408 708s winner 1 loss 0.238 cannon 0.448 法兰西帝国失守两个战区，有序撤退
+seed 237570 825s winner 1 loss 0.430 cannon 0.456 法兰西帝国失守两个战区，有序撤退
+seed 229651 675s winner 1 loss 0.275 cannon 0.000 法兰西帝国失守两个战区，有序撤退
+seed 285084 750s winner 1 loss 0.390 cannon 0.593 法兰西帝国失守两个战区，有序撤退
+seed 245489 1200s winner 1 loss 0.173 cannon 0.113 夜幕降临，法兰西帝国趁夜撤离战场
+seed 261327 624s winner 1 loss 0.202 cannon 0.006 法兰西帝国失守两个战区，有序撤退
+seed 269246 756s winner 0 loss 0.315 cannon 0.000 反法同盟失守两个战区，有序撤退
+seed 316760 543s winner 1 loss 0.203 cannon 0.189 法兰西帝国失守两个战区，有序撤退
+seed 277165 569s winner 1 loss 0.333 cannon 0.256 法兰西帝国失守两个战区，有序撤退
+seed 293003 660s winner 0 loss 0.302 cannon 0.330 反法同盟失守两个战区，有序撤退
+seed 300922 743s winner 0 loss 0.347 cannon 0.373 反法同盟失守两个战区，有序撤退
+seed 308841 565s winner 1 loss 0.282 cannon 0.504 法兰西帝国失守两个战区，有序撤退
+{
+  seeds: 40,
+  medianSeconds: 618.5,
+  minSeconds: 389,
+  maxSeconds: 1200,
+  loserLossFraction: 0.3139166666666666,
+  generalDeathFraction: 0.1,
+  wins: [ 17, 23 ],
+  cannonShare: 0.32037143410609464,
+  pooledCannonShare: 0.3608277470125328
+}
+Battle assertions passed.

@@ -92,8 +92,7 @@ try {
         window.__arenaDebug.startBattle();
         window.__arenaDebug.setLighting('storm');
         window.__arenaDebug.zoomTo(48);
-        window.__arenaDebug.panTo(0,0);
-        window.__arenaDebug.setSpeed(2);`);
+        window.__arenaDebug.setSpeed(16);`);
     const combat = await waitFor(s => s.activeSmoke > 0 && s.landedGore > 0 && s.landedCorpses > 0 && s.bloodPools > 0, 120000);
     assert.equal(combat.lighting, 'storm');
     console.log('Combat', combat);

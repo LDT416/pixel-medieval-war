@@ -2,6 +2,7 @@ import type { Company, Faction } from './arenaTypes';
 import type { SimWorld } from './world';
 import { inRect, inWoods, layout, WIDTH } from './maps';
 import { MUSKET, dist } from './combat';
+import { CommandPlan } from './commandPlan';
 
 const CANNONADE = { aggressive: 330, cunning: 560, steadfast: 650, cautious: 900 };
 const ASSAULT = { aggressive: 58, cunning: 50, steadfast: 44, cautious: 36 };
@@ -9,58 +10,66 @@ const EAGER = { aggressive: 1, cunning: 1.1, steadfast: 1.7, cautious: 1.9 };
 
 /** 两军各自的“总司令”：决定炮火准备多久、何时全线推进、骑兵何时出击、近卫军何时押上。 */
 export class Director {
+    readonly plan=new CommandPlan();
     cannonadeEnd: [number, number] = [0, 0];
     secondWave: [number, number] = [0, 0];
-    guardAt: [number, number] = [0, 0];
     advanced: [boolean, boolean] = [false, false];
-    committed: [boolean, boolean] = [false, false];
     reset(w: SimWorld) {
+        this.plan.reset();
         for (const f of [0, 1] as const) {
             const trait = w.generals[f].trait;
-            this.cannonadeEnd[f] = w.posture[f] === 'attack' ? CANNONADE[trait] + w.rng.int(0, 240) : 0;
+            this.cannonadeEnd[f] = w.posture[f] === 'attack' ? w.deployEnd+CANNONADE[trait] + w.rng.int(0, 240) : 0;
             this.secondWave[f] = 0;
-            this.guardAt[f] = 3400 + w.rng.int(0, 2200) - (trait === 'aggressive' ? 800 : trait === 'cautious' ? -500 : 0);
-            this.advanced[f] = this.committed[f] = false;
+            this.advanced[f]=false;
         }
     }
     update(w: SimWorld) {
-        for (const f of [0, 1] as const) if (!w.broken[f]) this.army(w, f);
+        for (const f of [0, 1] as const) if (!w.broken[f] && w.legacySide!==f){
+            if((w.tick-w.deployEnd-1)%300===0)this.plan.review(w,f);
+            this.army(w,f);
+        }
     }
     private army(w: SimWorld, f: Faction) {
         const g = w.generals[f], trait = g.trait, attack = w.posture[f] === 'attack', face = f ? -1 : 1;
-        const own = w.companies.filter(c => c.faction === f && c.alive>0 && c.status !== 'gone' && !w.logistics.isResting(c) && !w.lostSectors[f][c.sector]);
+        const own = w.companies.filter(c => c.faction === f && c.alive>0 && c.status !== 'gone' && !w.logistics.isCommitted(c) && !w.lostSectors[f][c.sector]);
+        const plan=w.plans[f];
+        const free=(c:Company)=>!this.plan.assigned(c,w.tick) && !plan.reserve.includes(c.id);
         const leader = g.alive ? g.title + g.name : '代理指挥官';
         // ---- 全线推进 ----
         if (attack && !this.advanced[f] && w.tick >= this.cannonadeEnd[f]) {
             this.advanced[f] = true; this.secondWave[f] = w.tick + 330;
             let x = 0, y = 0, n = 0;
-            for (const c of own) if (c.line === 0) { w.logistics.dispatch(w,c,'advance'); x += c.x; y += c.y; n++; }
+            for (const c of own) if (c.line === 0 && free(c)) { w.logistics.dispatch(w,c,'advance'); x += c.x; y += c.y; n++; }
             w.say(`${leader}下令：全线推进！`, f, n ? x / n : WIDTH / 2, n ? y / n : 1600, 2);
         }
         if (this.secondWave[f] && w.tick >= this.secondWave[f]) {
             this.secondWave[f] = 0;
-            for (const c of own) if (c.line === 1 && c.order === 'hold') w.logistics.dispatch(w,c,'advance');
+            for (const c of own) if (c.line === 1 && c.order === 'hold' && free(c)) w.logistics.dispatch(w,c,'advance');
         }
         // 攻方：重整好的连队再次投入进攻。
         if (attack && this.advanced[f] && !this.secondWave[f] && w.tick % 150 === 1)
-            for (const c of own) if ((c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && c.kind !== 'cuirassier') w.logistics.dispatch(w,c,'advance');
+            for (const c of own) if (free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && c.kind !== 'cuirassier') w.logistics.dispatch(w,c,'advance');
         // 守方：敌军疲态尽显时转入全线反击。
         if (!attack && w.tick > 3600 && w.tick % 90 === 1) {
             const e = (1 - f) as Faction;
             if (w.armyMorale(e) < 38 || w.effective(f) > w.effective(e) * 1.35 || w.tick > 16500) {
                 w.posture[f] = 'attack'; this.advanced[f] = true;
-                for (const c of own) if (c.line !== 6 && c.line !== 5 && c.line !== 4 && c.kind !== 'cuirassier' && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
+                for (const c of own) if (free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && c.kind !== 'cuirassier' && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
                 w.say(f ? `${leader}挥舞帽子：全线前进！` : `${leader}下令：全线反击！`, f, w.frontline().x, w.frontline().y, 3);
             }
         }
         // ---- 刺刀冲锋 ----
         for (const c of own) {
             if (c.status !== 'steady' || (c.kind !== 'line_infantry' && c.kind !== 'guard_grenadier') || c.line === 6) continue;
-            if(w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
+            if((!free(c) && c.order!=='advance' && (c.order==='reserve' || dist(c,w.companies[c.target]??c)>260)) || w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
             if (c.order !== 'advance' && c.order !== 'hold') continue;
-            const t = w.companies[c.target];
-            if (!t || t.status === 'gone' || t.kind === 'cuirassier' || t.status === 'rout') continue;
-            let limit = ASSAULT[trait] - (attack ? 0 : 10) + (c.kind === 'guard_grenadier' && this.committed[f] ? 22 : 0);
+            const current=w.companies[c.target];
+            const viable=(o:Company)=>o.faction!==f && o.alive>0 && o.line!==5 && o.kind!=='cuirassier' && o.status!=='rout' && o.status!=='gone';
+            const reach=w.weather==='fog'?1300:2250;
+            const t=current && viable(current)?current:w.companies.filter(o=>viable(o)&&dist(o,c)<reach)
+                .sort((a,b)=>dist(a,c)-dist(b,c))[0];
+            if(!t)continue;
+            let limit = ASSAULT[trait] - (attack ? 0 : 10) + (c.kind === 'guard_grenadier' && plan.reserveAt!==null ? 22 : 0);
             if (inRect(layout.farm, t.x, t.y, 20)) limit -= 14;
             const d = dist(c, t);
             const support=own.some(o=>o!==c && o.line!==5 && o.status==='steady' && dist(o,c)<480);
@@ -69,7 +78,9 @@ export class Director {
             const window=w.tick-t.firstVolleyAt<80 && d<150;
             const lowAmmo=c.ammo<8*c.alive;
             if(worn && !support && c.losses>Math.max(1,c.kills)*1.3 && w.logistics.requestRelief(w,c))continue;
-            if ((d<1550 && fresh && (c.id%3!==2 || attack)) || (d<MUSKET+40 && (t.morale<limit || t.alive<c.alive*.45 || window || lowAmmo || (worn && (support || c.kills>=1.2*Math.max(1,c.losses)))))) {
+            const isolated=!w.companies.some(o=>o!==t && o.faction===t.faction && o.line!==5 && o.alive>3 && o.status==='steady' && dist(o,t)<250);
+            const designated=c.order==='advance' && (c.sector===plan.mainEffort || isolated) && (support || c.morale>65);
+            if ((d<reach && (fresh || designated) && (c.id%3!==2 || attack)) || (d<MUSKET+40 && (t.morale<limit || t.alive<c.alive*.45 || window || lowAmmo || (worn && (support || c.kills>=1.2*Math.max(1,c.losses)))))) {
                 c.order = 'assault'; c.forced = t.id;
                 c.freshAtStart=fresh;c.charges++;
                 if (c.kind === 'guard_grenadier' || w.rng.next() < .22) w.say(`${c.name}上刺刀，冲锋！`, f, c.x, c.y, c.kind === 'guard_grenadier' ? 2 : 1);
@@ -102,16 +113,6 @@ export class Director {
                     c.charges++;c.order = 'charge'; c.forced = best.id;
                     w.say(`${c.name}拔出马刀，向${best.name}发起冲锋！`, f, c.x, c.y, 2);
                 }
-            }
-        }
-        // ---- 近卫军 ----
-        if (!this.committed[f]) {
-            const theirs = w.armyMorale((1 - f) as Faction), ratio = w.effective(f) / Math.max(1, w.effective((1 - f) as Faction));
-            if (w.tick > this.guardAt[f] || (theirs < 46 && w.tick > 1500) || (ratio < .72 && w.tick > 1700)) {
-                this.committed[f] = true;
-                let x = 0, y = 0, n = 0;
-                for (const c of own) if (c.line === 2 && c.status !== 'rout') { w.logistics.dispatch(w,c,'advance'); c.base += 6; c.morale += 6; x += c.x; y += c.y; n++; }
-                if (n) w.say(f ? '“近卫军，起立！”英军最后的预备队从麦田里站了起来' : `${leader}押上了最后的赌注：老近卫军出击！`, f, x / n, y / n, 3);
             }
         }
         // ---- 参谋部跟随主力 ----

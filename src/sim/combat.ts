@@ -17,6 +17,8 @@ export function shake(c: Company, amount: number) {
 }
 export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: number, explosive: boolean, by: Company | null) {
     if (u.hp <= 0) return false;
+    if (u.general && (!by || by.faction===u.faction || !(explosive && by.kind==='field_cannon' || by.kind==='cuirassier' && by.line!==5))) return false;
+    if (explosive && w.companies[u.company].formation==='column') amount*=1.4;
     u.hp = Math.max(0, u.hp - amount); u.hitAt = w.tick;
     emit(w, 'hit', u, dx, dy, explosive);
     if (u.hp > 0) return false;
@@ -32,7 +34,7 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
         if (c.kind === 'guard_grenadier' || (w.tick > 900 && w.rng.next() < .2)) w.say(`${c.name}的军旗倒下了`, c.faction, u.x, u.y, 1);
     }
     if (by) by.kills++;
-    if (u.general) w.generalDown(u);
+    if (u.general) w.generalDown(u,explosive?'炮弹':'骑兵');
     return true;
 }
 function victim(w: SimWorld, t: Company, front: number) {
@@ -162,10 +164,13 @@ export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     for(const o of c.members)if(o.hp>0 && o.shotsOnTarget>0 && o.aimTarget===t.id && Math.hypot(t.x-o.aimX,t.y-o.aimY)<=150 && Math.abs(o.rangeError)<Math.abs(g.rangeError))g.rangeError=o.rangeError;
     const lx=(t.x-g.x)/d, ly=(t.y-g.y)/d;
     const lateral=(w.rng.next()+w.rng.next()-1)*(14+d*.03)*(g.shotsOnTarget<2?1.8:1);
-    const ax=aim.x+lx*g.rangeError-ly*lateral, ay=aim.y+ly*g.rangeError+lx*lateral;
+    // 少数游戏弹道越过原目标；落点始终根据这枚弹的方向生成，不查询后排单位的位置。
+    const longMiss=w.rng.next()<.22;
+    const offset=g.rangeError+(longMiss?w.rng.int(560,1600):0);
+    const ax=aim.x+lx*offset-ly*lateral, ay=aim.y+ly*offset+lx*lateral;
     const dd=Math.max(1,Math.hypot(ax-g.x,ay-g.y)),dx=(ax-g.x)/dd,dy=(ay-g.y)/dd;
     const tx=ax,ty=ay;
-    let roll=w.weather==='rain'?100:280;
+    let roll=(w.weather==='rain'?100:280)*(longMiss?2.2:1);
     if(blocked(tx,ty,dx,dy,roll))return;
     g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
     if (behindCrest(ax, ay, t.faction)){
@@ -196,8 +201,11 @@ export function resolveRounds(w: SimWorld) {
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
         if(Math.floor(r.rolled/120)>Math.floor((r.rolled-step)/120))emit(w,'bounce',r.gun,r.dx,r.dy,true,px,py);
         const source = w.companies[r.company];
-        if (r.kills < 5) w.hash.visit(px, py, 8, u => {
+        if (r.kills < 5) w.hash.visit(px, py, 12, u => {
             if (u.faction === r.faction || r.kills >= (w.companies[u.company].formation==='square'?5:3)) return;
+            // 坐骑的像素轮廓比站立角色宽。所有骑手（包括参谋）共享同一个碰撞范围。
+            const radius=u.kind==='cuirassier'?12:4.8;
+            if((u.x-px)**2+(u.y-py)**2>radius*radius)return;
             if (inRect(layout.farm, u.x, u.y, 8) && w.rng.next() < .7) { r.roll = 0; return; }
             damage(w, u, 190, r.dx, r.dy, true, source);
             r.kills++; r.roll -= 28;

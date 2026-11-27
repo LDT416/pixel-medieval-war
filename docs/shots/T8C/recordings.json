@@ -1,0 +1,49 @@
+{
+  "deployment": {
+    "seed": 7919,
+    "frames": 170,
+    "begin": 0,
+    "end": 1350,
+    "camera": {
+      "distance": 82,
+      "desired": 82,
+      "x": 10456.339612439755,
+      "y": 6043.66664837148,
+      "quality": 0
+    }
+  },
+  "reinforcement": {
+    "seed": 7919,
+    "frames": 163,
+    "begin": 8461,
+    "end": 9179,
+    "camera": {
+      "distance": 102,
+      "desired": 102,
+      "x": 5311.284654680049,
+      "y": 4334.631571488314,
+      "quality": 0
+    }
+  },
+  "relief": {
+    "seed": 7919,
+    "frames": 218,
+    "begin": 14370,
+    "end": 16145,
+    "camera": {
+      "distance": 75.00000000000003,
+      "desired": 75,
+      "x": 7827.197844166507,
+      "y": 6625.117706537484,
+      "quality": 0
+    },
+    "handover": {
+      "tick": 15665,
+      "front": 23,
+      "reserve": 26,
+      "distance": 34.00000000000182,
+      "x": 7508.644131922312,
+      "y": 6578.249692428483
+    }
+  }
+}

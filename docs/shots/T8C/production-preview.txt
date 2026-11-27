@@ -1,0 +1,77 @@
+Combat {
+  tick: 9967,
+  jitter: {
+    flipsPerSec: 0,
+    poseTogglesPerSec: 0.00014771871525340378,
+    slotSwapsPerDeath: 0.8
+  },
+  camera: {
+    distance: 140.9054606881445,
+    desired: 125,
+    x: 8314.473281940362,
+    y: 4237.737299960586,
+    quality: 0
+  },
+  fps: 60,
+  drawCalls: 59,
+  tracers: { segments: 115, drawCalls: 1, mode: 'clear' },
+  chargeDrums: 0,
+  following: -1,
+  alive: [ 298, 297 ],
+  dead: [ 2, 3 ],
+  fled: [ 0, 0 ],
+  winner: null,
+  ended: false,
+  seed: 7919,
+  weather: 'rain',
+  scale: 600,
+  lighting: 'storm',
+  activeSmoke: 236,
+  odds: 0.620701471893625,
+  morale: [ 80.39322033898306, 72.17418859323126 ],
+  news: 30,
+  activeAirGore: 0,
+  landedCorpses: 1,
+  landedGore: 63,
+  bloodPools: 210,
+  goreTexturesLoaded: 7
+}
+Victory {
+  tick: 14430,
+  jitter: {
+    flipsPerSec: 0,
+    poseTogglesPerSec: 0.0012579507844986736,
+    slotSwapsPerDeath: 0.4
+  },
+  camera: {
+    distance: 169.88119621157676,
+    desired: 170,
+    x: 7921.5951422592625,
+    y: 6528.191789739609,
+    quality: 0
+  },
+  fps: 58,
+  drawCalls: 59,
+  tracers: { segments: 0, drawCalls: 0, mode: 'clear' },
+  chargeDrums: 0,
+  following: -1,
+  alive: [ 253, 233 ],
+  dead: [ 47, 58 ],
+  fled: [ 0, 9 ],
+  winner: 0,
+  ended: true,
+  seed: 7919,
+  weather: 'rain',
+  scale: 600,
+  lighting: 'storm',
+  activeSmoke: 107,
+  odds: 1,
+  morale: [ 78.99280787982804, 65.16513888046777 ],
+  news: 53,
+  activeAirGore: 0,
+  landedCorpses: 75,
+  landedGore: 476,
+  bloodPools: 2138,
+  goreTexturesLoaded: 7
+}
+Production WebGL preview assertions passed.

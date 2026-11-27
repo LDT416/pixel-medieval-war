@@ -163,7 +163,7 @@ function pickTarget(w: SimWorld, c: Company) {
         return true;
     };
     const forced = w.companies[c.forced];
-    if (forced && forced.status !== 'gone' && forced.alive > 0 && visible(forced)) return forced;
+    if (forced && forced.status !== 'gone' && forced.alive > 0 && (forced.line!==5 || c.kind==='cuirassier' && c.order==='charge') && visible(forced)) return forced;
     c.forced = -1;
     const reach = c.kind === 'field_cannon' ? gunRange(w) : w.weather === 'fog' ? 1000 : 2600;
     let best: Company | undefined, score = Infinity;
@@ -319,7 +319,7 @@ export function updateCompany(w: SimWorld, c: Company) {
             if(distance<700)c.lastHorse=w.tick;
             if(distance<250 || (distance<450 && previous-distance>8 && w.tick-c.leftSquare>=60))threat=true;
         }
-        if(threat && !sheltered)setFormation(w,c,'square');
+        if((threat || (w.director.plan.wantsSquare(c,w.tick) && w.tick-c.leftSquare>=60)) && !sheltered)setFormation(w,c,'square');
         else if(c.formation==='square' && w.tick-c.lastHorse>=240 && w.tick-c.formedSquareAt>=900)setFormation(w,c,'line');
         else if (c.formation !== 'square') setFormation(w, c, !sheltered && ((c.order==='advance' && d>600) || (c.order==='assault' && (c.formation==='column' || (d>350 && c.id%3===0)))) ? 'column' : 'line');
     }
@@ -380,7 +380,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     lag = Math.hypot(mx - c.x, my - c.y);
     let speed = c.speed * (c.formation === 'column' ? 1.05 : c.formation === 'square' ? .3 : c.formation === 'line' ? .85 : 1) * (c.status === 'shaken' ? .75 : 1);
     speed*=movementAt(c.x,c.y)*(1-.35*c.fatigue);
-    if(w.layout.width>=12000 && c.line!==5 && c.order!=='rally' && c.assaultStage!=='rush' && c.order!=='charge')speed*=.135;
+    if(w.layout.width>=12000 && c.line!==5 && c.order!=='rally' && c.assaultStage!=='rush' && c.order!=='charge')speed*=w.logistics.isRelieving(c)?1:c.kind==='cuirassier'?.42:.135;
     if(c.limbered)speed*=.7;
     if(c.order==='charge')speed*=1.35;else if(c.assaultStage==='rush')speed*=1.8;
     if (c.formUntil > w.tick && c.formation !== 'column') speed *= .3;
@@ -467,9 +467,21 @@ function meleePressure(w: SimWorld, a: Company, b: Company) {
 }
 function updateStaff(w: SimWorld, c: Company, threat: number) {
     const g = w.generals[c.faction], face = c.faction ? -1 : 1;
+    // 地图有三片交战区。以前把三处横坐标和纵坐标全部平均，指挥标志容易落在两处战区之间。
+    const sector=w.plans[c.faction].mainEffort;
+    let lead:Company|undefined;
+    for(const unit of w.companies){
+        if(unit.faction!==c.faction || unit.sector!==sector || unit.line>1 || !unit.alive || unit.status==='gone' || unit.status==='rout')continue;
+        if(!lead || (unit.x-lead.x)*face>0)lead=unit;
+    }
+    if(lead){
+        c.homeX=Math.max(80,Math.min(WIDTH-80,lead.x-face*1090));
+        c.homeY=lead.y;
+    }
     if (threat < 300) { c.homeX -= face * 18; c.homeX = Math.min(WIDTH - 80, Math.max(80, c.homeX)); }
     const gd = Math.hypot(c.homeX - c.x, c.homeY - c.y);
     if (gd > 1) { const s = Math.min(gd, c.speed * 6 / 30); c.vx=(c.homeX-c.x)/gd*s*5; c.vy=(c.homeY-c.y)/gd*s*5; }
+    else { c.vx=0;c.vy=0; }
     c.hx = face; c.hy = 0;
     if (!g.alive && c.alive > 0 && threat > 900) c.order = 'hold';
 }

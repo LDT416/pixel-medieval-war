@@ -1,9 +1,11 @@
 import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type General,
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
-import { WIDTH, HEIGHT, CX, CY, LINE_GAP, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
+import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
+import { LegacyDirector } from './legacyDirector';
+import { prepareDeployment, marchDeployment, type BattlePlan } from './deployment';
 import { CampaignLogistics } from './campaignLogistics';
 import { CampaignObjectives } from './campaignObjectives';
 import { advance, updateCompany, formUp, rout } from './strategy';
@@ -22,6 +24,10 @@ const VALUE: Record<Kind, number> = { line_infantry: 1, guard_grenadier: 1.55, c
 export const TIMEOUT = 36000, PURSUIT = 210;
 
 export class SimWorld {
+    readonly deployEnd=1350;
+    rearGuard:[number|null,number|null]=[null,null];
+    plans!: [BattlePlan,BattlePlan];
+    private legacy?: LegacyDirector;
     lostSectors:boolean[][]=[[],[]];
     readonly noAssault:[boolean,boolean]=[false,false];
     charges:{tick:number;company:number;target:number;fresh:boolean;outcome:'break'|'repulsed'|'melee'}[]=[];
@@ -41,13 +47,13 @@ export class SimWorld {
     tick = 0; scale: Scale = 1200; seed = 1815;
     weather: Weather = 'clear'; posture: [Posture, Posture] = ['attack', 'defend']; layout!: Layout;
     reinforcement: Reinforcement | null = null; openingOdds = .5;
-    constructor(scale: Scale = 1200, seed = 1815) { this.reset(scale, seed); }
+    constructor(scale: Scale = 1200, seed = 1815, readonly legacySide:Faction|null=null) { this.reset(scale, seed); }
 
     reset(scale: Scale = this.scale, seed = this.seed) {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
-        this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
+        this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
         const r = this.rng.next();
         this.weather = r < .55 ? 'clear' : r < .8 ? 'rain' : 'fog';
@@ -67,10 +73,19 @@ export class SimWorld {
             this.reinforcement = { faction: f, tick: this.rng.int(10000, 18000), arrived: false, count: Math.round(scale / 2 * .16),
                 name: f ? '普鲁士比洛军' : '格鲁希元帅的右翼军' };
         }
+        this.plans=prepareDeployment(this);
         this.director.reset(this);
+        if(this.legacySide!==null){
+            const next=this.rng.state;
+            this.legacy=new LegacyDirector();this.legacy.reset(this);
+            this.legacy.cannonadeEnd[this.legacySide]+=this.deployEnd;
+            this.legacy.guardAt[this.legacySide]+=this.deployEnd;
+            this.rng.state=next;
+        }
         this.logistics.reset(this);this.objectives.reset();
         this.hash.rebuild(this.units);
         this.openingOdds = this.odds();
+
     }
     private company(f: Faction, kind: Kind, name: string, line: number, n: number, x: number, y: number, formation: Formation, order: Order, ranks: number) {
         const trait = this.generals[f].trait, face = f ? -1 : 1;
@@ -185,12 +200,21 @@ export class SimWorld {
     step() {
         this.events.length = 0;
         if (this.ended) return;
+        if(activeLayout!==this.layout)setLayout(this.layout);
         this.tick++;
+        if(this.tick<=this.deployEnd){
+            marchDeployment(this);
+            if(this.tick%30===0)this.sampleTimeline();
+            return;
+        }
         this.hash.rebuild(this.units);
         const rf = this.reinforcement;
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
         this.logistics.step(this);
-        if (this.tick % 30 === 1 && this.winner === null) this.director.update(this);
+        if (this.tick % 30 === 1 && this.winner === null){
+            this.director.update(this);
+            if(this.legacy && this.legacySide!==null && !this.broken[this.legacySide])this.legacy.army(this,this.legacySide);
+        }
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
         resolveRounds(this);
@@ -210,13 +234,14 @@ export class SimWorld {
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
         if(this.tick%30===0){
             if(this.winner===null)this.objectives.update(this);
-            this.timeline.push({tick:this.tick,odds:this.odds(),eff:[this.effective(0),this.effective(1)],morale:[this.armyMorale(0),this.armyMorale(1)]});
+            this.sampleTimeline();
         }
         if (this.winner !== null && this.tick - this.endTick >= PURSUIT) {
             this.ended = true; this.summarize(); this.rounds.length = 0;
             for (const u of this.units) if (u.hp > 0) { u.moving = false; u.vx = u.vy = 0; u.pose = 'stand'; }
         }
     }
+    private sampleTimeline(){this.timeline.push({tick:this.tick,odds:this.odds(),eff:[this.effective(0),this.effective(1)],morale:[this.armyMorale(0),this.armyMorale(1)]});}
     private summarize(){
         const samples=[{tick:0,odds:this.openingOdds},...this.timeline.filter(p=>p.tick<this.endTick),{tick:this.endTick,odds:this.winner===0?1:0}];
         let cross=-1, fastest=0, swing=0, left=0;
@@ -261,15 +286,25 @@ export class SimWorld {
     breakArmy(f: Faction, why: string) {
         if (this.broken[f]) return;
         this.broken[f] = true;
-        for(const c of this.companies)if(c.faction===f && c.status!=='rout' && c.alive){c.order='rally';c.homeX=c.x+(f?1:-1)*900;c.forced=-1;}
-        this.say(`${ARMY[f]}全线崩溃！`, f, this.frontline().x, this.frontline().y, 3);
+        const field=this.companies.filter(c=>c.faction===f && c.status!=='rout' && c.alive>0);
+        const screen=field.filter(c=>c.line!==5 && c.kind!=='field_cannon' && c.morale>40)
+            .sort((a,b)=>(f?1:-1)*(a.x-b.x))[0];
+        this.rearGuard[f]=screen?.id??null;
+        for(const c of field){
+            c.forced=-1;
+            c.order=c===screen?'hold':'rally';
+            c.homeX=Math.max(80,Math.min(this.width-80,c.x+(c===screen?0:(f?1:-1)*900)));
+            c.homeY=c.y;
+        }
+        if(screen)this.say(screen.name+'留下掩护其余部队撤离',f,screen.x,screen.y,2);
+        this.say(`${ARMY[f]}开始全军撤退`, f, this.frontline().x, this.frontline().y, 3);
         if (this.winner === null) { this.winner = (1 - f) as Faction; this.endTick = this.tick; this.reason = why; }
     }
-    generalDown(u: Soldier) {
+    generalDown(u: Soldier,cause:'炮弹'|'骑兵'='炮弹') {
         const g = this.generals[u.faction];
         if (!g.alive) return;
         g.alive = false;
-        this.say(`${g.title}${g.name}${this.rng.next() < .5 ? '中弹落马' : '被炮弹击中'}！全军震动`, u.faction, u.x, u.y, 3);
+        this.say(`${g.title}${g.name}${cause==='骑兵'?'遭遇敌骑，落马阵亡':'被流弹击中'}！全军震动`, u.faction, u.x, u.y, 3);
         for (const c of this.companies) if (c.faction === u.faction) shake(c, 14);
     }
     say(text: string, faction: Faction | -1, x: number, y: number, weight: number) {
@@ -319,5 +354,5 @@ export class SimWorld {
         return { x: live.reduce((n, s) => n + s[0] / s[2], 0) / live.length, y: live.reduce((n, s) => n + s[1] / s[2], 0) / live.length };
     }
     companyOf(u: Soldier) { return this.companies[u.company]; }
-    get width() { return WIDTH; }
+    get width() { return this.layout.width; }
 }

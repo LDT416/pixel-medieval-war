@@ -97,6 +97,16 @@ async function strategic(){
     writeFileSync('docs/shots/W2/measurements.json',JSON.stringify({near,far,nearMedian:median(near),farMedian:median(far)},null,2));
     assert.ok(median(far)>=median(near),'全图帧率');
 }
+async function plans(){
+    await metrics(1440,900,false);await loadPage();await ev('d.replay(42)');
+    const visible=await ev("document.querySelector('.deployment-chart')?.open && document.querySelector('.deployment-chart canvas').getBoundingClientRect().height>0");
+    assert.ok(visible,'情报卡应直接显示双方计划位置');
+    mkdirSync('docs/shots/T8C',{recursive:true});await wait(550);await shot('docs/shots/T8C/plans.png');
+    await ev("d.startBattle();d.setSpeed(0);while(!w.ended)w.step();d.stepFrames(1);document.querySelector('#analysis h3:last-of-type').scrollIntoView({block:'center'})");
+    const text=await ev("document.getElementById('analysis').innerText");
+    assert.ok(text.includes('作战计划复盘')&&text.includes('预备队'));
+    await wait(250);await shot('docs/shots/T8C/debrief.png');
+}
 async function follow(){
     await metrics(1280,820,false);await loadPage();
     const company=await ev('w.companies.find(c=>c.line===0)');
@@ -131,5 +141,5 @@ async function audio(){
     const after=await ev('state().chargeDrums');assert.ok(after>before,'真实信号应调度可播放的 Web Audio 鼓声');
     mkdirSync('docs/shots/W6',{recursive:true});writeFileSync('docs/shots/W6/audio.json',JSON.stringify({seed:42,muteButtonStates:states,firstActualSignal:hit,webAudioDrumsBefore:before,webAudioDrumsAfter:after},null,2));
 }
-try{await call('Runtime.enable');await call('Page.enable');if(job==='all'||job==='mobile')await mobile();if(job==='all'||job==='strategic')await strategic();if(job==='audio')await audio();if(job==='follow')await follow();assert.deepEqual(errors,[]);console.log('镜头、交互与渲染验收通过');}
+try{await call('Runtime.enable');await call('Page.enable');if(job==='all'||job==='mobile')await mobile();if(job==='all'||job==='strategic')await strategic();if(job==='audio')await audio();if(job==='follow')await follow();if(job==='plans')await plans();assert.deepEqual(errors,[]);console.log('镜头、交互与渲染验收通过');}
 finally{ws.close();await fetch(host+'/json/close/'+tab.id);}
