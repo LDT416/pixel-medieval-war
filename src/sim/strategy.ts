@@ -365,7 +365,7 @@ export function updateCompany(w: SimWorld, c: Company) {
                 c.homeX=front-face*170; c.limbered=true; c.relocated=true;c.deployUntil=w.tick+setupTicks(c);
             }
         }else if(c.limbered && Math.hypot(c.x-c.homeX,c.y-c.homeY)<2){
-            c.limbered=false;c.deployUntil=w.tick+setupTicks(c);
+            c.limbered=false;c.deployUntil=w.tick+setupTicks(c);w.earthworks.dig(w,c.id);
         }
     }
     let gx = c.homeX, gy = c.homeY;
@@ -474,7 +474,12 @@ export function updateCompany(w: SimWorld, c: Company) {
     if (isArtillery(c)) {
         if (!c.limbered && w.tick>=c.deployUntil && lag < 30 && gd < 5) for (const gun of c.members) if (gun.hp > 0 && !gun.cooldown && !gun.moving) {
             const gt = d < CANISTER ? t : pickTarget(w, c) ?? t;
-            if (dist(gun, gt) < gunRange(w)) gunFire(w, gun, c, gt);
+            if (dist(gun, gt) >= gunRange(w)) continue;
+            if (gunFire(w, gun, c, gt)) continue;
+            // 射击纪律：首选目标的弹道会经过友军，就改打其它看得见的目标（离原目标近的优先）。
+            const alt = w.companies.filter(o => o !== gt && o.faction !== c.faction && o.alive > 0 && o.status !== 'gone' && o.line !== 5
+                && dist(gun, o) < gunRange(w) && w.sight.canSee(w, c, o)).sort((a, b) => dist(a, gt) - dist(b, gt)).slice(0, 3);
+            for (const o of alt) if (gunFire(w, gun, c, o)) break;
         }
     } else if (!isMounted(c) && c.assaultStage!=='rush' && c.assaultStage!=='melee' && !c.engaged && d < MUSKET && w.tick >= c.reloadAt && c.order !== 'charge' && t.status !== 'rout') {
         volley(w, c, t);

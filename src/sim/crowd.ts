@@ -16,7 +16,7 @@ function extent(u:Soldier,c:Company,nx:number,ny:number){
 function weight(u:Soldier,c:Company){return isArtillery(u)&&!c.limbered?0:1/u.body.mass;}
 export class Crowd {
     private scenery=new Map<number,Obstacle[]>();
-    private bins=new Map<number,Soldier[]>();
+    private bins:Soldier[][]=[];
     private occupied:number[]=[];
     private columns=1;
     private goalX:number[]=[];private goalY:number[]=[];
@@ -25,7 +25,7 @@ export class Crowd {
     private lastX:number[]=[];private lastY:number[]=[];
     reset(l:Layout){
         this.layout=l;this.columns=Math.ceil(l.width/CELL)+2;
-        this.slide=[];this.bins.clear();this.occupied=[];this.lastX=[];this.lastY=[];this.scenery.clear();
+        this.slide=[];this.bins=[];this.occupied=[];this.lastX=[];this.lastY=[];this.scenery.clear();
         const add=(o:Obstacle)=>{
             for(let j=Math.floor((o.y-o.halfY-14)/CELL);j<=Math.floor((o.y+o.halfY+14)/CELL);j++)
                 for(let i=Math.floor((o.x-o.halfX-14)/CELL);i<=Math.floor((o.x+o.halfX+14)/CELL);i++){
@@ -62,37 +62,37 @@ export class Crowd {
         }
     }
     private fill(w:SimWorld){
-        for(const k of this.occupied)this.bins.get(k)!.length=0;
+        for(const k of this.occupied)this.bins[k].length=0;
         this.occupied.length=0;
         for(const u of w.units)if(u.hp>0){
-            const k=this.key(u.x,u.y);let bin=this.bins.get(k);
-            if(!bin){bin=[];this.bins.set(k,bin);}
+            const k=this.key(u.x,u.y);let bin=this.bins[k];
+            if(!bin){bin=[];this.bins[k]=bin;}
             if(!bin.length)this.occupied.push(k);
             bin.push(u);
         }
     }
     private pairs(visit:(a:Soldier,b:Soldier)=>void){
         for(const k of this.occupied){
-            const us=this.bins.get(k)!;
+            const us=this.bins[k];
             for(let i=0;i<us.length;i++)for(let j=i+1;j<us.length;j++)visit(us[i],us[j]);
             for(const next of [k+1,k+this.columns-1,k+this.columns,k+this.columns+1]){
-                const vs=this.bins.get(next);
+                const vs=this.bins[next];
                 if(vs?.length)for(const u of us)for(const v of vs)visit(u,v);
             }
         }
     }
     private insert(u:Soldier){
-        const k=this.key(u.x,u.y);let bin=this.bins.get(k);
-        if(!bin){bin=[];this.bins.set(k,bin);}
+        const k=this.key(u.x,u.y);let bin=this.bins[k];
+        if(!bin){bin=[];this.bins[k]=bin;}
         if(!bin.length)this.occupied.push(k);
         bin.push(u);
     }
     private clearance(w:SimWorld,u:Soldier,x:number,y:number){
-        const ua=u.body.a,ub=u.body.b,radius=ua+14;
+        const ua=u.body.a,ub=u.body.b,radius=ua+11.5;
         let clearance=1;
         const rows=Math.floor((y+radius)/CELL),cols=Math.floor((x+radius)/CELL);
         for(let j=Math.floor((y-radius)/CELL);j<=rows;j++)for(let i=Math.floor((x-radius)/CELL);i<=cols;i++){
-            const bin=this.bins.get(j*this.columns+i);if(!bin)continue;
+            const bin=this.bins[j*this.columns+i];if(!bin)continue;
             for(const v of bin){
                 if(v===u)continue;
                 const dx=x-v.x,dy=y-v.y,limit=ua+v.body.a,d2=dx*dx+dy*dy;
@@ -117,7 +117,7 @@ export class Crowd {
         this.lastX[u.id]=u.x;this.lastY[u.id]=u.y;this.insert(u);
     }
     step(w:SimWorld){
-        for(const k of this.occupied)this.bins.get(k)!.length=0;
+        for(const k of this.occupied)this.bins[k].length=0;
         this.occupied.length=0;
         const {goalX,goalY}=this;
         for(const u of w.units)if(u.hp>0){
@@ -167,7 +167,7 @@ export class Crowd {
                 }
             }
             u.x=Math.max(2,Math.min(this.layout.width-2,u.x));u.y=Math.max(2,Math.min(this.layout.height-2,u.y));
-            if(this.key(u.x,u.y)!==k){const list=this.bins.get(k)!;list.splice(list.indexOf(u),1);this.insert(u);}
+            if(this.key(u.x,u.y)!==k){const list=this.bins[k];list.splice(list.indexOf(u),1);this.insert(u);}
             const moved=Math.hypot(u.x-x,u.y-y);
             if(u.moving)u.stride+=moved-Math.hypot(dx,dy);
             u.px=x;u.py=y;u.vx=(u.x-x)*30;u.vy=(u.y-y)*30;

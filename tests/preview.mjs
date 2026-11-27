@@ -4,8 +4,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const preview = process.env.ARENA_PREVIEW || 'http://127.0.0.1:4185/';
 const browser = process.env.ARENA_BROWSER || 'http://127.0.0.1:9527';
-const battleScale = Number(process.env.ARENA_QA_SCALE || 600);
-assert.ok([600, 1200, 1800].includes(battleScale));
+const battleScale = Number(process.env.ARENA_QA_SCALE || 1200);
+assert.ok([1200, 2400, 3600].includes(battleScale));
 
 const tab = await (await fetch(browser + '/json/new?about:blank', { method: 'PUT' })).json();
 const socket = new WebSocket(tab.webSocketDebuggerUrl);
@@ -75,14 +75,14 @@ try {
     // 开局停在战前情报卡，跳过押注直接开战。
     await evaluate('window.__arenaDebug.startBattle()');
     const initial = await waitFor(s => s.tick >= 3);
-    assert.equal(initial.scale, 1200);
+    assert.equal(initial.scale, 2400);
     assert.equal(initial.goreTexturesLoaded, 7);
     assert.ok(initial.drawCalls > 0);
     assert.equal(assets.size, 7);
     for (const url of assets) assert.ok(url.startsWith(new URL('./art/gore/', preview).href));
 
     await evaluate("document.querySelectorAll('[data-scale]')[2].click()");
-    assert.equal((await state()).scale, 1800);
+    assert.equal((await state()).scale, 3600);
     await evaluate('window.__arenaDebug.setSpeed(0)');
     const frozen = await state();
     await delay(350);

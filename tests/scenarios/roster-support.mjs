@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 const bundled=await build({stdin:{contents:"export {SimWorld} from './src/sim/world';export {supportOptions} from './src/sim/units/support';export {variants,formationTicks,setupTicks,travelFatigue,restRecovery} from './src/sim/units/roster'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',write:false});
 const {SimWorld,supportOptions,variants,formationTicks,setupTicks,travelFatigue,restRecovery}=await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
-const w=new SimWorld(1800,23757);
+const w=new SimWorld(3600,23757);
 const roles=new Set(w.companies.map(c=>c.variant).filter(Boolean));
 assert.deepEqual([...roles].sort(),Object.keys(variants).sort());
 for(const c of w.companies.filter(c=>c.variant))assert.equal(variants[c.variant].base,c.kind);

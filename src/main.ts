@@ -124,7 +124,7 @@ async function start(){
             hud.update(world,performance.now());
         },panTo:(x:number,z:number)=>{arena.userAt=performance.now();arena.panTo(x,z);},zoomTo:(d:number)=>{arena.userAt=performance.now();arena.zoomTo(d);}};
     Object.assign(window,{__arenaDebug:debug});
-    reset(arena.mobileMode?600:1200,world.seed);document.getElementById('notice')!.hidden=true;
+    reset(arena.mobileMode?1200:2400,world.seed);document.getElementById('notice')!.hidden=true;
     let last=performance.now();
     function frame(now:number){
         const elapsed=Math.max(0,(now-last)/1000);last=now;

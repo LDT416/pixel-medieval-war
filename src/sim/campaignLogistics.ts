@@ -58,7 +58,7 @@ export class CampaignLogistics{
                 let brigade=group;
                 if(group.companies.length>=5){
                     const moved=group.companies.splice(-2);
-                    brigade={id:this.brigades.length,faction:c.faction,sector,corps,companies:moved,commanderId:w.companies[moved[0]].members[0].id};
+                    brigade={id:this.brigades.length,faction:c.faction,sector,corps,companies:moved,commanderId:(moved.map(id=>w.companies[id].members[0]).find(Boolean)??group.companies.map(id=>w.companies[id].members[0]).find(Boolean))?.id??-1};
                     this.brigades.push(brigade);for(const id of moved)w.companies[id].brigade=brigade.id;
                 }
                 c.sector=sector;c.corps=corps;c.brigade=brigade.id;brigade.companies.push(c.id);

@@ -1,8 +1,8 @@
 import type { Faction, Kind } from './types';
 export type { Faction, Kind };
 export const kinds: Kind[] = ['line_infantry','guard_grenadier','cuirassier','bannerman','field_cannon'];
-export type Scale = 600 | 1200 | 1800;
-export const scales: Scale[] = [600,1200,1800];
+export type Scale = 1200 | 2400 | 3600;
+export const scales: Scale[] = [1200,2400,3600];
 export const TICKS = 30;
 export type Action = 'stand'|'march'|'run'|'aim'|'load'|'thrust'|'recoil'|'kneel'|'kneelLoad';
 /** 连队队形：线列火力最强，纵队行军快，方阵克骑兵但怕炮。 */
@@ -57,6 +57,8 @@ export interface Round {
     x: number; y: number; tx: number; ty: number; dx: number; dy: number;
     age: number; duration: number; roll: number; rolled: number; speed: number;
     gun: Soldier; faction: Faction; company: number;
+    /** 飞行顶点高度、剩余能量（每撞一人递减）、已命中个体、已受士气冲击的连、上一帧高度。 */
+    apex: number; energy: number; hit: Set<number>; touched: number[]; lastH: number;
 }
 export interface Reinforcement { faction: Faction; tick: number; arrived: boolean; count: number; name: string }
 

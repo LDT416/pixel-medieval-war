@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/phase2.mjs && node tests/pace-probe.mjs && node tests/crowd-probe.mjs && node tests/scenarios/crowd.mjs && node tests/tracer-geometry.mjs && node tests/projectile-probe.mjs && node tests/scenarios/roster-support.mjs && node tests/logistics.mjs && node tests/scenarios/visibility.mjs && node tests/scenarios/handover.mjs",
+    "test": "node tests/phase2.mjs && node tests/pace-probe.mjs && node tests/crowd-probe.mjs && node tests/scenarios/crowd.mjs && node tests/tracer-geometry.mjs && node tests/ballistics-probe.mjs && node tests/scenarios/roster-support.mjs && node tests/logistics.mjs && node tests/scenarios/visibility.mjs && node tests/scenarios/handover.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"

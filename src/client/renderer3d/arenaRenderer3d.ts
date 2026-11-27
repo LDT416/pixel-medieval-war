@@ -4,6 +4,7 @@ import {WIDTH,HEIGHT} from '../../sim/maps';
 import * as T from 'three';
 import type { SimWorld } from '../../sim/world';
 import {Tracers3d} from './tracers3d';
+import {Emplacements3d} from './emplacements3d';
 import { roundPosition } from '../../sim/combat';
 import { Standees,upload } from './spriteAtlas';
 import { createTerrain,terrainHeight,toX,toZ,fromX,fromZ,SCALE } from './terrain3d';
@@ -14,6 +15,7 @@ import { SmokeSystem } from './smokeSystem3d';
 export class ArenaRenderer3d{
     private renderer:T.WebGLRenderer;private scene=new T.Scene();
     readonly tracers=new Tracers3d(this.scene);
+    private emplacements=new Emplacements3d(this.scene);
     private camera=new T.PerspectiveCamera(28,1,.3,24000);
     lights:BattlefieldLight; smoke:SmokeSystem; gore!:GoreSystem;
     private standees:Standees;private post=new PostFx();private terrain:ReturnType<typeof createTerrain>;
@@ -85,7 +87,7 @@ export class ArenaRenderer3d{
     home(world:SimWorld){const p=world.frontline();this.panTo(toX(p.x),toZ(p.y));}
     setLighting(mode:Lighting){this.lights.set(mode);this.standees.rim.value.copy(this.lights.rim);}
     /** 新一局：地形随地图种子重建，清空残留。 */
-    reset(){this.terrain.rebuild();this.gore.reset();this.smoke.reset();this.tracers.reset();this.lights.reset();this.balls.count=0;this.panTo(0,0);}
+    reset(){this.terrain.rebuild();this.emplacements.reset();this.gore.reset();this.smoke.reset();this.tracers.reset();this.lights.reset();this.balls.count=0;this.panTo(0,0);}
     advanceEffects(w:SimWorld,dt:number){this.gore.update(dt);this.smoke.update(w.ended?[]:w.units,dt);}
     events(w:SimWorld){this.tracers.observe(w,this.smoke);for(const e of w.events){this.gore.event(e);this.smoke.event(e);}}
     private controls(){
@@ -110,6 +112,7 @@ export class ArenaRenderer3d{
         this.terrain.updateView(this.target.x,this.target.z,this.distance,this.camera.aspect);
         this.terrain.wind.value+=dt;this.lights.update(this.target,this.distance,this.camera.aspect,dt);
         this.strategy.update(w,this.distance,realDt,this.canvas.clientHeight,performance.now());
+        this.emplacements.update(w);
         const soldierFade=this.strategy.soldierOpacity;this.smoke.setDistant(1-soldierFade);
         this.standees.mesh.visible=this.standees.ao.visible=soldierFade>.005;
         const spriteMaterial=this.standees.mesh.material as T.Material;

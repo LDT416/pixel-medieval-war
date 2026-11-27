@@ -23,7 +23,7 @@
 
 在新的源码目录运行 `npm ci`，再运行 `npm test` 和 `npm run build`。正常移动换防和可见信息分别可用 `node tests/scenarios/handover.mjs` 和 `node tests/scenarios/visibility.mjs` 单独复验。
 
-- `npm test` 跑完 600/1200/1800 三档对局，检查数值有限、坐标不越界、兵力守恒、同种子可复现，以及 1800 人每帧 p99 低于 8 ms，最后统计多个种子的胜负与时长分布（`SEEDS=60 npm test` 可调整局数）。
+- `npm test` 跑完 1200/2400/3600 三档对局，检查数值有限、坐标不越界、兵力守恒、同种子可复现，以及 3600 人每帧 p99 低于 8 ms，最后统计多个种子的胜负与时长分布（`SEEDS=60 npm test` 可调整局数）。
 - `node tests/pace-probe.mjs 23757` 测完整对局的移动、空闲、首次开炮与首次伤亡。`node tests/speedprobe.mjs 23757` 保留旧版采样窗口，适合跨版本对照。
 - `node tests/projectile-probe.mjs 23757` 输出格点动作次数、命中与命中友方数，同时检验在结算前移出格子和空格落点。
 - `node tests/behavior-probe.mjs` 默认跑 20 局，逐局输出已交班次数、补充弹药数、方阵切换及友方落格计数。

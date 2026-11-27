@@ -50,14 +50,14 @@ if(!isMainThread){
     const check=(ok,name)=>{if(!ok)failures.push(name);};
     const world=new SimWorld(1200,7);
     assert.equal(world.layout.width,16000);assert.equal(world.layout.height,8000);
-    for(const scale of [600,1200,1800]){
+    for(const scale of [1200,2400,3600]){
         world.reset(scale,42);assert.deepEqual(world.alive,[scale/2,scale/2]);
         const {row,p99,avg}=battle(world,true),jitter=world.jitter;
         console.log(scale,row.endSeconds.toFixed(1)+'s',row.reason,'avg',avg.toFixed(2)+'ms','p99',p99.toFixed(2)+'ms');
         if(scale===1200)check(jitter.flipsPerSec<.05&&jitter.poseTogglesPerSec<.1&&jitter.slotSwapsPerDeath<=2,'jitter');
-        if(scale===1800)check(p99<8,'1800-unit tick p99');
+        if(scale===3600)check(p99<8,'3600-unit tick p99');
         baseline.push({scale,p99,avg,jitter});
-        if(scale<1800){
+        if(scale<3600){
             const first=signature(world);world.reset(scale,42);battle(world);
             assert.equal(signature(world),first,'deterministic replay');
         }

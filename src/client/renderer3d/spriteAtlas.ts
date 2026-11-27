@@ -25,7 +25,7 @@ export class Standees {
     private unitGroups=new WeakMap<Soldier,{group:Sheet['data']['groups'][number];kneelAt:number}>();
     readonly ready:Promise<void>;
     constructor(scene:T.Scene) {
-        const tex=new T.Texture(),cap=2400,g=new T.PlaneGeometry(1,1);
+        const tex=new T.Texture(),cap=4600,g=new T.PlaneGeometry(1,1);
         this.uv=attribute(g,'aUvRect',cap,4);this.flip=attribute(g,'aFlipFlash',cap,2);
         this.tint=attribute(g,'aTint',cap,3);
 

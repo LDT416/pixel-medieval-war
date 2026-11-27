@@ -55,7 +55,7 @@ async function inspect(name,url,images){
             }finally{rmSync(temp,{recursive:true,force:true});}
             results.events=events;
         }
-        await ev(`d.setScale(1800);d.startBattle();d.setSpeed(0);while(w.tick<1600&&!w.ended)w.step();aim(w.frontline(),130);d.setSpeed(1)`);
+        await ev(`d.setScale(3600);d.startBattle();d.setSpeed(0);while(w.tick<1600&&!w.ended)w.step();aim(w.frontline(),130);d.setSpeed(1)`);
         await delay(2200);
         const stats=await ev(`(async()=>{const fps=[],drawCalls=[];for(let i=0;i<16;i++){await new Promise(r=>setTimeout(r,500));const s=d.getState();fps.push(s.fps);drawCalls.push(s.drawCalls)}const gl=document.querySelector('canvas').getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return {fps,drawCalls,gpu:ext&&gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)}})()`);
         if(errors.length)throw Error(errors.join('\n'));

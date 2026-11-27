@@ -1,4 +1,3 @@
-import {boardActions} from './units/weapons';
 import {artillery as isArtillery, guard as isGuard, mounted as isMounted, standard as isStandard} from './units/abilities';
 import type { Soldier, BattleEvent, Company, Round } from './arenaTypes';
 import type { SimWorld } from './world';
@@ -43,14 +42,20 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
 /** 首轮齐射后切换到排或翼射击。每名射手独立保留装填与弹药状态。 */
 export function volley(w:SimWorld,c:Company,t:Company,close=false){
     if(c.ammo<=0 || c.status==='rout')return;
+    // 射击纪律：目标连里混着己方士兵（正在白刃或骑兵冲进去了），整连不向它开火。
+    let mixed=false;const reach=Math.max(40,t.files*7+20);
+    w.hash.visit(t.x,t.y,reach,o=>{if(!mixed&&o.faction===c.faction)mixed=true;});
+    if(mixed){w.ballistics.discipline.heldFire++;c.reloadAt=w.tick+15;return;}
     const first=c.firingSince<0, age=w.tick-c.firingSince;
     const mode=first?'first':c.status==='shaken'||age>2700?'free':c.faction===1 && c.id%3===0?'platoon':'rank';
     const groups=mode==='platoon'?4:c.ranks;
     const dx=t.x-c.x,dy=t.y-c.y,side=-dx*c.hy+dy*c.hx;
     const facing=(dx*c.hx+dy*c.hy)/Math.max(1,Math.hypot(dx,dy));
+    // 方阵只有朝向敌人的那几面开火，不能隔着方阵内部打到对面的自己人。
+    const faceToward=(u:Soldier)=>c.formation!=='square' || ((u.x-c.x)*dx+(u.y-c.y)*dy)/Math.max(1,Math.hypot(u.x-c.x,u.y-c.y)*Math.hypot(dx,dy))>.45;
     const canTurn=(u:Soldier)=>!close || facing>=.5 || (facing<-.707 ? u.slot>=Math.max(0,c.capacity-c.files) : (side>0 ? u.slot%c.files>=c.files/2 : u.slot%c.files<c.files/2));
     const shooters=c.members.filter(u=>u.hp>0 && u.ammo>0 && !u.moving && u.loadedAt<=w.tick && u.fireAt<=w.tick &&
-        (c.formation!=='column' || u.slot<c.files*2) && canTurn(u));
+        (c.formation!=='column' || u.slot<c.files*2) && canTurn(u) && faceToward(u));
     const groupOf=(u:Soldier)=>mode==='platoon'?Math.min(3,Math.floor(u.slot%c.files*4/c.files)):Math.floor(u.slot/c.files)%c.ranks;
     let group=c.nextGroup%groups;
     if(shooters.length && !shooters.some(u=>groupOf(u)===group))group=groupOf(shooters[0]);
@@ -76,19 +81,46 @@ export function volley(w:SimWorld,c:Company,t:Company,close=false){
     const losing=c.losses>Math.max(1,c.kills)*1.3;
     shake(c,.08*(losing?1.5:1));shake(t,.20*(t.formation==='column'?.7:1)*(t.losses>Math.max(1,t.kills)*1.3?1.5:1));
 }
+/** 选一名瞄准对象：优先目标连前两排、离射手较近的人。 */
+function pickAim(w:SimWorld,u:Soldier,t:Company){
+    const front=t.formation==='line'?t.files*2:t.members.length;
+    let best:Soldier|null=null,bd=Infinity;
+    for(let i=0;i<4;i++){
+        const v=t.members[w.rng.int(0,Math.max(0,Math.min(t.members.length,front)-1))];
+        if(!v||v.hp<=0)continue;
+        const d=(v.x-u.x)**2+(v.y-u.y)**2;
+        if(d<bd){bd=d;best=v;}
+    }
+    if(!best)for(const v of t.members)if(v.hp>0){best=v;break;}
+    return best;
+}
+/** 综合散布系数：硝烟、疲劳、动摇、射击模式、天气与兵种训练。越大越散。 */
+function spreadOf(w:SimWorld,c:Company,t:Company){
+    return (1+.8*c.smoke+.35*t.smoke)*(1+.4*c.fatigue)*(c.status==='shaken'?1.5:1)
+        *(c.fireMode==='first'?.8:c.fireMode==='free'?1.3:1)*(isGuard(c)?.85:1)*(w.weather==='rain'?1.12:1);
+}
 export function shoot(w:SimWorld,u:Soldier,c:Company){
     const t=w.companies[u.shotTarget];
     if(!t || !w.sight.canSee(w,c,t) || t.status==='gone' || c.status==='rout' || u.moving || u.ammo<=0 || c.assaultStage==='rush')return;
+    const aim=pickAim(w,u,t);if(!aim)return;
+    // 射击纪律：火线上有站立的友军就不开火（新兵偶尔会失误照开）。
+    const kneeling=u.kneelUntil>w.tick;
+    if(w.ballistics.meleeNear(w,u,aim.x,aim.y)){w.ballistics.discipline.heldFire++;u.fireAt=-1;return;}
+    const spread=spreadOf(w,c,t);
+    if(w.ballistics.laneBlocked(w,u,aim.x,aim.y,kneeling?.72:1,spread)){
+        if(w.rng.next()>(c.status==='shaken'?.02:.004)){w.ballistics.discipline.heldFire++;u.fireAt=-1;return;}
+        w.ballistics.discipline.ignored++;
+    }
     u.ammo--;c.ammo--;u.shotsFired++;
     u.loadedAt=w.tick+Math.round(w.rng.int(75,90)*(isGuard(c)?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)+(u.shotsFired>15?.15:0)));
     c.smoke=Math.min(1,c.smoke+.04);
-    const dx = t.x - u.x, dy = t.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
-    u.firedAt = w.tick; u.pose = 'aim';
-    if (w.weather === 'rain' && w.rng.next() < .3) return;
-    const fire=emit(w, 'fire', u, dx / d, dy / d, false);
-    // A game action selects a board cell. Its occupant is read only when the marker expires.
-    const at=w.boardShots.place(w,u,'musket',t.x+w.rng.int(-110,110),t.y+w.rng.int(-110,110),w.tick+boardActions.musket.flashTicks);
-    fire.endX=at.x;fire.endY=at.y;
+    const dx=aim.x-u.x,dy=aim.y-u.y,d=Math.max(1,Math.hypot(dx,dy));
+    u.firedAt=w.tick;u.pose='aim';
+    if(w.weather==='rain' && w.rng.next()<.3)return;
+    const fire=emit(w,'fire',u,dx/d,dy/d,false);
+    const shot=w.ballistics.musket(w,u,c,aim,spread);
+    fire.endX=shot.x;fire.endY=shot.y;fire.struck=shot.struck;
+    w.events.push({type:'tileImpact',kind:u.kind,unitId:u.id,faction:u.faction,x:shot.x,y:shot.y,dx:0,dy:0,explosive:false,struck:shot.struck});
 }
 /** 白刃战一击。骑兵砍阵线如切菜，撞方阵则寸步难行。 */
 export function strike(w: SimWorld, u: Soldier, foe: Soldier) {
@@ -105,16 +137,37 @@ export function strike(w: SimWorld, u: Soldier, foe: Soldier) {
     u.firedAt = w.tick;
 }
 
+/** 实心弹飞行顶点高度：远射吊得高，近射几乎平射。 */
+const apexOf=(d:number)=>Math.min(6,.4+d*.0024);
+/** 弹道上某点的高度（0=地面，1=人高）。飞行段：炮口 1.0 → 落点 0；滚跳段：一跳一跳逐渐变低。 */
+function flightHeight(t:number,apex:number){return 1*(1-t)+4*apex*t*(1-t);}
+function bounceHeight(s:number,roll:number,energy:number){return Math.abs(Math.sin(s*Math.PI/140))*1.35*Math.max(.25,energy)*(1-s/Math.max(1,roll));}
+/**
+ * 预测这一炮的低空段（会撞人的部分）是否经过己方部队。用于炮兵的射击纪律。
+ * riskTolerance 越大越敢冒险（激进统帅）。
+ */
+function endangersFriends(w:SimWorld,g:Soldier,tx:number,ty:number,roll:number,dx:number,dy:number,risk:number){
+    const d=Math.hypot(tx-g.x,ty-g.y),apex=apexOf(d);
+    let near=0;
+    const probe=(x:number,y:number)=>w.hash.visit(x,y,26,u=>{if(u.faction===g.faction && u.company!==g.company)near++;});
+    for(let s=60;s<d;s+=40){const t=s/d;if(flightHeight(t,apex)<1.3)probe(g.x+(tx-g.x)*t,g.y+(ty-g.y)*t);}
+    for(let s=0;s<=roll;s+=30)if(bounceHeight(s,roll,1)<1.3)probe(tx+dx*s,ty+dy*s);
+    return near>risk*20;
+}
 export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
+    const risk=w.generals[c.faction]?.trait==='aggressive'?.15:w.generals[c.faction]?.trait==='cautious'?0:.05;
     const d = dist(g, t);
-    g.pose = 'recoil';
     if (d < CANISTER) {
-        g.firedAt=w.tick;emit(w,'fire',g,(t.x-g.x)/Math.max(1,d),(t.y-g.y)/Math.max(1,d),true);
-        w.boardShots.place(w,g,'scatter',t.x+w.rng.int(-48,48),t.y+w.rng.int(-48,48),w.tick+boardActions.scatter.flashTicks);
-        g.cooldown=w.rng.int(210,270);
-        return;
+        const dx=(t.x-g.x)/Math.max(1,d),dy=(t.y-g.y)/Math.max(1,d);
+        // 霰弹锥里有友军就不打。
+        let friends=0;
+        for(let s=30;s<d+40;s+=30)w.hash.visit(g.x+dx*s,g.y+dy*s,18+s*.13,u=>{if(u.faction===g.faction&&u.company!==g.company)friends++;});
+        if(friends>risk*10){w.ballistics.discipline.heldFire++;g.cooldown=20;return false;}
+        g.pose='recoil';g.firedAt=w.tick;emit(w,'fire',g,dx,dy,true);
+        w.ballistics.canister(w,g,c,t.x,t.y);
+        g.cooldown=w.rng.int(150,190);
+        return true;
     }
-    const aim = t;
     if(g.aimTarget!==t.id || Math.hypot(t.x-g.aimX,t.y-g.aimY)>150){
         g.aimTarget=t.id;g.aimX=t.x;g.aimY=t.y;g.shotsOnTarget=0;
         g.rangeError=(w.rng.next()<.5?-1:1)*w.rng.int(120,260)*(w.weather==='fog'?2:1);
@@ -122,43 +175,48 @@ export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     for(const o of c.members)if(o.hp>0 && o.shotsOnTarget>0 && o.aimTarget===t.id && Math.hypot(t.x-o.aimX,t.y-o.aimY)<=150 && Math.abs(o.rangeError)<Math.abs(g.rangeError))g.rangeError=o.rangeError;
     const lx=(t.x-g.x)/d, ly=(t.y-g.y)/d;
     const lateral=(w.rng.next()+w.rng.next()-1)*(14+d*.03)*(g.shotsOnTarget<2?1.8:1);
-    // 少数游戏弹道越过原目标；落点始终根据这枚弹的方向生成，不查询后排单位的位置。
-    const longMiss=w.rng.next()<.22;
-    const offset=g.rangeError+(longMiss?w.rng.int(560,1600):0);
-    const ax=aim.x+lx*offset-ly*lateral, ay=aim.y+ly*offset+lx*lateral;
+    const ax=t.x+lx*g.rangeError-ly*lateral, ay=t.y+ly*g.rangeError+lx*lateral;
     const dd=Math.max(1,Math.hypot(ax-g.x,ay-g.y)),dx=(ax-g.x)/dd,dy=(ay-g.y)/dd;
-    const tx=ax,ty=ay;
-    let roll=(w.weather==='rain'?100:280)*(longMiss?2.2:1);
-
-    g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
-    if (behindCrest(ax, ay, t.faction)){
-        roll*=.3;
-        if(w.tick-([...w.news].reverse().find(n=>n.text.includes('炮弹砸在山脊'))?.tick??-1000)>900)w.say('炮弹砸在山脊上，没能弹过去',g.faction,ax,ay,1);
-    }
-    w.boardShots.place(w,g,'round',tx,ty,w.tick+Math.max(6,Math.ceil(dd/60))-1);
-    w.rounds.push({ x: g.x, y: g.y, tx, ty, dx, dy, age: 0, duration: Math.max(6, Math.ceil(dd / 60)), roll, rolled: 0, speed: 24,
-        gun: g, faction: g.faction, company: c.id });
+    let roll=(w.weather==='rain'?140:420);
+    if (behindCrest(ax, ay, t.faction)) roll*=.3;
+    // 射击纪律：低空段或弹跳走廊经过己方部队，就不开这一炮，交给炮兵连换目标。
+    if(endangersFriends(w,g,ax,ay,roll,dx,dy,risk)){w.ballistics.discipline.heldFire++;g.cooldown=25;return false;}
+    g.pose='recoil';g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
+    if (behindCrest(ax, ay, t.faction) && w.tick-([...w.news].reverse().find(n=>n.text.includes('炮弹砸在山脊'))?.tick??-1000)>900)
+        w.say('炮弹砸在山脊上，没能弹过去',g.faction,ax,ay,1);
+    w.ballistics.countRound();
+    w.rounds.push({ x: g.x, y: g.y, tx: ax, ty: ay, dx, dy, age: 0, duration: Math.max(6, Math.ceil(dd / 60)), roll, rolled: 0, speed: 24,
+        gun: g, faction: g.faction, company: c.id, apex: apexOf(dd), energy: 1, hit: new Set([g.id]), touched: [], lastH: 1 });
     emit(w, 'fire', g, dx, dy, true);
     g.cooldown = w.rng.int(210,270);
+    return true;
 }
 export function roundPosition(r: Round, alpha = 0) {
     if (r.age + alpha < r.duration) {
         const t = Math.min(1, (r.age + alpha) / r.duration);
-        return { x: r.x + (r.tx - r.x) * t, y: r.y + (r.ty - r.y) * t, h: 8 * t * (1 - t) + .5 };
+        return { x: r.x + (r.tx - r.x) * t, y: r.y + (r.ty - r.y) * t, h: flightHeight(t, r.apex) * 1.6 + .15 };
     }
     const s = Math.min(r.roll, r.rolled + r.speed * alpha);
-    return { x: r.tx + r.dx * s, y: r.ty + r.dy * s, h: .25 + Math.abs(Math.sin(s * .035)) * 1.1 * (1 - s / Math.max(1, r.roll)) };
+    return { x: r.tx + r.dx * s, y: r.ty + r.dy * s, h: .2 + bounceHeight(s, r.roll, r.energy) * 1.6 };
 }
+/** 推进所有实心弹：低空段（飞行末段与每一跳的低处）打倒路径上的所有人，不分敌我。 */
 export function resolveRounds(w: SimWorld) {
     for (let i = w.rounds.length - 1; i >= 0; i--) {
         const r = w.rounds[i];
         r.age++;
-        if (r.age < r.duration) continue;
-        if (r.age === r.duration) emit(w, 'impact', r.gun, r.dx, r.dy, true, r.tx, r.ty);
-        const step = Math.min(r.speed, r.roll - r.rolled);
+        if (r.age <= r.duration) {
+            const t0=(r.age-1)/r.duration,t1=Math.min(1,r.age/r.duration);
+            const h0=flightHeight(t0,r.apex),h1=flightHeight(t1,r.apex);
+            if(Math.min(h0,h1)<1.8)w.ballistics.sweep(w,r,r.x+(r.tx-r.x)*t0,r.y+(r.ty-r.y)*t0,r.x+(r.tx-r.x)*t1,r.y+(r.ty-r.y)*t1,h0,h1);
+            if (r.age === r.duration) emit(w, 'impact', r.gun, r.dx, r.dy, true, r.tx, r.ty);
+            continue;
+        }
+        const s0 = r.rolled, step = Math.min(r.speed, r.roll - r.rolled);
         r.rolled += step; r.speed *= .985;
+        const ha=bounceHeight(s0,r.roll,r.energy),hb=bounceHeight(r.rolled,r.roll,r.energy);
+        w.ballistics.sweep(w,r,r.tx+r.dx*s0,r.ty+r.dy*s0,r.tx+r.dx*r.rolled,r.ty+r.dy*r.rolled,Math.min(ha,hb),Math.min(ha,hb));
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
-        if(Math.floor(r.rolled/120)>Math.floor((r.rolled-step)/120))emit(w,'bounce',r.gun,r.dx,r.dy,true,px,py);
-        if (r.rolled >= r.roll || r.speed < 5 || px < 0 || py < 0 || px >= WIDTH || py >= HEIGHT) w.rounds.splice(i, 1);
+        if(Math.floor(r.rolled/140)>Math.floor(s0/140))emit(w,'bounce',r.gun,r.dx,r.dy,true,px,py);
+        if (r.rolled >= r.roll || r.speed < 5 || r.energy <= 0 || px < 0 || py < 0 || px >= WIDTH || py >= HEIGHT) w.rounds.splice(i, 1);
     }
 }

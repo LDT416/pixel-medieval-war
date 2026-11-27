@@ -4,7 +4,8 @@ import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleE
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
 import {BoardSight} from './boardSight';
-import {BoardShots} from './projectiles';
+import {Ballistics} from './projectiles';
+import {Earthworks} from './emplacements';
 import {Crowd} from './crowd';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
@@ -43,7 +44,9 @@ export class SimWorld {
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
     sight=new BoardSight();
-    boardShots=new BoardShots();
+    ballistics=new Ballistics();
+    /** 炮兵阵地的土胸墙。 */
+    earthworks=new Earthworks();
     crowd=new Crowd(); hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
     get jitter(){
@@ -57,7 +60,7 @@ export class SimWorld {
 
     reset(scale: Scale = this.scale, seed = this.seed) {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
-        this.sight=new BoardSight();this.boardShots=new BoardShots();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
+        this.sight=new BoardSight();this.ballistics=new Ballistics();this.earthworks.reset();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
         this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
@@ -220,6 +223,7 @@ export class SimWorld {
             return;
         }
         this.hash.rebuild(this.units);
+        if(!this.earthworks.dug){this.earthworks.dug=true;this.earthworks.dig(this);}
         const rf = this.reinforcement;
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
         this.logistics.step(this);
@@ -230,7 +234,7 @@ export class SimWorld {
         }
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
-        resolveRounds(this);this.boardShots.step(this);
+        resolveRounds(this);
         const n = this.units.length, start = this.tick % 2 * (n >> 1);
         for (let i = 0; i < n; i++) {
             const u = this.units[(i + start) % n];
@@ -285,7 +289,7 @@ export class SimWorld {
                 if(peak<15)continue;
                 const eff=group.reduce((n,c)=>n+(c.status==='rout'?0:c.alive),0);
                 const morale=group.reduce((n,c)=>n+c.morale*c.alive,0)/Math.max(1,group.reduce((n,c)=>n+c.alive,0));
-                if(eff>=.65*peak && morale>=25)continue;
+                if(eff>=.5*peak && morale>=20)continue;
                 this.lostSectors[f][sector]=true;
                 this.say(ARMY[f]+['左翼','中央','右翼'][sector]+'撤离战区',f,group[0].x,group[0].y,3);
                 for(const c of group)if(c.status!=='rout'&&c.alive){c.order='rally';c.forced=-1;c.homeX=c.x+(f?1:-1)*680;}

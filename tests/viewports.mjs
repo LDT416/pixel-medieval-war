@@ -79,7 +79,7 @@ async function mobile(){
 }
 async function strategic(){
     mkdirSync('docs/shots/W2',{recursive:true});await metrics(1440,860,false);await loadPage();
-    await ev("d.setScale(1800);d.startBattle();d.setSpeed(1);if(document.getElementById('auto').getAttribute('aria-pressed')==='true')document.getElementById('auto').click()");
+    await ev("d.setScale(3600);d.startBattle();d.setSpeed(1);if(document.getElementById('auto').getAttribute('aria-pressed')==='true')document.getElementById('auto').click()");
     const c=await ev('w.companies.find(c=>c.line===0)??w.companies[0]');
     await ev(`d.panTo((${c.x}-w.layout.width/2)*.05,(${c.y}-w.layout.height/2)*.05);d.zoomTo(40)`);await wait(2500);
     const measure=async()=>{const samples=[];for(let i=0;i<10;i++){await wait(500);samples.push(await ev('({fps:state().fps,drawCalls:state().drawCalls})'));}return samples;};

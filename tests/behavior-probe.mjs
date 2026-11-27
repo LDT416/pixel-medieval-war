@@ -35,6 +35,6 @@ if(isMainThread){
                 last.set(c.id,c.formation);
             }
         }
-        parentPort.postMessage({seed:w.seed,handovers:w.logistics.handovers.length,refilled:w.logistics.resupplied,engagedToggles,flips,quick,worst,boardActions:w.boardShots.stats});
+        parentPort.postMessage({seed:w.seed,handovers:w.logistics.handovers.length,refilled:w.logistics.resupplied,engagedToggles,flips,quick,worst,ballistics:w.ballistics.stats});
     }
 }

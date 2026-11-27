@@ -82,7 +82,7 @@ async function film(name,frames,step,company){
     encoder.stdin.end();assert.equal((await done)[0],0);return {frames,maxSegments,markerFrames,bestScore};
 }
 async function performanceRun(seed,p,mode){
-    await position(seed,1800,p,85,0);
+    await position(seed,3600,p,85,0);
     await ev(`while(d.getState().tracers.mode!=='${mode}')document.querySelector('#tracer-mode').click();d.setSpeed(1)`);
     await delay(1800);const fps=[],calls=[],segments=[];
     for(let i=0;i<16;i++){await delay(500);const s=await ev('d.getState()');fps.push(s.fps);calls.push(s.tracers.drawCalls);segments.push(s.tracers.segments);}
@@ -108,9 +108,9 @@ try{
     await position(seed,1200,mid,Math.max(160,Math.min(282,p.distance*.09)),startLead);
     const ticks=last.tick-p.tick+last.flight+35+startLead,frames=Math.min(300,Math.ceil(ticks/1.5));
     const battery=await film('battery',frames,ticks/frames,p.company);
-    const benchmark=await plan(1800);assert.ok(benchmark.muskets);
+    const benchmark=await plan(3600);assert.ok(benchmark.muskets);
     const on=await performanceRun(seed,benchmark.muskets,'clear'),off=await performanceRun(seed,benchmark.muskets,'off');
-    const report={seed,scale:1200,zoom:{volley:58,battery:Math.max(160,Math.min(282,p.distance*.09))},scene,volley,battery,benchmark:{scale:1800,on,off,delta:off.median-on.median},errors};
+    const report={seed,scale:1200,zoom:{volley:58,battery:Math.max(160,Math.min(282,p.distance*.09))},scene,volley,battery,benchmark:{scale:3600,on,off,delta:off.median-on.median},errors};
     writeFileSync(dir+'/measurements.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
     assert.ok(volley.bestScore>0 && volley.maxSegments>0 && battery.maxSegments>0 && battery.markerFrames>0);assert.ok(on.maxSegments>0 && on.maxCalls<=2 && off.maxCalls===0 && off.median-on.median<=5);assert.equal(errors.length,0);
 }finally{ws.close();await fetch(browser+'/json/close/'+tab.id);}
