@@ -61,7 +61,7 @@ export class Tracers3d{
         row.append(button);nav.append(row);
     }
     private line(a:Point,b:Point,tick:number,life:number,kind:number){
-        this.segments.push({a,b,born:tick,life,kind});
+        if(this.mode!=='off')this.segments.push({a,b,born:tick,life,kind});
     }
     private musket(w:SimWorld,e:BattleEvent,smoke:SmokeSystem){
         const target=w.companies[w.units[e.unitId].company].target;
@@ -116,11 +116,17 @@ export class Tracers3d{
         }
         this.mesh.count=n;this.mesh.visible=n>0;
         for(const a of [this.start,this.end,this.style])upload(a,n);
+        const placed:{x:number;y:number}[]=[];
         this.labels=this.labels.filter(m=>{
             if(time-m.tick>42){m.node.remove();return false;}
             const p=this.projection.set(m.p.x,m.p.y,m.p.z).project(camera);
             m.node.hidden=zoom>300 || this.mode==='off' || Math.abs(p.x)>1 || Math.abs(p.y)>1 || Math.abs(p.z)>1;
-            if(!m.node.hidden){m.node.style.left=(p.x+1)*50+'%';m.node.style.top=(1-p.y)*50+'%';m.node.style.opacity=String(Math.min(1,(42-time+m.tick)/12));}
+            if(!m.node.hidden){
+                const x=(p.x+1)*width*.5;let y=(1-p.y)*height*.5;
+                while(placed.some(t=>Math.abs(t.x-x)<48&&Math.abs(t.y-y)<16))y-=16;
+                placed.push({x,y});m.node.style.left=x/width*100+'%';m.node.style.top=y/height*100+'%';
+                m.node.style.opacity=String(Math.min(1,(42-time+m.tick)/12));
+            }
             return true;
         });
     }

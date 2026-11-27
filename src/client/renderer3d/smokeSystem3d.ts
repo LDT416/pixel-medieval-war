@@ -6,7 +6,7 @@ import { attribute,upload } from './spriteAtlas';
 import { toX,toZ,terrainHeight } from './terrain3d';
 import type { BattlefieldLight } from './lightingPresets';
 const CAP=5600;
-type Puff={x:number;y:number;z:number;vx:number;vy:number;vz:number;life:number;age:number;size:number;kind:number;seed:number};
+type Puff={x:number;y:number;z:number;vx:number;vy:number;vz:number;life:number;age:number;size:number;kind:number;seed:number;floor:number};
 export class SmokeSystem{
     private density=new Float32Array(64*32);
     private soil:T.InstancedMesh;private clods:{x:number;y:number;z:number;vx:number;vy:number;vz:number;age:number;s:number}[]=[];
@@ -35,17 +35,18 @@ export class SmokeSystem{
         material.onBeforeCompile=s=>{s.vertexShader='attribute float aFrame;\n'+s.vertexShader.replace('#include <uv_vertex>','#include <uv_vertex>\n vMapUv.x=(vMapUv.x+aFrame)/8.;');};
         const plane=new T.PlaneGeometry(1,1);plane.translate(.5,0,0);attribute(plane,'aFrame',256,1);
         this.flash=new T.InstancedMesh(plane,material,256);this.flash.count=0;this.flash.frustumCulled=false;scene.add(this.flash);
-        const g=new T.PlaneGeometry(1,1);this.shape=attribute(g,'aPuff',CAP,4);this.style=attribute(g,'aStyle',CAP,3);
+        const g=new T.PlaneGeometry(1,1);this.shape=attribute(g,'aPuff',CAP,4);this.style=attribute(g,'aStyle',CAP,4);
         const mat=new T.ShaderMaterial({uniforms:this.uniforms,transparent:true,depthWrite:false,side:T.DoubleSide,
-            vertexShader:`attribute vec4 aPuff;attribute vec3 aStyle;uniform vec4 uLight[9];
-            varying vec2 v;varying vec3 style;varying float fire;
-            void main(){v=uv*2.-1.;style=aStyle;vec4 mv=modelViewMatrix*vec4(aPuff.xyz,1.);
+            vertexShader:`attribute vec4 aPuff,aStyle;uniform vec4 uLight[9];
+            varying vec2 v;varying vec3 style;varying float fire,clearance;
+            void main(){v=uv*2.-1.;style=aStyle.xyz;
+                clearance=(aPuff.y-aStyle.w)/max(.05,aPuff.w)+position.x*viewMatrix[1][0]+position.y*viewMatrix[1][1];vec4 mv=modelViewMatrix*vec4(aPuff.xyz,1.);
                 fire=0.;for(int i=0;i<9;i++){vec3 d=aPuff.xyz-uLight[i].xyz;fire+=uLight[i].w/(2.+dot(d,d));}
                 if(aStyle.y>4.5 && aStyle.y<5.5){
                     mv=modelViewMatrix*vec4(aPuff.xyz+vec3(position.x,0.,position.y)*aPuff.w,1.);
                 }else mv.xy+=position.xy*aPuff.w;
                 gl_Position=projectionMatrix*mv;}`,
-            fragmentShader:`uniform float uDistant;uniform vec3 uSun,uSky;varying vec2 v;varying vec3 style;varying float fire;
+            fragmentShader:`uniform float uDistant;uniform vec3 uSun,uSky;varying vec2 v;varying vec3 style;varying float fire,clearance;
             void main(){
                 float age=style.x,k=style.y,phase=style.z,r=length(v);
                 float warp=.09*sin(5.*v.x+phase+age)*cos(4.*v.y-phase)+.045*sin(v.x*12.+v.y*6.+phase);
@@ -61,13 +62,15 @@ export class SmokeSystem{
                 if(k>6.5)alpha*=.32;
                 if(k>3.5 && k<4.5){col=vec3(5.,2.3,.42);alpha=(1.-smoothstep(.08,1.,r))*(1.-age);}
                 if(k>4.5 && k<5.5){alpha=(1.-smoothstep(.025,.14,abs(r-.77)))*(1.-age)*.41;col=vec3(.46,.36,.21);}
+                if(k<3.5 || k>5.5)alpha*=smoothstep(.015,.28,clearance);
+                alpha*=1.-smoothstep(.73,.96,max(abs(v.x),abs(v.y)));
                 if(alpha<.007)discard;gl_FragColor=vec4(col,alpha*uDistant);
             }`});
         this.mesh=new T.InstancedMesh(g,mat,CAP);this.mesh.count=0;this.mesh.frustumCulled=false;this.mesh.renderOrder=8;scene.add(this.mesh);
     }
     private add(x:number,y:number,z:number,kind:number,size:number,life:number,vx:number,vy:number,vz:number){
         if(this.items.length>=this.particleLimit)return;
-        this.items.push({x,y,z,kind,size,life,vx,vy,vz,age:0,seed:this.rng.next()*9});
+        this.items.push({x,y,z,kind,size,life,vx,vy,vz,age:0,seed:this.rng.next()*9,floor:terrainHeight(x,z)});
     }
     bulletImpact(x:number,y:number,z:number,hit:boolean){
         const n=hit?2+this.rng.int(0,1):1;
@@ -140,7 +143,7 @@ export class SmokeSystem{
         this.items.forEach((p,i)=>{
             const t=p.age/p.life;
             this.shape.setXYZW(i,p.x,p.y,p.z,p.size*(p.kind===4?1: .46+t*(p.kind===3?3.3:1.8)));
-            this.style.setXYZ(i,t,p.kind,p.seed);
+            this.style.setXYZW(i,t,p.kind,p.seed,p.floor);
         });
         this.mesh.count=this.count;upload(this.shape,this.count);upload(this.style,this.count);
     }
