@@ -7,7 +7,8 @@ export const gunRange = (w: SimWorld) => w.weather === 'fog' ? 1350 : 2480;
 export const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export function emit(w: SimWorld, type: BattleEvent['type'], u: Soldier, dx: number, dy: number, explosive: boolean, x = u.x, y = u.y) {
-    w.events.push({ type, x, y, dx, dy, explosive, unitId: u.id, kind: u.kind, faction: u.faction });
+    const e:BattleEvent={type,x,y,dx,dy,explosive,unitId:u.id,kind:u.kind,faction:u.faction};
+    w.events.push(e);return e;
 }
 /** 士气打击。士气是这场斗蛐蛐的核心：大部分连队不是被杀光，而是被吓跑。 */
 export function shake(c: Company, amount: number) {
@@ -71,10 +72,10 @@ export function shoot(w: SimWorld, u: Soldier, c: Company) {
     const dx = t.x - u.x, dy = t.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
     u.firedAt = w.tick; u.pose = 'aim';
     if (w.weather === 'rain' && w.rng.next() < .3) return;
-    emit(w, 'fire', u, dx / d, dy / d, false);
+    const fire=emit(w, 'fire', u, dx / d, dy / d, false);
     if (w.rng.next() < c.hitChance) {
         const v = victim(w, t, t.formation === 'line' ? t.files * 2 : t.members.length);
-        if (v) damage(w, v, w.rng.int(55, 130), dx / d, dy / d, false, c);
+        if(v){fire.endX=v.x;fire.endY=v.y;fire.struck=true;damage(w,v,w.rng.int(55,130),dx/d,dy/d,false,c);}
     }
 }
 /** 白刃战一击。骑兵砍阵线如切菜，撞方阵则寸步难行。 */

@@ -38,6 +38,7 @@ export interface Sample {tick:number; odds:number; eff:[number,number]; morale:[
 export interface TurningPoint {tick:number; kind:"decisive"|"swing"; delta:number; from:number; to:number; causes:News[]}
 export interface News { odds:number; tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
 export interface BattleEvent {
+    endX?:number; endY?:number; struck?:boolean;
     type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash';
     x: number; y: number; dx: number; dy: number; faction: Faction; kind: Kind;
     explosive: boolean; unitId: number;

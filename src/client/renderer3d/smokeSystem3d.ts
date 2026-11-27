@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {WIDTH,HEIGHT} from '../../sim/maps';
 import type { Soldier,BattleEvent } from '../../sim/arenaTypes';
 import { Rng } from '../../sim/rng';
 import { attribute,upload } from './spriteAtlas';
@@ -51,6 +52,7 @@ export class SmokeSystem{
                 float top=clamp(.43+v.y*.46-v.x*.23+bulb*.24,0.,1.);
                 vec3 dye=k<.5?vec3(.50,.40,.235):k<1.5?vec3(.44,.29,.14):vec3(.64,.65,.60);
                 if(k>2.5 && k<3.5)dye=mix(vec3(.49,.48,.44),vec3(.72,.73,.69),smoothstep(.05,.59,age));
+                if(k>7.5)dye=vec3(.55,.08,.07);
                 if(k>5.5 && k<6.5)dye=vec3(.25,.19,.095);
                 vec3 col=dye*mix(uSky,uSun,top)+vec3(1.,.41,.09)*min(fire*.10,1.3)*edge;
                 float alpha=edge*(1.-age)*(k<1.5?.27:.53)*smoothstep(0.,.075,age+.025);
@@ -64,6 +66,11 @@ export class SmokeSystem{
     private add(x:number,y:number,z:number,kind:number,size:number,life:number,vx:number,vy:number,vz:number){
         if(this.items.length>=this.particleLimit)return;
         this.items.push({x,y,z,kind,size,life,vx,vy,vz,age:0,seed:this.rng.next()*9});
+    }
+    bulletImpact(x:number,y:number,z:number,hit:boolean){
+        const n=hit?2+this.rng.int(0,1):1;
+        for(let i=0;i<n;i++)this.add(x,y,z,hit?8:1,hit?.24:.72,hit?.19:.36,
+            (this.rng.next()-.5)*2,.65+this.rng.next(),(this.rng.next()-.5)*1.8);
     }
     event(e:BattleEvent){
         if(e.type!=='impact' && e.type!=='bounce' && e.type!=='fire')return;
@@ -81,7 +88,7 @@ export class SmokeSystem{
         this.lights.flash(mx,y,mz,gun);
         if(this.flames.length<256)this.flames.push({x:mx,y:y+1.1,z:mz,angle:-Math.atan2(e.dy,e.dx),age:0,size:gun?2.8:1.05});
         if(gun)this.add(mx,y+.12,mz,5,2.8,.55,0,0,0);
-        const cell=Math.min(31,Math.max(0,Math.floor(e.y/100)))*64+Math.min(63,Math.max(0,Math.floor(e.x/100)));
+        const cell=Math.min(31,Math.max(0,Math.floor(e.y/HEIGHT*32)))*64+Math.min(63,Math.max(0,Math.floor(e.x/WIDTH*64)));
         this.density[cell]=Math.min(25,this.density[cell]+(gun?2:.45));
         if(!gun && this.items.length>3200)return;
         for(let i=0;i<(gun?11:3);i++){
@@ -106,7 +113,7 @@ export class SmokeSystem{
         for(let i=0;i<this.density.length;i++){
             const den=this.density[i]*=decay;
             if(den>1 && this.rng.next()<dt*Math.min(2,den*.18)){
-                const x=toX((i%64+.5)*100),z=toZ((Math.floor(i/64)+.5)*100);
+                const x=toX((i%64+.5)*WIDTH/64),z=toZ((Math.floor(i/64)+.5)*HEIGHT/32);
                 this.add(x,terrainHeight(x,z)+1.8,z,7,3+Math.min(5,den),4,.45,.2,.18);
             }
         }

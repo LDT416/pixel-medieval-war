@@ -2,6 +2,7 @@ import {CameraGestures,groundOffset} from './cameraGestures';
 import {WIDTH,HEIGHT} from '../../sim/maps';
 import * as T from 'three';
 import type { SimWorld } from '../../sim/world';
+import {Tracers3d} from './tracers3d';
 import { roundPosition } from '../../sim/combat';
 import { Standees,upload } from './spriteAtlas';
 import { createTerrain,terrainHeight,toX,toZ,fromX,fromZ,SCALE } from './terrain3d';
@@ -12,6 +13,7 @@ import { SmokeSystem } from './smokeSystem3d';
 const elevation=39*Math.PI/180;
 export class ArenaRenderer3d{
     private renderer:T.WebGLRenderer;private scene=new T.Scene();
+    readonly tracers=new Tracers3d(this.scene);
     private camera=new T.PerspectiveCamera(28,1,.3,24000);
     lights:BattlefieldLight; smoke:SmokeSystem; gore!:GoreSystem;
     private standees:Standees;private post=new PostFx();private terrain:ReturnType<typeof createTerrain>;
@@ -50,7 +52,7 @@ export class ArenaRenderer3d{
         this.renderer.info.autoReset=false;
         this.lights=new BattlefieldLight(this.scene);this.terrain=createTerrain(this.scene);
         this.standees=new Standees(this.scene);this.smoke=new SmokeSystem(this.scene,this.lights);
-        this.balls=new T.InstancedMesh(new T.IcosahedronGeometry(.16,1),new T.MeshStandardMaterial({color:0x302b28}),120);
+        this.balls=new T.InstancedMesh(new T.IcosahedronGeometry(.40,1),new T.MeshStandardMaterial({color:0x393c41,metalness:.45,roughness:.51}),320);
         this.balls.count=0;this.balls.frustumCulled=false;this.scene.add(this.balls);
         this.resize();this.desired=this.distance=Math.min(300,Math.max(190,330/this.camera.aspect));this.controls();
         new ResizeObserver(()=>this.resize()).observe(canvas);
@@ -80,9 +82,9 @@ export class ArenaRenderer3d{
     home(world:SimWorld){const p=world.frontline();this.panTo(toX(p.x),toZ(p.y));}
     setLighting(mode:Lighting){this.lights.set(mode);this.standees.rim.value.copy(this.lights.rim);}
     /** 新一局：地形随地图种子重建，清空残留。 */
-    reset(){this.terrain.rebuild();this.gore.reset();this.smoke.reset();this.lights.reset();this.balls.count=0;this.panTo(0,0);}
+    reset(){this.terrain.rebuild();this.gore.reset();this.smoke.reset();this.tracers.reset();this.lights.reset();this.balls.count=0;this.panTo(0,0);}
     advanceEffects(w:SimWorld,dt:number){this.gore.update(dt);this.smoke.update(w.ended?[]:w.units,dt);}
-    events(w:SimWorld){for(const e of w.events){this.gore.event(e);this.smoke.event(e);}}
+    events(w:SimWorld){this.tracers.observe(w,this.smoke);for(const e of w.events){this.gore.event(e);this.smoke.event(e);}}
     private controls(){
         const c=this.canvas,touch=()=>{this.userAt=performance.now();};
         this.gestures=new CameraGestures(c,{distance:()=>this.desired,clampZoom:d=>this.limitZoom(d),
@@ -100,7 +102,7 @@ export class ArenaRenderer3d{
         const smooth=1-Math.exp(-realDt*(performance.now()-this.userAt<1500?11:2.6));
         this.distance=T.MathUtils.lerp(this.distance,this.desired,smooth);this.target.lerp(this.goal,smooth);
         this.target.y=terrainHeight(this.target.x,this.target.z);
-        this.camera.position.copy(this.target);this.camera.position.y+=this.distance*Math.sin(elevation);this.camera.position.z+=this.distance*Math.cos(elevation);this.camera.lookAt(this.target);
+        this.camera.position.copy(this.target);this.camera.position.y+=this.distance*Math.sin(elevation)+this.tracers.cameraKick(this.target.x,this.target.z,this.distance,w.tick+alpha);this.camera.position.z+=this.distance*Math.cos(elevation);this.camera.lookAt(this.target);
         this.terrain.updateView(this.target.x,this.target.z,this.distance,this.camera.aspect);
         this.terrain.wind.value+=dt;this.lights.update(this.target,this.distance,this.camera.aspect,dt);
         this.standees.draw(w.units,w.companies,w.tick,alpha);this.advanceEffects(w,dt);
@@ -109,6 +111,11 @@ export class ArenaRenderer3d{
             const p=roundPosition(w.rounds[i],alpha),x=toX(p.x),z=toZ(p.y);
             this.balls.setMatrixAt(i,this.matrix.makeTranslation(x,terrainHeight(x,z)+p.h,z));
         }
+        for(const s of this.tracers.resting){
+            if(this.balls.count>=this.balls.instanceMatrix.count)break;
+            this.balls.setMatrixAt(this.balls.count++,this.matrix.makeTranslation(s.p.x,s.p.y,s.p.z));
+        }
+        this.tracers.draw(w.tick,alpha,this.canvas.clientWidth,this.canvas.clientHeight,this.distance,this.camera);
         upload(this.balls.instanceMatrix,this.balls.count);this.renderer.info.reset();
         this.post.draw(this.renderer,this.scene,this.camera);
     }

@@ -31,6 +31,7 @@ async function start(){
     },jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
+    arena.tracers.installControl();
     function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
     function reset(scale:Scale,seed:number){
         skipping=false;world.reset(scale,seed);arena.reset();
@@ -95,7 +96,7 @@ async function start(){
         if(now>=focusUntil){follow=-1;priority=0;}
         if(now>focusUntil){focusUntil=now+1200;arena.focus(hotX,hotY,Math.max(170,Math.min(260,arena.zoom)));}
     }
-    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,camera:arena.cameraInfo,fps:Math.round(fps),drawCalls:arena.drawCalls,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
+    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,camera:arena.cameraInfo,fps:Math.round(fps),drawCalls:arena.drawCalls,tracers:arena.tracers.stats,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
         winner:world.winner,ended:world.ended,seed:world.seed,weather:world.weather,scale:world.scale,lighting:arena.lighting,activeSmoke:arena.smoke.count,
         odds:world.odds(),morale:[world.armyMorale(0),world.armyMorale(1)],news:world.news.length,...arena.gore.stats}),
         setScale,setLighting,setSpeed,restart:()=>reset(world.scale,newSeed()),replay:(seed:number)=>reset(world.scale,seed),startBattle:()=>placeBet(-1,0),

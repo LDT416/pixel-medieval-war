@@ -33,3 +33,5 @@
 .major{left:auto;right:64px;bottom:15px}.intel-open .major,.victory-open .major{display:none}
 @media(max-width:530px){.major{right:10px;bottom:50px}}
 #victory.overlay{z-index:45;padding:12px;overflow:hidden}.victory-card{box-sizing:border-box;max-height:calc(100dvh - 24px)}
+
+.range-callout{position:fixed;pointer-events:none;transform:translate(-50%,-130%);font:600 12px serif;color:#fff4c8;text-shadow:0 1px 3px #19180f,0 0 5px #321f0c}
