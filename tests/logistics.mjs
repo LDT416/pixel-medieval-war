@@ -52,6 +52,7 @@ const reserve=g.companies.find(r=>r.faction===front.faction&&r.sector===front.se
 const depot=s.wagons.find(v=>v.id===front.corps);front.ammo=0;for(const u of front.members)u.ammo=0;
 front.x=4000;front.y=3000;reserve.x=4400;reserve.y=3100;
 const chief=g.generals[front.faction].unit;chief.x=4500;chief.y=3100;
+assert.equal(s.requestRelief(g,front,g.companies.find(c=>c.faction!==front.faction)),false);
 assert.ok(s.requestRelief(g,front,reserve));
 for(let i=0;i<150;i++){g.tick++;s.step(g);}
 assert.ok(s.isRelieving(reserve));assert.equal(front.line,0);assert.equal(s.rotations,0,'first line waits for actual relief');

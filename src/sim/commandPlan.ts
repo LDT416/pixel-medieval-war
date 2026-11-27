@@ -27,7 +27,7 @@ export class CommandPlan {
         return true;
     }
     review(w:SimWorld,f:Faction){
-        const plan=w.plans[f], own=w.companies.filter(c=>c.faction===f&&c.line!==5),enemy=w.companies.filter(c=>c.faction!==f&&active(c)&&c.line!==5);
+        const plan=w.plans[f], own=w.companies.filter(c=>c.faction===f&&c.line!==5),enemy=w.sight.visibleToArmy(w,f).filter(c=>active(c)&&c.line!==5);
         const friendly=own.filter(c=>active(c)&&!w.lostSectors[f][c.sector]&&!w.logistics.isCommitted(c));
         const available=friendly.filter(c=>!c.engaged&&!this.assigned(c,w.tick));
         const ready=plan.reserve.map(id=>w.companies[id]).filter(c=>c&&available.includes(c)&&!this.used.has(c.id));

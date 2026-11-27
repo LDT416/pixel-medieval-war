@@ -24,21 +24,21 @@ const clamp=(v:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,v));
 const foot=(c:Company)=>isLineTroop(c)||isGuard(c);
 const center=(s:Sector,l:Layout)=>(s+.5)*l.height/3;
 
-function evaluate(w:SimWorld,f:Faction,r:Rng):SectorIntel[]{
+function evaluate(w:SimWorld,r:Rng):SectorIntel[]{
     const l=w.layout,error=w.weather==='fog'?.25:w.weather==='rain'?.20:.14;
     return zones.map(sector=>{
         const count=(pts:Point[])=>pts.filter(p=>sectorOf(p.y,l)===sector).length;
         const woods=count(l.woods),farms=count(l.farms),high=count(l.ridges),cross=count(l.bridges);
         const cover=Math.min(1,(woods*.20+farms*.22+high*.18));
         const roadLinks=l.roads.filter(road=>road.points.some(p=>sectorOf(p.y,l)===sector)).length;
-        const truth=w.companies.filter(c=>c.faction!==f&&c.line!==5&&sectorOf(c.y,l)===sector).reduce((s,c)=>s+c.alive,0);
+        const sectorBudget=w.scale/6;
         return {sector,cover,openness:1-cover,passage:Math.min(1,.20+cross*.28+roadLinks*.11),elevation:Math.min(1,high*.55),
-            enemyEstimate:Math.round(truth*(1+(r.next()*2-1)*error))};
+            enemyEstimate:Math.round(sectorBudget*(1+(r.next()*2-1)*error))};
     });
 }
 function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Objective>):BattlePlan{
     const l=w.layout,face=f?-1:1,trait=w.generals[f].trait,attacking=w.posture[f]==='attack',own=w.companies.filter(c=>c.faction===f);
-    const intel=evaluate(w,f,r),total=Math.max(1,intel.reduce((s,p)=>s+p.enemyEstimate,0));
+    const intel=evaluate(w,r),total=Math.max(1,intel.reduce((s,p)=>s+p.enemyEstimate,0));
     const scored=intel.map(s=>({sector:s.sector,score:attacking?
         .58*(1-s.enemyEstimate/total)+s.openness*(trait==='aggressive'?.21:.12)+s.passage*.14+(trait==='cunning'&&s.sector!==1?.16:0)+r.next()*.22:
         s.enemyEstimate/total+s.cover*.2+s.passage*.1+r.next()*.10})).sort((a,b)=>b.score-a.score);

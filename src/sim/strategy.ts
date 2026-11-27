@@ -4,6 +4,8 @@ import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, movementAt, behindCrest, inWoods, inRect, layout } from './maps';
 import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, gunFire } from './combat';
 
+import {formationTicks,setupTicks} from './units/roster';
+import {unitTypes} from './units/unitTypes';
 import {PACE} from './scale';
 
 const SPACING: Record<Formation, [number, number]> = {
@@ -22,7 +24,9 @@ export function filesFor(c: Company, n: number) {
 function slotOffset(c: Company, i: number): [number, number] {
     const [sp, dp] = SPACING[c.formation];
     if (c.formation === 'square') {
-        const n = Math.max(4, c.capacity), side = Math.ceil(n / 4), half = (side - 1) * sp / 2;
+        if(c.capacity<4)return [(i-(c.capacity-1)/2)*sp,0];
+        // Each edge owns its starting corner. Its final slot stops one spacing before the next corner.
+        const side=Math.ceil(c.capacity/4),half=side*sp/2;
         const edge = Math.floor(i / side) % 4, j = i % side, t = j * sp - half;
         return edge === 0 ? [t, -half] : edge === 1 ? [half, t] : edge === 2 ? [-t, half] : [-half, -t];
     }
@@ -125,7 +129,7 @@ export function advance(w: SimWorld, u: Soldier) {
     let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
     if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
     
-    const charging = c.order === 'charge' || (c.order === 'assault' && dist(c, w.companies[c.target] ?? c) < 320);
+    const charging = c.order === 'charge' || (c.order === 'assault' && c.target>=0 && w.sight.canSee(w,c,w.companies[c.target]) && dist(c,w.companies[c.target]) < 320);
     const gait=c.sprintUntil>w.tick?PACE.horseSprint:c.assaultStage==='rush'?PACE.footRush:u.speed;
     const moved=moveToward(w,u,tx,ty,gait*(1-PACE.maxFatiguePenalty*c.fatigue));
     faceToward(u,c.hx);
@@ -149,7 +153,7 @@ export function advance(w: SimWorld, u: Soldier) {
 function nearestEnemy(w: SimWorld, c: Company, filter?: (o: Company) => boolean) {
     let best: Company | undefined, bd = Infinity;
     for (const o of w.companies) {
-        if (o.faction === c.faction || o.status === 'gone' || o.alive <= 0 || o.line === 5 || (filter && !filter(o))) continue;
+        if (o.faction === c.faction || o.status === 'gone' || o.alive <= 0 || o.line === 5 || !w.sight.canSee(w,c,o) || (filter && !filter(o))) continue;
         const d = dist(c, o);
         if (d < bd) { bd = d; best = o; }
     }
@@ -157,6 +161,7 @@ function nearestEnemy(w: SimWorld, c: Company, filter?: (o: Company) => boolean)
 }
 function pickTarget(w: SimWorld, c: Company) {
     const visible=(o:Company)=>{
+        if(!w.sight.canSee(w,c,o))return false;
         if(isArtillery(c)){
             const dx=o.x-c.x,dy=o.y-c.y,d2=dx*dx+dy*dy||1;
             for(const g of layout.woods){
@@ -188,14 +193,14 @@ function pickTarget(w: SimWorld, c: Company) {
     return best;
 }
 function setFormation(w: SimWorld, c: Company, f: Formation) {
-    if (c.formation === f) return;
+    if (c.formation === f || !unitTypes[c.kind].formation.allowed.includes(f)) return;
     if(f==='square' && w.tick-c.leftSquare<120)return;
     c.capacity=c.members.length; c.margin=0; c.lastShrink=w.tick;
     const squareChange=c.formation==='square' || f==='square';
     if(c.formation==='square')c.leftSquare=w.tick;
     if(f==='square')c.formedSquareAt=w.tick;
     c.formation = f;
-    c.formUntil = w.tick + Math.round((f === 'square' ? (isGuard(c) ? 36 : 58) : 55) * (c.status === 'shaken' ? 1.5 : 1));
+    c.formUntil = w.tick + formationTicks(c,f,c.status==='shaken');
     c.files = filesFor(c, c.members.length);
     if(!squareChange){c.members.forEach((u,i)=>u.slot=i);return;}
     const free=c.members.map((_,i)=>{
@@ -226,7 +231,7 @@ function compact(w:SimWorld,c:Company){
         const side=Math.ceil(c.capacity/4);
         for(let j=0;j<side;j++){
             if(occupied.has(j))continue;
-            const rear=occupied.get(3*side-1-j);
+            const rear=occupied.get(3*side-j);
             if(rear)move(rear,j);
         }
         return;
@@ -323,7 +328,7 @@ export function updateCompany(w: SimWorld, c: Company) {
         const sheltered = inRect(layout.farm, c.x, c.y, 20) || inWoods(c.x, c.y);
         let threat=false;
         for(const horse of w.companies){
-            if(horse.faction===c.faction || !isMounted(horse) || horse.line===5 || horse.alive<4 || horse.status==='rout' || horse.status==='gone')continue;
+            if(horse.faction===c.faction || !isMounted(horse) || horse.line===5 || horse.alive<4 || horse.status==='rout' || horse.status==='gone' || !w.sight.canSee(w,c,horse))continue;
             const distance=dist(c,horse),previous=c.cavalryDistances.get(horse.id)??distance;
             c.cavalryDistances.set(horse.id,distance);
             const moving=Math.hypot(horse.vx,horse.vy)>3;
@@ -357,10 +362,10 @@ export function updateCompany(w: SimWorld, c: Company) {
             for(const p of w.companies)if(p.faction===c.faction && p.line===0 && p.alive && p.status!=='rout'){sum+=p.x;count++;}
             const front=sum/count, face=c.faction?-1:1;
             if(count && (front-c.initialFront)*face>600){
-                c.homeX=front-face*170; c.limbered=true; c.relocated=true;c.deployUntil=w.tick+PACE.limberTicks;
+                c.homeX=front-face*170; c.limbered=true; c.relocated=true;c.deployUntil=w.tick+setupTicks(c);
             }
         }else if(c.limbered && Math.hypot(c.x-c.homeX,c.y-c.homeY)<2){
-            c.limbered=false;c.deployUntil=w.tick+PACE.limberTicks;
+            c.limbered=false;c.deployUntil=w.tick+setupTicks(c);
         }
     }
     let gx = c.homeX, gy = c.homeY;
@@ -452,7 +457,8 @@ export function updateCompany(w: SimWorld, c: Company) {
             c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
         }
     }
-    const opponent=w.companies[c.chargeOpponent>=0?c.chargeOpponent:c.contactId];
+    const contactCompany=w.companies[c.chargeOpponent>=0?c.chargeOpponent:c.contactId];
+    const opponent=contactCompany && w.sight.canSee(w,c,contactCompany)?contactCompany:undefined;
     if(c.engaged && opponent && (w.tick-c.chargeAt)%18<6)meleePressure(w,c,opponent);
     if(isMounted(c) && c.order==='charge' && c.chargeOpponent>=0 && (w.tick-c.chargeAt>200 || opponent?.status==='gone' || opponent?.status==='rout' || (opponent?.formation==='square' && w.tick-c.chargeAt>=72))){
         const retreatX=opponent?c.x-opponent.x:-c.hx, retreatY=opponent?c.y-opponent.y:-c.hy;

@@ -15,3 +15,18 @@ w.tick=3;w.boardShots.step(w);assert.ok(other.hp<hp);assert.equal(w.boardShots.s
 const after=other.hp;w.tick++;w.boardShots.step(w);assert.equal(other.hp,after);
 other.x+=64;w.hash.rebuild([other]);w.boardShots.place(w,shooter,'musket',528,528,4);w.boardShots.step(w);assert.equal(other.hp,after);
 console.log('Delayed cell: friendly occupant affected once; empty cell missed.');
+
+// Schedule while the first token is alone. Change occupancy before the due tick.
+const foe=w.units.find(u=>u.faction!==shooter.faction && !u.general);
+const beforeFoe=foe.hp;
+const beforeFriend=other.hp;
+other.x=528;other.y=528;w.hash.rebuild([other]);
+w.boardShots.place(w,shooter,'musket',528,528,7);
+other.x=513;other.y=528;foe.x=528;foe.y=528;
+w.hash.rebuild([foe,other]);w.tick=7;w.boardShots.step(w);
+assert.ok(foe.hp<beforeFoe);assert.equal(other.hp,beforeFriend);
+other.x=544;w.hash.rebuild([other]);w.boardShots.place(w,shooter,'musket',528,528,8);w.tick=8;w.boardShots.step(w);
+assert.equal(other.hp,beforeFriend);
+other.x=512;w.hash.rebuild([other]);w.boardShots.place(w,shooter,'musket',528,528,9);w.tick=9;w.boardShots.step(w);
+assert.ok(other.hp<beforeFriend);
+console.log('Changed occupancy, mixed factions, center priority and half-open boundary passed.');

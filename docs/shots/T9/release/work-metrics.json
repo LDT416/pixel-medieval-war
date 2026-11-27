@@ -1,0 +1,897 @@
+{
+  "rules": {
+    "duration": "victory tick / 30, excludes pursuit animation",
+    "loserLoss": "(dead + escaped + remaining routing) / starting loser strength",
+    "generalDeaths": "games with at least one fallen commander in chief / games",
+    "cannonShare": "unweighted mean of cannon death fractions per game; pooled ratio also reported"
+  },
+  "stats": {
+    "seeds": 24,
+    "medianSeconds": 221,
+    "minSeconds": 81.5,
+    "maxSeconds": 1200,
+    "loserLossFraction": 0.30798611111111107,
+    "generalDeathFraction": 0,
+    "wins": [
+      15,
+      9
+    ],
+    "cannonShare": 0.0718995171792865,
+    "pooledCannonShare": 0.0722077922077922
+  },
+  "baseline": [
+    {
+      "scale": 600,
+      "p99": 1.7389000000000578,
+      "avg": 0.7358473585941616,
+      "jitter": {
+        "flipsPerSec": 0.00043293606188279834,
+        "poseTogglesPerSec": 0.002157915683447073,
+        "slotSwapsPerDeath": 1.0421052631578946
+      }
+    },
+    {
+      "scale": 1200,
+      "p99": 2.570400000000518,
+      "avg": 1.4523266791744796,
+      "jitter": {
+        "flipsPerSec": 0.0013773343325048184,
+        "poseTogglesPerSec": 0.007163044670033282,
+        "slotSwapsPerDeath": 1.069204152249135
+      }
+    },
+    {
+      "scale": 1800,
+      "p99": 3.758299999994051,
+      "avg": 2.238514148148196,
+      "jitter": {
+        "flipsPerSec": 0.003448489350532466,
+        "poseTogglesPerSec": 0.015161725582864568,
+        "slotSwapsPerDeath": 1.1147859922178989
+      }
+    }
+  ],
+  "rows": [
+    {
+      "seed": 7919,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 169.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        106,
+        172
+      ],
+      "fled": [
+        0,
+        3
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 10,
+      "loserLossFraction": 0.30833333333333335,
+      "failedGenerals": [],
+      "deaths": 278,
+      "cannonDeaths": 22,
+      "cannonShare": 0.07913669064748201,
+      "sectorNews": [
+        3,
+        18,
+        8
+      ]
+    },
+    {
+      "seed": 15838,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 131,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        185,
+        140
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 23,
+      "loserLossFraction": 0.3466666666666667,
+      "failedGenerals": [],
+      "deaths": 325,
+      "cannonDeaths": 18,
+      "cannonShare": 0.055384615384615386,
+      "sectorNews": [
+        16,
+        6,
+        1
+      ]
+    },
+    {
+      "seed": 23757,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 148,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        138,
+        109
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 51,
+      "loserLossFraction": 0.315,
+      "failedGenerals": [],
+      "deaths": 247,
+      "cannonDeaths": 15,
+      "cannonShare": 0.06072874493927125,
+      "sectorNews": [
+        13,
+        5,
+        7
+      ]
+    },
+    {
+      "seed": 31676,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 1200,
+      "reason": "夜幕降临，反法同盟趁夜撤离战场",
+      "dead": [
+        155,
+        150
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.25,
+      "failedGenerals": [],
+      "deaths": 305,
+      "cannonDeaths": 26,
+      "cannonShare": 0.08524590163934426,
+      "sectorNews": [
+        11,
+        9,
+        13
+      ]
+    },
+    {
+      "seed": 39595,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 558.5,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        207,
+        161
+      ],
+      "fled": [
+        0,
+        3
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        96,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.345,
+      "failedGenerals": [],
+      "deaths": 368,
+      "cannonDeaths": 65,
+      "cannonShare": 0.1766304347826087,
+      "sectorNews": [
+        24,
+        13,
+        4
+      ]
+    },
+    {
+      "seed": 47514,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 606.5,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        171,
+        155
+      ],
+      "fled": [
+        12,
+        2
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        96
+      ],
+      "loserRouting": 28,
+      "loserLossFraction": 0.3516666666666667,
+      "failedGenerals": [],
+      "deaths": 326,
+      "cannonDeaths": 4,
+      "cannonShare": 0.012269938650306749,
+      "sectorNews": [
+        3,
+        20,
+        3
+      ]
+    },
+    {
+      "seed": 55433,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 179,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        239,
+        201
+      ],
+      "fled": [
+        4,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 32,
+      "loserLossFraction": 0.3883333333333333,
+      "failedGenerals": [],
+      "deaths": 440,
+      "cannonDeaths": 1,
+      "cannonShare": 0.0022727272727272726,
+      "sectorNews": [
+        19,
+        14,
+        7
+      ]
+    },
+    {
+      "seed": 63352,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 638.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        210,
+        180
+      ],
+      "fled": [
+        0,
+        3
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 8,
+      "loserLossFraction": 0.31833333333333336,
+      "failedGenerals": [],
+      "deaths": 390,
+      "cannonDeaths": 8,
+      "cannonShare": 0.020512820512820513,
+      "sectorNews": [
+        62,
+        26,
+        5
+      ]
+    },
+    {
+      "seed": 71271,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 187.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        157,
+        173
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 30,
+      "loserLossFraction": 0.3383333333333333,
+      "failedGenerals": [],
+      "deaths": 330,
+      "cannonDeaths": 38,
+      "cannonShare": 0.11515151515151516,
+      "sectorNews": [
+        15,
+        11,
+        12
+      ]
+    },
+    {
+      "seed": 79190,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 165.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        164,
+        147
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 8,
+      "loserLossFraction": 0.25833333333333336,
+      "failedGenerals": [],
+      "deaths": 311,
+      "cannonDeaths": 28,
+      "cannonShare": 0.09003215434083602,
+      "sectorNews": [
+        4,
+        19,
+        0
+      ]
+    },
+    {
+      "seed": 87109,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 1200,
+      "reason": "夜幕降临，法兰西帝国趁夜撤离战场",
+      "dead": [
+        142,
+        180
+      ],
+      "fled": [
+        9,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.25166666666666665,
+      "failedGenerals": [],
+      "deaths": 322,
+      "cannonDeaths": 12,
+      "cannonShare": 0.037267080745341616,
+      "sectorNews": [
+        24,
+        9,
+        17
+      ]
+    },
+    {
+      "seed": 95028,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 81.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        87,
+        125
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 12,
+      "loserLossFraction": 0.22833333333333333,
+      "failedGenerals": [],
+      "deaths": 212,
+      "cannonDeaths": 3,
+      "cannonShare": 0.014150943396226415,
+      "sectorNews": [
+        2,
+        0,
+        15
+      ]
+    },
+    {
+      "seed": 102947,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 246.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        173,
+        183
+      ],
+      "fled": [
+        3,
+        1
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 10,
+      "loserLossFraction": 0.3233333333333333,
+      "failedGenerals": [],
+      "deaths": 356,
+      "cannonDeaths": 53,
+      "cannonShare": 0.14887640449438203,
+      "sectorNews": [
+        7,
+        6,
+        21
+      ]
+    },
+    {
+      "seed": 110866,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 195.5,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        212,
+        135
+      ],
+      "fled": [
+        5,
+        7
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 1,
+      "loserLossFraction": 0.36333333333333334,
+      "failedGenerals": [],
+      "deaths": 347,
+      "cannonDeaths": 19,
+      "cannonShare": 0.05475504322766571,
+      "sectorNews": [
+        20,
+        8,
+        4
+      ]
+    },
+    {
+      "seed": 118785,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 186.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        147,
+        174
+      ],
+      "fled": [
+        11,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 21,
+      "loserLossFraction": 0.325,
+      "failedGenerals": [],
+      "deaths": 321,
+      "cannonDeaths": 16,
+      "cannonShare": 0.04984423676012461,
+      "sectorNews": [
+        18,
+        6,
+        9
+      ]
+    },
+    {
+      "seed": 126704,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 302,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        95,
+        166
+      ],
+      "fled": [
+        0,
+        3
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 14,
+      "loserLossFraction": 0.305,
+      "failedGenerals": [],
+      "deaths": 261,
+      "cannonDeaths": 30,
+      "cannonShare": 0.11494252873563218,
+      "sectorNews": [
+        14,
+        16,
+        9
+      ]
+    },
+    {
+      "seed": 134623,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 181,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        170,
+        147
+      ],
+      "fled": [
+        9,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.29833333333333334,
+      "failedGenerals": [],
+      "deaths": 317,
+      "cannonDeaths": 36,
+      "cannonShare": 0.11356466876971609,
+      "sectorNews": [
+        15,
+        8,
+        11
+      ]
+    },
+    {
+      "seed": 142542,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 286.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        133,
+        185
+      ],
+      "fled": [
+        3,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.30833333333333335,
+      "failedGenerals": [],
+      "deaths": 318,
+      "cannonDeaths": 64,
+      "cannonShare": 0.20125786163522014,
+      "sectorNews": [
+        1,
+        14,
+        11
+      ]
+    },
+    {
+      "seed": 150461,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 85,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        148,
+        172
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 19,
+      "loserLossFraction": 0.31833333333333336,
+      "failedGenerals": [],
+      "deaths": 320,
+      "cannonDeaths": 28,
+      "cannonShare": 0.0875,
+      "sectorNews": [
+        25,
+        1,
+        4
+      ]
+    },
+    {
+      "seed": 158380,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 1200,
+      "reason": "夜幕降临，反法同盟趁夜撤离战场",
+      "dead": [
+        139,
+        140
+      ],
+      "fled": [
+        3,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.23333333333333334,
+      "failedGenerals": [],
+      "deaths": 279,
+      "cannonDeaths": 2,
+      "cannonShare": 0.007168458781362007,
+      "sectorNews": [
+        2,
+        15,
+        21
+      ]
+    },
+    {
+      "seed": 166299,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 259.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        173,
+        161
+      ],
+      "fled": [
+        5,
+        7
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 11,
+      "loserLossFraction": 0.29833333333333334,
+      "failedGenerals": [],
+      "deaths": 334,
+      "cannonDeaths": 31,
+      "cannonShare": 0.09281437125748503,
+      "sectorNews": [
+        17,
+        4,
+        18
+      ]
+    },
+    {
+      "seed": 174218,
+      "weather": "fog",
+      "scale": 1200,
+      "winner": 0,
+      "endSeconds": 102.5,
+      "reason": "反法同盟失守两个战区，有序撤退",
+      "dead": [
+        109,
+        132
+      ],
+      "fled": [
+        0,
+        0
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 30,
+      "loserLossFraction": 0.27,
+      "failedGenerals": [],
+      "deaths": 241,
+      "cannonDeaths": 2,
+      "cannonShare": 0.008298755186721992,
+      "sectorNews": [
+        22,
+        1,
+        1
+      ]
+    },
+    {
+      "seed": 182137,
+      "weather": "clear",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 586,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        179,
+        223
+      ],
+      "fled": [
+        14,
+        1
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 0,
+      "loserLossFraction": 0.32166666666666666,
+      "failedGenerals": [],
+      "deaths": 402,
+      "cannonDeaths": 6,
+      "cannonShare": 0.014925373134328358,
+      "sectorNews": [
+        10,
+        11,
+        7
+      ]
+    },
+    {
+      "seed": 190056,
+      "weather": "rain",
+      "scale": 1200,
+      "winner": 1,
+      "endSeconds": 304,
+      "reason": "法兰西帝国失守两个战区，有序撤退",
+      "dead": [
+        190,
+        160
+      ],
+      "fled": [
+        3,
+        15
+      ],
+      "initial": [
+        600,
+        600
+      ],
+      "reinforced": [
+        0,
+        0
+      ],
+      "loserRouting": 3,
+      "loserLossFraction": 0.32666666666666666,
+      "failedGenerals": [],
+      "deaths": 350,
+      "cannonDeaths": 29,
+      "cannonShare": 0.08285714285714285,
+      "sectorNews": [
+        16,
+        8,
+        14
+      ]
+    }
+  ],
+  "failures": []
+}

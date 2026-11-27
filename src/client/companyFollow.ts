@@ -6,6 +6,7 @@ export class CompanyFollow{
     private card=document.createElement('section');
     private name=document.createElement('b');
     private stats=document.createElement('p');
+    private intel=document.createElement('p');
     private support=document.createElement('p');
     private plot=document.createElement('canvas');
     private news=document.createElement('p');
@@ -17,7 +18,7 @@ export class CompanyFollow{
         const close=document.createElement('button');close.textContent='×';close.title='结束跟随';close.onclick=()=>this.stop();
         this.card.className='company-follow glass';this.card.hidden=true;
         this.plot.width=180;this.plot.height=24;this.plot.setAttribute('aria-label','有效兵力随时间变化');
-        this.card.append(close,this.name,this.stats,this.plot,this.support,this.news);document.querySelector('#hud')!.append(this.card);
+        this.card.append(close,this.name,this.stats,this.plot,this.support,this.intel,this.news);document.querySelector('#hud')!.append(this.card);
         let down:{x:number;y:number;time:number}|null=null,pending:number|undefined;
         canvas.addEventListener('pointerdown',e=>{
             if(pending!==undefined){clearTimeout(pending);pending=undefined;down=null;return;}
@@ -62,6 +63,10 @@ export class CompanyFollow{
         if(time<this.now)return;this.now=time+220;
         this.name.textContent=c.name;
         this.stats.textContent='兵力 '+c.alive+' / '+c.peak+'　士气 '+Math.round(c.morale)+'　歼敌 '+c.kills;
+        const report=w.sight.latest(w,c.faction);
+        this.intel.textContent=report
+            ? '己方最近目击　格 ('+report.column+', '+report.row+') · '+Math.floor((w.tick-report.tick)/30)+' 秒前'
+            : '己方暂无目击报告';
         const options=w.logistics.support.get(c.id);
         this.support.hidden=!options;
         this.support.textContent=options?'后勤选择　'+options.map(o=>o.label+' '+Math.round(o.score*100)).join(' · '):'';

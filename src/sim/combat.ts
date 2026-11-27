@@ -78,7 +78,7 @@ export function volley(w:SimWorld,c:Company,t:Company,close=false){
 }
 export function shoot(w:SimWorld,u:Soldier,c:Company){
     const t=w.companies[u.shotTarget];
-    if(!t || t.status==='gone' || c.status==='rout' || u.moving || u.ammo<=0 || c.assaultStage==='rush')return;
+    if(!t || !w.sight.canSee(w,c,t) || t.status==='gone' || c.status==='rout' || u.moving || u.ammo<=0 || c.assaultStage==='rush')return;
     u.ammo--;c.ammo--;u.shotsFired++;
     u.loadedAt=w.tick+Math.round(w.rng.int(75,90)*(isGuard(c)?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)+(u.shotsFired>15?.15:0)));
     c.smoke=Math.min(1,c.smoke+.04);

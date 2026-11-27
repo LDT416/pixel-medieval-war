@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-const bundle=await build({stdin:{contents:"export {SimWorld} from './src/sim/world'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',write:false});
-const {SimWorld}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const bundle=await build({stdin:{contents:"export {SimWorld} from './src/sim/world';export {formUp} from './src/sim/strategy'",resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',write:false});
+const {SimWorld,formUp}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 function run(){
     const w=new SimWorld(600,42),companies=w.companies.filter(c=>c.kind==='line_infantry').slice(0,2);
     const row=companies[0].members.slice(0,6),relief=companies[1].members.slice(0,3);
@@ -39,3 +39,17 @@ gun.x=500;gun.y=500;w.crowd.step(w);w.tick=w.deployEnd+1;
 gun.x=510;w.crowd.step(w);assert.equal(gun.x,500);
 w.companies[gun.company].limbered=true;gun.x=510;w.crowd.step(w);assert.ok(gun.x>500);
 console.log(JSON.stringify({gate,wall,limberedX:gun.x}));
+
+// The initial square and subsequent reshapes share a slot coordinate function.
+const squares=new SimWorld(1200,42);
+const template=squares.companies.find(c=>c.kind==='line_infantry'&&c.line!==6);
+for(let n=1;n<=64;n++){
+    const c={...template,x:1000,y:1000,line:0,hx:1,hy:0,formation:'square',
+        members:Array.from({length:n},()=>({...template.members[0],jx:0,jy:0}))};
+    formUp(c);
+    for(let i=0;i<n;i++)for(let j=0;j<i;j++){
+        const a=c.members[i],b=c.members[j];
+        assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>=13,'square size '+n+' has conflicting slots '+i+' and '+j);
+    }
+}
+console.log('Square layout: 1–64 members, minimum spacing 13px.');

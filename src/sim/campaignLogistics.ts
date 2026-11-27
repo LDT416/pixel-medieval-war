@@ -1,3 +1,4 @@
+import {travelFatigue,restRecovery} from './units/roster';
 import {supportOptions} from './units/support';
 import {guard as isGuard, lineTroop as isLineTroop, mounted as isMounted, standard as isStandard} from './units/abilities';
 import type {Company,Faction,Order} from './arenaTypes';
@@ -144,7 +145,7 @@ export class CampaignLogistics{
     private deliver(w:SimWorld,m:Courier,c:Company){
         if(m.returning){
             const pending=[...this.relieving].find(([,task])=>task.front===c.id);
-            if(!pending)return;
+            if(!pending || !present(c) || !present(w.companies[pending[0]]))return;
             if(distance(c,w.companies[pending[0]])>105){pending[1].retireSent=-1;return;}
         }
         c.order=m.order;c.forced=m.target;
@@ -196,7 +197,10 @@ export class CampaignLogistics{
             const moving=Math.hypot(c.vx,c.vy)>2;
             const firing=w.tick-c.firingSince<150&&c.firingSince>=0||w.tick-c.lastMelee<45;
             const rate=c.assaultStage==='rush'||c.order==='charge'&&moving?.0045:c.engaged||firing?.0026:moving?.0012:-.005;
-            c.fatigue=Math.max(0,Math.min(1,c.fatigue+rate));
+            const atDepot=rate<0 && c.fatigue>0 && restRecovery(c)!==1 && this.wagons.some(v=>
+                v.faction===c.faction && !v.destroyed && v.stock>0 && distance(c,v)<170);
+            const modifier=atDepot?restRecovery(c):moving && rate>0?travelFatigue(c):1;
+            c.fatigue=Math.max(0,Math.min(1,c.fatigue+rate*modifier));
             if(c.fatigue>.6&&(c.engaged||firing))c.morale=Math.max(0,c.morale-(c.fatigue-.6)*.12);
             if(!rifle(c))continue;
             const wagon=this.wagonFor(c),rest=this.resting.get(c.id);

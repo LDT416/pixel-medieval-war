@@ -33,6 +33,7 @@ export class Director {
     private army(w: SimWorld, f: Faction) {
         const g = w.generals[f], trait = g.trait, attack = w.posture[f] === 'attack', face = f ? -1 : 1;
         const own = w.companies.filter(c => c.faction === f && c.alive>0 && c.status !== 'gone' && !w.logistics.isCommitted(c) && !w.lostSectors[f][c.sector]);
+        const seen=w.sight.visibleToArmy(w,f);
         const plan=w.plans[f];
         const free=(c:Company)=>!this.plan.assigned(c,w.tick) && !plan.reserve.includes(c.id);
         const leader = g.alive ? g.title + g.name : '代理指挥官';
@@ -52,8 +53,8 @@ export class Director {
             for (const c of own) if (free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && !isMounted(c)) w.logistics.dispatch(w,c,'advance');
         // 守方：敌军疲态尽显时转入全线反击。
         if (!attack && w.tick > 3600 && w.tick % 90 === 1) {
-            const e = (1 - f) as Faction;
-            if (w.armyMorale(e) < 38 || w.effective(f) > w.effective(e) * 1.35 || w.tick > 16500) {
+            const visiblyWorn=seen.length>0 && seen.every(c=>c.status==='rout' || c.morale<38);
+            if (visiblyWorn || w.tick > 16500) {
                 w.posture[f] = 'attack'; this.advanced[f] = true;
                 for (const c of own) if (free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && !isMounted(c) && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
                 w.say(f ? `${leader}挥舞帽子：全线前进！` : `${leader}下令：全线反击！`, f, w.frontline().x, w.frontline().y, 3);
@@ -62,12 +63,12 @@ export class Director {
         // ---- 刺刀冲锋 ----
         for (const c of own) {
             if (c.status !== 'steady' || (!isLineTroop(c) && !isGuard(c)) || c.line === 6) continue;
-            if((!free(c) && c.order!=='advance' && (c.order==='reserve' || dist(c,w.companies[c.target]??c)>260)) || w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
+            if((!free(c) && c.order!=='advance' && (c.order==='reserve' || (!seen.includes(w.companies[c.target]) || dist(c,w.companies[c.target])>260))) || w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
             if (c.order !== 'advance' && c.order !== 'hold') continue;
             const current=w.companies[c.target];
             const viable=(o:Company)=>o.faction!==f && o.alive>0 && o.line!==5 && !isMounted(o) && o.status!=='rout' && o.status!=='gone';
             const reach=w.weather==='fog'?1300:2250;
-            const t=current && viable(current)?current:w.companies.filter(o=>viable(o)&&dist(o,c)<reach)
+            const t=current && seen.includes(current) && viable(current)?current:seen.filter(o=>viable(o)&&dist(o,c)<reach)
                 .sort((a,b)=>dist(a,c)-dist(b,c))[0];
             if(!t)continue;
             let limit = ASSAULT[trait] - (attack ? 0 : 10) + (isGuard(c) && plan.reserveAt!==null ? 22 : 0);
@@ -79,7 +80,7 @@ export class Director {
             const window=w.tick-t.firstVolleyAt<80 && d<150;
             const lowAmmo=c.ammo<8*c.alive;
             if(worn && !support && c.losses>Math.max(1,c.kills)*1.3 && w.logistics.requestRelief(w,c))continue;
-            const isolated=!w.companies.some(o=>o!==t && o.faction===t.faction && o.line!==5 && o.alive>3 && o.status==='steady' && dist(o,t)<250);
+            const isolated=!seen.some(o=>o!==t && o.faction===t.faction && o.line!==5 && o.alive>3 && o.status==='steady' && dist(o,t)<250);
             const designated=c.order==='advance' && (c.sector===plan.mainEffort || isolated) && (support || c.morale>65);
             if ((d<reach && (fresh || designated) && (c.id%3!==2 || attack)) || (d<MUSKET+40 && (t.morale<limit || t.alive<c.alive*.45 || window || lowAmmo || (worn && (support || c.kills>=1.2*Math.max(1,c.losses)))))) {
                 c.order = 'assault'; c.forced = t.id;
@@ -93,15 +94,15 @@ export class Director {
                 if (!isMounted(c) || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52 || w.tick<c.blownUntil) continue;
                 if (w.rng.next() > .4) continue;
                 let best: Company | undefined, bs = 0;
-                for (const o of w.companies) {
+                for (const o of seen) {
                     if (o.faction === f || o.status === 'gone' || o.status === 'rout' || (o.alive < 4 && o.line!==5)) continue;
                     const d = dist(c, o);
                     if (d > 1600 || inWoods(o.x, o.y, 30) || inRect(layout.farm, o.x, o.y, 40)) continue;
                     if (o.formation === 'square' && o.formUntil <= w.tick) continue;
                     let s = o.status === 'shaken' ? 2 : o.formUntil > w.tick && o.formation!=='square' && w.tick-o.leftSquare>300 ? 2.4 : 0;
-                    if (isArtillery(o) && !w.companies.some(p => p.faction === o.faction && !isArtillery(p) && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
+                    if (isArtillery(o) && !seen.some(p => p.faction === o.faction && !isArtillery(p) && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
                     if(o.line===5){
-                        const cover=own.length && w.companies.some(p=>p.faction===o.faction && p.line!==5 && p.status==='steady' && p.alive>=6 && dist(p,o)<580);
+                        const cover=own.length && seen.some(p=>p.faction===o.faction && p.line!==5 && p.status==='steady' && p.alive>=6 && dist(p,o)<580);
                         if(cover || d>1150 || !w.generals[o.faction].alive)continue;
                         s=2.8;
                     }

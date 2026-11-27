@@ -23,9 +23,11 @@ export class BoardShots {
                 write++;continue;
             }
             const source=w.units[this.source[i]],kind=codes[this.kind[i]],x=this.x[i],y=this.y[i];
-            let id=Infinity;
+            let id=Infinity, bestDistance=Infinity;
             w.hash.visit(x,y,CELL,unit=>{
-                if(unit.id!==source.id && unit.x>=x-CELL/2 && unit.x<x+CELL/2 && unit.y>=y-CELL/2 && unit.y<y+CELL/2)id=Math.min(id,unit.id);
+                if(unit.id===source.id || unit.x<x-CELL/2 || unit.x>=x+CELL/2 || unit.y<y-CELL/2 || unit.y>=y+CELL/2)return;
+                const distance=(unit.x-x)**2+(unit.y-y)**2;
+                if(distance<bestDistance || (distance===bestDistance && unit.id<id)){bestDistance=distance;id=unit.id;}
             });
             const receiver=w.units[id];
             if(receiver){

@@ -3,6 +3,7 @@ import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleE
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
+import {BoardSight} from './boardSight';
 import {BoardShots} from './projectiles';
 import {Crowd} from './crowd';
 import { SpatialHash } from './spatialHash';
@@ -41,6 +42,7 @@ export class SimWorld {
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
+    sight=new BoardSight();
     boardShots=new BoardShots();
     crowd=new Crowd(); hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
@@ -55,7 +57,7 @@ export class SimWorld {
 
     reset(scale: Scale = this.scale, seed = this.seed) {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
-        this.boardShots=new BoardShots();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
+        this.sight=new BoardSight();this.boardShots=new BoardShots();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
         this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
@@ -222,6 +224,7 @@ export class SimWorld {
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
         this.logistics.step(this);
         if (this.tick % 30 === 1 && this.winner === null){
+            this.sight.scan(this);
             this.director.update(this);
             if(this.legacy && this.legacySide!==null && !this.broken[this.legacySide])this.legacy.army(this,this.legacySide);
         }
