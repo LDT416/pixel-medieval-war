@@ -2,7 +2,7 @@ import {Paths3d} from './paths3d';
 import {Scenery} from './scenery3d';
 import * as T from 'three';
 import { Rng } from '../../sim/rng';
-import { WIDTH, HEIGHT, layout, ridge, inRect } from '../../sim/maps';
+import { WIDTH, HEIGHT, layout, ridge, inRect, riverAt, onRoad } from '../../sim/maps';
 
 /** 模拟像素 → 场景单位（0.05）。场地中心为原点。 */
 export const SCALE=.05;
@@ -138,7 +138,9 @@ export function createTerrain(scene:T.Scene) {
         for(let i=0;i<spots.length;i++){
             const [ox,oz,r,s]=spots[i];
             const px=ox*span+Math.round((gx-ox*span)/span)*span,pz=oz*span+Math.round((gz-oz*span)/span)*span;
-            o.position.set(px,terrainHeight(px,pz),pz);o.rotation.y=r;o.scale.setScalar(s);o.updateMatrix();tufts.setMatrixAt(i,o.matrix);
+            const sx=fromX(px),sy=fromZ(pz);
+            const bare=sx<0||sx>WIDTH||sy<0||sy>HEIGHT||Math.abs(sx-riverAt(sy))<layout.river.width*.52||onRoad(sx,sy);
+            o.position.set(px,terrainHeight(px,pz),pz);o.rotation.y=r;o.scale.setScalar(bare?0:s);o.updateMatrix();tufts.setMatrixAt(i,o.matrix);
         }
         tufts.instanceMatrix.needsUpdate=true;tufts.computeBoundingSphere();
     }
