@@ -4,6 +4,7 @@ import { WIDTH, HEIGHT, CX, CY, LINE_GAP, createLayout, setLayout, ridgeLine, ty
 import { Rng } from './rng';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
+import { CampaignLogistics } from './campaignLogistics';
 import { advance, updateCompany, formUp, rout } from './strategy';
 import { resolveRounds, shake } from './combat';
 
@@ -27,7 +28,7 @@ export class SimWorld {
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
-    hash = new SpatialHash(); rng = new Rng(1815); director = new Director();
+    hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
     get jitter(){
         const seconds=Math.max(1,this.stationaryFrames/30);
@@ -63,6 +64,7 @@ export class SimWorld {
                 name: f ? '普鲁士比洛军' : '格鲁希元帅的右翼军' };
         }
         this.director.reset(this);
+        this.logistics.reset(this);
         this.hash.rebuild(this.units);
         this.openingOdds = this.odds();
     }
@@ -169,6 +171,7 @@ export class SimWorld {
         if (cav) born.push(this.company(f, 'cuirassier', f ? '普鲁士枪骑兵团' : '格鲁希军龙骑兵团', 3, cav, CX - face * (250 + k * 170), y0, 'wedge', 'hold', 2));
         if (guns) born.push(this.company(f, 'field_cannon', f ? '普鲁士炮兵连' : '格鲁希军炮兵连', 4, guns, CX - face * 650, y0 + ys * 80, 'battery', 'hold', 1));
         for (const c of born) { c.hx = 0; c.hy = ys; formUp(c); c.hx = face; c.hy = 0; this.reinforced[f] += c.alive; }
+        this.logistics.sync(this);
         this.say(f ? `${r.name}从侧翼杀到！布吕歇尔兑现了诺言` : `${r.name}终于赶到战场！`, f, CX - face * 400, y0, 3);
         for (const c of this.companies) if (c.status !== 'gone') {
             if (c.faction === f) c.morale = Math.min(c.base, c.morale + 10); else shake(c, 7);
@@ -182,6 +185,7 @@ export class SimWorld {
         this.hash.rebuild(this.units);
         const rf = this.reinforcement;
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
+        this.logistics.step(this);
         if (this.tick % 30 === 1 && this.winner === null) this.director.update(this);
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}

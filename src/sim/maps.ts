@@ -26,7 +26,7 @@ function empty(size:Size):Layout {
     return {...size,seed:0,lineGap:950,ridgeOwner:-1,ridgeX:size.width/2,ridgeWidth:330,farm:null,farmOwner:-1,woods:[],
         farms:[],river:{points:[],width:0},roads:[],bridges:[],ridges:[],objectives:[]};
 }
-export let layout=empty(CLASSIC_SIZE);
+export let layout=empty(CAMPAIGN_SIZE);
 export let WIDTH=layout.width, HEIGHT=layout.height, CX=WIDTH/2, CY=HEIGHT/2, LINE_GAP=layout.lineGap;
 export function setLayout(l:Layout){
     layout=l;WIDTH=l.width;HEIGHT=l.height;CX=WIDTH/2;CY=HEIGHT/2;LINE_GAP=l.lineGap;
