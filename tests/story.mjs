@@ -5,7 +5,7 @@ const w = new SimWorld(1200, Number(process.argv[2] || 6 * 7919));
 while (!w.ended) w.step();
 const t = n => (n / 30 | 0) + 's';
 console.log(w.weather, w.generals.map(g => g.name + g.trait), w.posture, w.layout.ridgeOwner, !!w.layout.farm, 'odds', w.openingOdds.toFixed(2));
-for (const n of w.news) console.log(t(n.tick).padStart(5), n.weight, n.faction, n.text);
+for (const n of w.news) console.log(t(n.tick).padStart(5), n.weight, n.faction, ['左翼','中央','右翼'][Math.max(0,Math.min(2,Math.floor(n.y*3/w.layout.height)))], n.text);
 console.log('winner', w.winner, w.reason, t(w.tick));
 
 console.log('转折点',w.turningPoints);console.table([...w.companies].sort((a,b)=>b.kills-a.kills).slice(0,3).map(({name,kills,losses,routs,rallies})=>({name,kills,losses,routs,rallies})));

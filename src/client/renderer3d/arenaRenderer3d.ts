@@ -1,4 +1,5 @@
-import {CameraGestures,groundOffset} from './cameraGestures';
+import {StrategicLayer} from './strategicLayer';
+import {CameraGestures,groundOffset,viewElevation} from './cameraGestures';
 import {WIDTH,HEIGHT} from '../../sim/maps';
 import * as T from 'three';
 import type { SimWorld } from '../../sim/world';
@@ -10,7 +11,6 @@ import { BattlefieldLight,type Lighting } from './lightingPresets';
 import { PostFx } from './postFx';
 import { GoreSystem } from './goreSystem3d';
 import { SmokeSystem } from './smokeSystem3d';
-const elevation=39*Math.PI/180;
 export class ArenaRenderer3d{
     private renderer:T.WebGLRenderer;private scene=new T.Scene();
     readonly tracers=new Tracers3d(this.scene);
@@ -19,6 +19,8 @@ export class ArenaRenderer3d{
     private standees:Standees;private post=new PostFx();private terrain:ReturnType<typeof createTerrain>;
     private target=new T.Vector3();private goal=new T.Vector3();private distance=158;private desired=158;
     private held=new Set<string>();private balls:T.InstancedMesh;private matrix=new T.Matrix4();
+    private strategy:StrategicLayer;
+    get mapSheet(){return this.strategy.sheet;}
     private gestures!:CameraGestures;
     private quality=0;private slowSamples=0;
     private mobile=matchMedia('(pointer:coarse)').matches || (navigator.maxTouchPoints>0 && Math.min(innerWidth,innerHeight)<=600);
@@ -53,13 +55,14 @@ export class ArenaRenderer3d{
         this.lights=new BattlefieldLight(this.scene);this.terrain=createTerrain(this.scene);
         this.standees=new Standees(this.scene);this.smoke=new SmokeSystem(this.scene,this.lights);
         this.balls=new T.InstancedMesh(new T.IcosahedronGeometry(.40,1),new T.MeshStandardMaterial({color:0x393c41,metalness:.45,roughness:.51}),320);
+        this.strategy=new StrategicLayer(this.scene);
         this.balls.count=0;this.balls.frustumCulled=false;this.scene.add(this.balls);
         this.resize();this.desired=this.distance=Math.min(300,Math.max(190,330/this.camera.aspect));this.controls();
         new ResizeObserver(()=>this.resize()).observe(canvas);
     }
     static async create(canvas:HTMLCanvasElement){
         const arena=new ArenaRenderer3d(canvas);
-        [arena.gore]=await Promise.all([GoreSystem.create(arena.scene,arena.lights),arena.terrain.load()]);
+        [arena.gore]=await Promise.all([GoreSystem.create(arena.scene,arena.lights),arena.terrain.load(),arena.standees.ready]);
         return arena;
     }
     private resize(){
@@ -102,10 +105,18 @@ export class ArenaRenderer3d{
         const smooth=1-Math.exp(-realDt*(performance.now()-this.userAt<1500?11:2.6));
         this.distance=T.MathUtils.lerp(this.distance,this.desired,smooth);this.target.lerp(this.goal,smooth);
         this.target.y=terrainHeight(this.target.x,this.target.z);
+        const elevation=viewElevation(this.distance);
         this.camera.position.copy(this.target);this.camera.position.y+=this.distance*Math.sin(elevation)+this.tracers.cameraKick(this.target.x,this.target.z,this.distance,w.tick+alpha);this.camera.position.z+=this.distance*Math.cos(elevation);this.camera.lookAt(this.target);
         this.terrain.updateView(this.target.x,this.target.z,this.distance,this.camera.aspect);
         this.terrain.wind.value+=dt;this.lights.update(this.target,this.distance,this.camera.aspect,dt);
-        this.standees.draw(w.units,w.companies,w.tick,alpha);this.advanceEffects(w,dt);
+        this.strategy.update(w,this.distance,realDt,this.canvas.clientHeight,performance.now());
+        const soldierFade=this.strategy.soldierOpacity;this.smoke.setDistant(1-soldierFade);
+        this.standees.mesh.visible=this.standees.ao.visible=soldierFade>.005;
+        const spriteMaterial=this.standees.mesh.material as T.Material;
+        if(spriteMaterial.transparent!==(soldierFade<.995)){spriteMaterial.transparent=soldierFade<.995;spriteMaterial.needsUpdate=true;}
+        spriteMaterial.opacity=soldierFade;spriteMaterial.alphaTest=.45*soldierFade;
+        (this.standees.ao.material as T.Material).opacity=soldierFade;
+        if(this.standees.mesh.visible)this.standees.draw(w.units,w.companies,w.tick,alpha);this.advanceEffects(w,dt);
         this.balls.count=Math.min(w.rounds.length,this.balls.instanceMatrix.count);
         for(let i=0;i<this.balls.count;i++){
             const p=roundPosition(w.rounds[i],alpha),x=toX(p.x),z=toZ(p.y);
@@ -117,6 +128,6 @@ export class ArenaRenderer3d{
         }
         this.tracers.draw(w.tick,alpha,this.canvas.clientWidth,this.canvas.clientHeight,this.distance,this.camera);
         upload(this.balls.instanceMatrix,this.balls.count);this.renderer.info.reset();
-        this.post.draw(this.renderer,this.scene,this.camera);
+        this.post.draw(this.renderer,this.strategy.full?this.strategy.overview:this.scene,this.camera);
     }
 }

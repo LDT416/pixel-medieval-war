@@ -6,9 +6,12 @@ interface GestureCamera {
     move:(x:number,z:number)=>void;
     touch:()=>void;
 }
+export function viewElevation(distance:number){
+    const t=Math.min(1,Math.max(0,(distance-300)/600));return (39+32*t*t*(3-2*t))*Math.PI/180;
+}
 /** 平面与屏幕射线的交点相对相机注视点的偏移（场景单位）。 */
 export function groundOffset(nx:number,ny:number,d:number,aspect:number){
-    const angle=39*Math.PI/180, f=Math.tan(14*Math.PI/180);
+    const angle=viewElevation(d), f=Math.tan(14*Math.PI/180);
     const t=d*Math.sin(angle)/(Math.sin(angle)-ny*f*Math.cos(angle));
     return {x:t*nx*f*aspect,z:d*Math.cos(angle)+t*(-Math.cos(angle)-ny*f*Math.sin(angle))};
 }

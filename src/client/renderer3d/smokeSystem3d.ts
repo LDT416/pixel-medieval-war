@@ -12,11 +12,13 @@ export class SmokeSystem{
     private soil:T.InstancedMesh;private clods:{x:number;y:number;z:number;vx:number;vy:number;vz:number;age:number;s:number}[]=[];
     private flash:T.InstancedMesh;private flames:{x:number;y:number;z:number;angle:number;age:number;size:number}[]=[];
     private matrix=new T.Object3D();
+    private distant={value:1};
+    setDistant(far:number){this.distant.value=1-.6*far;}
     private particleLimit=CAP;
     reduceParticles(){this.particleLimit=Math.floor(CAP*.45);if(this.items.length>this.particleLimit)this.items.length=this.particleLimit;}
     private items:Puff[]=[];private rng=new Rng(53);private mesh:T.InstancedMesh;
     private shape:T.InstancedBufferAttribute;private style:T.InstancedBufferAttribute;
-    private uniforms={uSun:{value:new T.Color()},uSky:{value:new T.Color()},uLight:{value:Array.from({length:9},()=>new T.Vector4())}};
+    private uniforms={uDistant:this.distant,uSun:{value:new T.Color()},uSky:{value:new T.Color()},uLight:{value:Array.from({length:9},()=>new T.Vector4())}};
     get count(){return this.items.length;}
     constructor(scene:T.Scene,private lights:BattlefieldLight){
         this.soil=new T.InstancedMesh(new T.DodecahedronGeometry(1,0),new T.MeshStandardMaterial({color:0x685338,flatShading:true,roughness:.95}),1100);
@@ -43,7 +45,7 @@ export class SmokeSystem{
                     mv=modelViewMatrix*vec4(aPuff.xyz+vec3(position.x,0.,position.y)*aPuff.w,1.);
                 }else mv.xy+=position.xy*aPuff.w;
                 gl_Position=projectionMatrix*mv;}`,
-            fragmentShader:`uniform vec3 uSun,uSky;varying vec2 v;varying vec3 style;varying float fire;
+            fragmentShader:`uniform float uDistant;uniform vec3 uSun,uSky;varying vec2 v;varying vec3 style;varying float fire;
             void main(){
                 float age=style.x,k=style.y,phase=style.z,r=length(v);
                 float warp=.09*sin(5.*v.x+phase+age)*cos(4.*v.y-phase)+.045*sin(v.x*12.+v.y*6.+phase);
@@ -59,7 +61,7 @@ export class SmokeSystem{
                 if(k>6.5)alpha*=.32;
                 if(k>3.5 && k<4.5){col=vec3(5.,2.3,.42);alpha=(1.-smoothstep(.08,1.,r))*(1.-age);}
                 if(k>4.5 && k<5.5){alpha=(1.-smoothstep(.025,.14,abs(r-.77)))*(1.-age)*.41;col=vec3(.46,.36,.21);}
-                if(alpha<.007)discard;gl_FragColor=vec4(col,alpha);
+                if(alpha<.007)discard;gl_FragColor=vec4(col,alpha*uDistant);
             }`});
         this.mesh=new T.InstancedMesh(g,mat,CAP);this.mesh.count=0;this.mesh.frustumCulled=false;this.mesh.renderOrder=8;scene.add(this.mesh);
     }

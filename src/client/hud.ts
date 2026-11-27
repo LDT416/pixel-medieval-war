@@ -1,3 +1,5 @@
+import {sectorOf} from '../sim/maps';
+import {showDeployment,showDebrief} from './battlePlansView';
 import { scales, TRAITS, WEATHER, type Scale, type Faction, type Company } from '../sim/arenaTypes';
 import type { Lighting } from './renderer3d/lightingPresets';
 import { ARMY, type SimWorld } from '../sim/world';
@@ -113,6 +115,7 @@ export class Hud{
         <div class="stake"><span>军饷 <b>${purse.points}</b>　战绩 ${purse.wins} 胜 ${purse.losses} 负${purse.streak>1?`　连胜 ${purse.streak}`:''}</span>
         <span class="chips">下注 ${(stakes.length?stakes:[purse.points]).map(s=>`<button data-stake="${s}" aria-pressed="${s===this.stakeAmount}">${s}</button>`).join('')}</span></div>
         <button class="watch ghost" data-side="-1">不押注，直接观战</button>`;
+        showDeployment(card,w);
         card.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach(b=>b.onclick=()=>{
             this.stakeAmount=Number(b.dataset.stake);card.querySelectorAll('[data-stake]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
         });
@@ -141,10 +144,11 @@ export class Hud{
             const list=this.get('ticker');
             for(const n of w.news.slice(this.shownNews)){
                 if(n.weight<1)continue;
-                const category=n.text.replace(/^.*?(?=拔出马刀|上刺刀|掉转马头|丢下火枪|在.*喝令下重整)/,'').split('，')[0];
+                const sector=['左翼','中央','右翼'][sectorOf(n.y,w.layout)];
+                const category=sector+n.text.replace(/^.*?(?=拔出马刀|上刺刀|掉转马头|丢下火枪|在.*喝令下重整)/,'').split('，')[0];
                 const prior=Array.from(list.children).find(el=>(el as HTMLElement).dataset.key===category && Number((el as HTMLElement).dataset.tick)>=n.tick-150 && el.classList.contains('f'+n.faction)) as HTMLElement|undefined;
                 const li=prior??document.createElement('li');li.dataset.key=category;li.dataset.tick=String(n.tick);li.dataset.count=String(Number(li.dataset.count||0)+1);li.className='f'+n.faction+' w'+n.weight;
-                li.innerHTML=`<time>${formatTime(n.tick)}</time>${esc(n.text)}${Number(li.dataset.count)>1?" ×"+li.dataset.count:""}`;li.tabIndex=0;li.onclick=()=>this.cb.jump(n.x,n.y);li.onkeydown=e=>{if(e.key==="Enter")li.click()};list.prepend(li);
+                li.innerHTML=`<time>${formatTime(n.tick)}</time><small class="sector-name">${sector}</small>${esc(n.text)}${Number(li.dataset.count)>1?" ×"+li.dataset.count:""}`;li.tabIndex=0;li.onclick=()=>this.cb.jump(n.x,n.y);li.onkeydown=e=>{if(e.key==="Enter")li.click()};list.prepend(li);
                 if(n.weight>=3){const h=this.get('headline');h.textContent=n.text;h.className='headline f'+n.faction;h.hidden=false;this.headlineUntil=now+4200;}
             }
             while(list.children.length>32)list.lastElementChild!.remove();
@@ -181,6 +185,7 @@ export class Hud{
             <h3>战功榜</h3><table><thead><tr><th>连队</th><th>歼敌</th><th>阵亡</th><th>溃散/重整</th></tr></thead><tbody>${rows}</tbody></table>
             <p>伤亡率最高 · ${esc(worst.name)}（${worst.losses}/${worst.peak}）</p>
             <h3>阵亡 / 溃逃</h3><table><thead><tr><th>兵种</th><th>法军</th><th>联军</th></tr></thead><tbody>${losses}</tbody></table>`;
+        showDebrief(this.get('analysis'),w);
         this.get('victory').hidden=false;this.root.classList.add('victory-open');
     }
     hideVictory(){this.get('victory').hidden=true;this.root.classList.remove('victory-open');}

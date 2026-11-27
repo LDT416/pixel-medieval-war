@@ -5,6 +5,7 @@ import { Rng } from './rng';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
 import { CampaignLogistics } from './campaignLogistics';
+import { CampaignObjectives } from './campaignObjectives';
 import { advance, updateCompany, formUp, rout } from './strategy';
 import { resolveRounds, shake } from './combat';
 
@@ -28,7 +29,7 @@ export class SimWorld {
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
-    hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics();
+    hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
     get jitter(){
         const seconds=Math.max(1,this.stationaryFrames/30);
@@ -64,7 +65,7 @@ export class SimWorld {
                 name: f ? '普鲁士比洛军' : '格鲁希元帅的右翼军' };
         }
         this.director.reset(this);
-        this.logistics.reset(this);
+        this.logistics.reset(this);this.objectives.reset();
         this.hash.rebuild(this.units);
         this.openingOdds = this.odds();
     }
@@ -205,26 +206,13 @@ export class SimWorld {
         }
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
         if(this.tick%30===0){
-            if(this.winner===null)this.updateFarm();
+            if(this.winner===null)this.objectives.update(this);
             this.timeline.push({tick:this.tick,odds:this.odds(),eff:[this.effective(0),this.effective(1)],morale:[this.armyMorale(0),this.armyMorale(1)]});
         }
         if (this.winner !== null && this.tick - this.endTick >= PURSUIT) {
             this.ended = true; this.summarize(); this.rounds.length = 0;
             for (const u of this.units) if (u.hp > 0) { u.moving = false; u.vx = u.vy = 0; u.pose = 'stand'; }
         }
-    }
-    private updateFarm(){
-        const farm=this.layout.farm, owner=this.layout.farmOwner;
-        if(!farm || this.companies.some(c=>c.line===6 && c.faction===owner && c.alive && c.status!=='rout'))return;
-        const distance=(c:Company)=>Math.hypot(c.x-farm.x,c.y-farm.y);
-        const attacker=this.companies.filter(c=>c.faction!==owner && c.status==='steady' && c.alive && (c.kind==='line_infantry'||c.kind==='guard_grenadier') && distance(c)<=200).sort((a,b)=>distance(a)-distance(b))[0];
-        if(!attacker)return;
-        for(const c of this.companies)if(c.line===6)c.line=1;
-        attacker.line=6;attacker.order='hold';attacker.forced=-1;attacker.homeX=farm.x;attacker.homeY=farm.y;
-        this.layout.farmOwner=attacker.faction;attacker.captures++;
-        this.say(attacker.name+'攻占了农庄！',attacker.faction,farm.x,farm.y,2);
-        const relief=this.companies.filter(c=>c.faction===owner && c.line===1 && c.alive>0 && c.status==='steady').sort((a,b)=>distance(a)-distance(b))[0];
-        if(relief){relief.order='assault';relief.forced=attacker.id;}
     }
     private summarize(){
         const samples=[{tick:0,odds:this.openingOdds},...this.timeline.filter(p=>p.tick<this.endTick),{tick:this.endTick,odds:this.winner===0?1:0}];

@@ -1,5 +1,6 @@
 import './style.css';
 import './client/mobileHud.css';
+import {TacticalMiniMap} from './client/tacticalMiniMap';
 import { atlasPreview } from './client/renderer3d/spriteAtlas';
 import type { News } from './sim/arenaTypes';
 import { SimWorld } from './sim/world';
@@ -31,6 +32,7 @@ async function start(){
     },jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
+    const miniMap=new TacticalMiniMap(document.querySelector('#hud')!,arena);
     arena.tracers.installControl();
     function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
     function reset(scale:Scale,seed:number){
@@ -130,7 +132,7 @@ async function start(){
         arena.render(world,real,world.ended?real:dt,accumulator);
         fpsTime+=elapsed;frameCount++;
         if(fpsTime>=.5){fps=frameCount/fpsTime;arena.observeFps(fps);fpsTime=frameCount=0;}
-        hudTime+=elapsed;if(hudTime>.15){hud.update(world,now);hudTime=0;
+        hudTime+=elapsed;if(hudTime>.15){hud.update(world,now);miniMap.update(world);hudTime=0;
             const host=document.getElementById('labels')!;
             host.replaceChildren();
             if(arena.zoom<90 && !world.ended && !hud.intelOpen){
