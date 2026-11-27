@@ -134,6 +134,7 @@ async function start(){
         if(!world.ended){
             accumulator+=dt*TICKS;
             const stepLimit=Math.min(8,Math.ceil(speed*2)+1);
+            const catchUpDeadline=performance.now()+1000/60;
             let steps=0;
             while(accumulator>=1 && !world.ended && steps<stepLimit){world.step();arena.events(world);sound.step(world);director(now);accumulator--;steps++;
                 if(world.tick===world.deployEnd){deploymentPlayback=false;accumulator=0;controls();break;}
@@ -141,6 +142,7 @@ async function start(){
                     const event=world.news.slice(skipFrom).find(n=>n.weight>=2);skipFrom=world.news.length;
                     if(event){setSpeed(1);arena.focus(event.x,event.y,110);accumulator=0;break;}
                 }
+                if(accumulator>=1 && performance.now()>=catchUpDeadline)break;
             }
             if(world.ended)accumulator=0;
             else if(accumulator>=1)accumulator%=1;
