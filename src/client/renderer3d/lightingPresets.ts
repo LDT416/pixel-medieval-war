@@ -42,7 +42,7 @@ export class BattlefieldLight {
     }
     update(target:T.Vector3,distance:number,aspect:number,dt:number){
         for(const p of this.flashes){p.intensity*=Math.exp(-dt*13);if(p.intensity<.02)p.intensity=0;}
-        const radius=Math.max(12,Math.ceil(distance*.31*Math.max(aspect,1.5)/2)*2), texel=2*radius/2048;
+        const radius=Math.min(120,Math.max(12,Math.ceil(distance*.31*Math.max(aspect,1.5)/2)*2)), texel=2*radius/2048;
         const c=this.center.copy(target);
         c.addScaledVector(this.right,Math.round(c.dot(this.right)/texel)*texel-c.dot(this.right));
         c.addScaledVector(this.up,Math.round(c.dot(this.up)/texel)*texel-c.dot(this.up));

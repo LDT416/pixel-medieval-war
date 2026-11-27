@@ -1,3 +1,4 @@
+import {Paths3d} from './paths3d';
 import {Scenery} from './scenery3d';
 import * as T from 'three';
 import { Rng } from '../../sim/rng';
@@ -9,7 +10,7 @@ export const toX=(x:number)=>(x-WIDTH/2)*SCALE;
 export const toZ=(y:number)=>(y-HEIGHT/2)*SCALE;
 export const fromX=(x:number)=>x/SCALE+WIDTH/2;
 export const fromZ=(z:number)=>z/SCALE+HEIGHT/2;
-export const HALF_W=WIDTH/2*SCALE, HALF_H=HEIGHT/2*SCALE;
+export let HALF_W=WIDTH/2*SCALE, HALF_H=HEIGHT/2*SCALE;
 const RIDGE=3.8;
 export function terrainHeight(x:number,z:number) {
     return .71*Math.sin(x*.048+z*.033)+.43*Math.cos(z*.083-x*.017)+.23*Math.sin(x*.093+z*.069)+RIDGE*ridge(fromX(x),fromZ(z));
@@ -59,16 +60,14 @@ function meadowTexture(){
         }
     }
     const texture=new T.CanvasTexture(canvas); texture.colorSpace=T.SRGBColorSpace;
-    texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.repeat.set(12,10);texture.anisotropy=4;
+    texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.repeat.set(1.75,1.75);texture.anisotropy=4;
     return texture;
 }
 
 export function createTerrain(scene:T.Scene) {
-    const tex=meadowTexture(), g=new T.PlaneGeometry(700,560,460,370);
-    g.rotateX(-Math.PI/2);
-    const pos=g.attributes.position;
-    const colors=new Float32Array(pos.count*3);
-    g.setAttribute('color',new T.BufferAttribute(colors,3));
+    const tex=meadowTexture();
+    const chunk=2000*SCALE;
+    const chunks=new Map<string,{mesh:T.Mesh<T.PlaneGeometry,T.MeshStandardMaterial>;detail:number}>();
     const mat=new T.MeshStandardMaterial({map:tex,vertexColors:true,roughness:.93,bumpMap:tex,bumpScale:.08,roughnessMap:tex});
     mat.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader
         .replace('#include <map_fragment>', `vec4 primaryGrass=texture2D(map,vMapUv);
@@ -76,7 +75,7 @@ export function createTerrain(scene:T.Scene) {
             vec4 brush=texture2D(map,crossField);
             diffuseColor*=mix(primaryGrass,brush,.32);`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor=.74+.23*roughnessFactor;');};
-    const ground=new T.Mesh(g,mat);ground.receiveShadow=true;scene.add(ground);
+
     const rng=new Rng(29), tuft=new T.BufferGeometry(), blades:number[]=[];
     for(let j=0;j<5;j++){
         const x=rng.next()*.34-.17,z=rng.next()*.28-.14,h=.12+rng.next()*.21;
@@ -89,31 +88,66 @@ export function createTerrain(scene:T.Scene) {
         s.uniforms.uWind=time;s.vertexShader='uniform float uWind;\n'+s.vertexShader.replace('#include <begin_vertex>',
         '#include <begin_vertex>\n transformed.x+=position.y*.28*sin(uWind*1.7+instanceMatrix[3].x*.34+instanceMatrix[3].z*.4);');
     };
-    const tufts=new T.InstancedMesh(tuft,tuftMat,6500),o=new T.Object3D(),c=new T.Color();
-    const spots=Array.from({length:tufts.count},()=>[(rng.next()-.5)*(HALF_W*2+40),(rng.next()-.5)*(HALF_H*2+30),rng.next()*6.28,.55+rng.next()*.95]);
-    for(let i=0;i<tufts.count;i++)tufts.setColorAt(i,c.setHex([0x7f8648,0xa89c55,0x657648,0xabaa68][i%4]));
+    const mobile=matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints>0 && Math.min(screen.width,screen.height)<=600;
+    const tufts=new T.InstancedMesh(tuft,tuftMat,mobile?3250:6500),o=new T.Object3D(),col=new T.Color();
+    const spots=Array.from({length:tufts.count},()=>[rng.next()-.5,rng.next()-.5,rng.next()*6.28,.55+rng.next()*.95]);
+    for(let i=0;i<tufts.count;i++)tufts.setColorAt(i,col.setHex([0x7f8648,0xa89c55,0x657648,0xabaa68][i%4]));
     tufts.receiveShadow=true;tufts.castShadow=true;scene.add(tufts);
-    const scenery=new Scenery(scene,time);
-    function rebuild(){
+    const scenery=new Scenery(scene,time), paths=new Paths3d(scene);
+    let lastView='',grassX=Infinity,grassZ=Infinity;
+    function tile(ix:number,iz:number,detail:number){
+        const left=ix*chunk-HALF_W,back=iz*chunk-HALF_H;
+        const g=new T.PlaneGeometry(chunk,chunk,detail,detail);g.rotateX(-Math.PI/2);
+        const pos=g.attributes.position,uv=g.attributes.uv,colors=new Float32Array(pos.count*3);
         for(let i=0;i<pos.count;i++){
-            const x=pos.getX(i),z=pos.getZ(i),h=terrainHeight(x,z);pos.setY(i,h);
-            // Long bands of pasture and dried grass; the ridge crest is drier and the farm yard is trampled.
-            const dry=.5+.5*Math.sin(x*.067+z*.094+1.8*Math.sin(z*.063));
-            const track=Math.exp(-((z-10*Math.sin(x*.044)-x*.18-15)**2)/3);
-            const crest=ridge(fromX(x),fromZ(z)), yard=inRect(layout.farm,fromX(x),fromZ(z),60)?1:0;
-            colors[i*3]=.78+dry*.20+track*.13+crest*.10+yard*.12;
-            colors[i*3+1]=.88+dry*.08-track*.14-crest*.02-yard*.06;
-            colors[i*3+2]=.76+dry*.15-track*.03-crest*.08-yard*.08;
+            const x=left+chunk/2+pos.getX(i),z=back+chunk/2+pos.getZ(i),sx=fromX(x),sy=fromZ(z);
+            pos.setY(i,terrainHeight(x,z));uv.setXY(i,x/chunk,z/chunk);
+            const dry=.5+.5*Math.sin(x*.067+z*.094+1.8*Math.sin(z*.063)),crest=ridge(sx,sy);
+            const yard=layout.farms.some(f=>inRect(f,sx,sy,60))?1:0;
+            colors.set([.78+dry*.20+crest*.10+yard*.12,.88+dry*.08-crest*.02-yard*.06,.76+dry*.15+crest*.08-yard*.08],i*3);
         }
-        pos.needsUpdate=true;g.attributes.color.needsUpdate=true;g.computeVertexNormals();
-        for(let i=0;i<tufts.count;i++){
-            const [x,z,r,s]=spots[i];
-            o.position.set(x,terrainHeight(x,z),z);o.rotation.y=r;o.scale.setScalar(s);
-            o.updateMatrix();tufts.setMatrixAt(i,o.matrix);
+        g.setAttribute('color',new T.BufferAttribute(colors,3));g.computeVertexNormals();
+        const mesh=new T.Mesh(g,mat);mesh.position.set(left+chunk/2,0,back+chunk/2);
+        mesh.receiveShadow=true;scene.add(mesh);return mesh;
+    }
+    function updateView(x:number,z:number,distance:number,aspect:number){
+        const ix=Math.floor((x+HALF_W)/chunk),iz=Math.floor((z+HALF_H)/chunk);
+        const rx=Math.max(1,Math.ceil(distance*.52*aspect/chunk)+1),rz=Math.max(1,Math.ceil(distance*.65/chunk)+1);
+        const near=distance<360,key=[ix,iz,rx,rz,near].join('/');
+        if(key!==lastView){
+            lastView=key;
+            const wanted=new Set<string>();
+            for(let j=Math.max(-2,iz-rz);j<=Math.min(Math.ceil(2*HALF_H/chunk)+1,iz+rz);j++){
+                for(let i=Math.max(-2,ix-rx);i<=Math.min(Math.ceil(2*HALF_W/chunk)+1,ix+rx);i++){
+                    const name=i+','+j,detail=near && Math.abs(i-ix)<=1 && Math.abs(j-iz)<=1?48:12;
+                    wanted.add(name);
+                    const old=chunks.get(name);if(old?.detail===detail)continue;
+                    if(old){scene.remove(old.mesh);old.mesh.geometry.dispose();}
+                    chunks.set(name,{mesh:tile(i,j,detail),detail});
+                }
+            }
+            for(const [name,t] of chunks)if(!wanted.has(name)){scene.remove(t.mesh);t.mesh.geometry.dispose();chunks.delete(name);}
         }
-        tufts.instanceMatrix.needsUpdate=true;
-        scenery.rebuild();
+        tufts.visible=distance<325;
+        if(!tufts.visible)return;
+        const gx=Math.round(x/16)*16,gz=Math.round(z/16)*16;
+        if(gx===grassX && gz===grassZ)return;
+        grassX=gx;grassZ=gz;
+        // 固定世界坐标格点替换离开镜头的草，不让已有草簇随镜头滑动。
+        const span=160;
+        for(let i=0;i<spots.length;i++){
+            const [ox,oz,r,s]=spots[i];
+            const px=ox*span+Math.round((gx-ox*span)/span)*span,pz=oz*span+Math.round((gz-oz*span)/span)*span;
+            o.position.set(px,terrainHeight(px,pz),pz);o.rotation.y=r;o.scale.setScalar(s);o.updateMatrix();tufts.setMatrixAt(i,o.matrix);
+        }
+        tufts.instanceMatrix.needsUpdate=true;tufts.computeBoundingSphere();
+    }
+    function rebuild(){
+        HALF_W=WIDTH*SCALE/2;HALF_H=HEIGHT*SCALE/2;
+        for(const t of chunks.values()){scene.remove(t.mesh);t.mesh.geometry.dispose();}
+        chunks.clear();lastView='';grassX=grassZ=Infinity;
+        updateView(0,0,158,1.7);paths.rebuild();scenery.rebuild();
     }
     rebuild();
-    return {wind:time,rebuild,load:async()=>{await scenery.load();scenery.rebuild();}};
+    return {wind:time,updateView,rebuild,load:async()=>{await scenery.load();scenery.rebuild();}};
 }

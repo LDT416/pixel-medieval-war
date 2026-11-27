@@ -101,6 +101,7 @@ export class ArenaRenderer3d{
         this.distance=T.MathUtils.lerp(this.distance,this.desired,smooth);this.target.lerp(this.goal,smooth);
         this.target.y=terrainHeight(this.target.x,this.target.z);
         this.camera.position.copy(this.target);this.camera.position.y+=this.distance*Math.sin(elevation);this.camera.position.z+=this.distance*Math.cos(elevation);this.camera.lookAt(this.target);
+        this.terrain.updateView(this.target.x,this.target.z,this.distance,this.camera.aspect);
         this.terrain.wind.value+=dt;this.lights.update(this.target,this.distance,this.camera.aspect,dt);
         this.standees.draw(w.units,w.companies,w.tick,alpha);this.advanceEffects(w,dt);
         this.balls.count=Math.min(w.rounds.length,this.balls.instanceMatrix.count);

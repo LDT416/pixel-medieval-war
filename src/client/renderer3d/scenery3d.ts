@@ -33,8 +33,7 @@ class FlatScenery {
     rebuild(){
         this.group.clear();
         const rng=new Rng(Math.floor(layout.seed*1000)+7);
-        const f=layout.farm;
-        if(f){
+        for(const f of layout.farms){
             const x=toX(f.x),z=toZ(f.y);
             this.put('farmhouse',x,z-1,f.w*SCALE*.95);
             this.put('haystack',x+f.w*SCALE*.55,z+2.5,2.8);
@@ -88,7 +87,7 @@ export class Scenery{
             o.position.set(x,terrainHeight(x,z)-.08,z);o.rotation.y=yaw;o.scale.setScalar(scale);o.updateMatrix();
             if(!groups.has(name))groups.set(name,[]);groups.get(name)!.push(o.matrix.clone());
         };
-        if(layout.farm){const f=layout.farm;put('Farm',toX(f.x),toZ(f.y),f.w*SCALE/9.5,layout.farmOwner===0?Math.PI:0);}
+        for(const f of layout.farms){put('Farm',toX(f.x),toZ(f.y),f.w*SCALE/9.5,layout.farmOwner===0?Math.PI:0);}
         for(const g of layout.woods)for(let i=0;i<Math.round(g.r*g.r/2300);i++){
             const a=rng.next()*Math.PI*2,r=Math.sqrt(rng.next())*g.r,x=toX(g.x+Math.cos(a)*r),z=toZ(g.y+Math.sin(a)*r);
             const size=.8+rng.next()*.45,yaw=rng.next()*Math.PI*2;
