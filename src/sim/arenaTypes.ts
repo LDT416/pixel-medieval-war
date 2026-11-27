@@ -19,7 +19,7 @@ export interface Soldier {
     face: number; moving: boolean; pose: Action; hitAt: number; firedAt: number; fireAt: number;
     stride: number; speed: number; cooldown: number; foe: number;
     aimTarget:number; aimX:number; aimY:number; rangeError:number; shotsOnTarget:number;
-    px:number; py:number; turnFrames:number; marchUntil:number; general: boolean; jx: number; jy: number;
+    px:number; py:number; turnFrames:number; marchUntil:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
@@ -31,10 +31,12 @@ export interface Company {
     engaged: boolean; checkedAt: number; chargeAt: number;
     /** 0 一线 · 1 二线 · 2 近卫预备队 · 3 骑兵 · 4 炮兵 · 5 参谋部 · 6 据点守军 · 7 援军 */
     line: number;
-    kills: number; underFire: number; speed: number; colors: number; rallied: number;
+    losses:number; volleys:number; routs:number; charges:number; captures:number; wooded:boolean; rallies:number; kills: number; underFire: number; speed: number; colors: number; rallied: number;
 }
 export interface General { faction: Faction; name: string; title: string; trait: Trait; unit: Soldier | null; company: number; alive: boolean }
-export interface News { tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
+export interface Sample {tick:number; odds:number; eff:[number,number]; morale:[number,number]}
+export interface TurningPoint {tick:number; kind:"decisive"|"swing"; delta:number; from:number; to:number; causes:News[]}
+export interface News { odds:number; tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
 export interface BattleEvent {
     type: 'fire'|'hit'|'death'|'impact'|'slash';
     x: number; y: number; dx: number; dy: number; faction: Faction; kind: Kind;

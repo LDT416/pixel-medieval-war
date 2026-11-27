@@ -23,7 +23,7 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
     w.alive[u.faction]--; w.dead[u.faction]++;
     emit(w, 'death', u, dx, dy, explosive);
     const c = w.companies[u.company];
-    c.alive--;
+    c.alive--;c.losses++;
     const lost = 1 - c.alive / c.peak;
     shake(c, (c.kind === 'field_cannon' ? 70 : c.kind === 'guard_grenadier' ? 62 : 95) / Math.max(6, c.peak) * (1 + lost * 1.4));
     if (u.kind === 'bannerman' && --c.colors === 0 && c.alive > 3) {
@@ -45,7 +45,7 @@ function victim(w: SimWorld, t: Company, front: number) {
 }
 /** 整连齐射：按连计算命中率，再给每名射手排一个错开几帧的开火时刻，形成一排排的枪焰涟漪。 */
 export function volley(w: SimWorld, c: Company, t: Company) {
-    const d = dist(c, t);
+    c.volleys++;const d = dist(c, t);
     let p = .03 + .15 * Math.pow(1 - Math.min(1, d / MUSKET), 1.5);
     if (t.formation === 'square' || t.formation === 'column') p *= 1.4;
     if (t.kind === 'cuirassier') p *= 1.25;
@@ -123,7 +123,7 @@ export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
         // 霰弹：近距离一炮扫倒一片。
         const dx = (t.x - g.x) / Math.max(1, d), dy = (t.y - g.y) / Math.max(1, d);
         g.firedAt=w.tick; emit(w, 'fire', g, dx, dy, true);
-        const n = w.rng.int(2, 4);
+        const n = Math.round(w.rng.int(2,4)*(t.formation==='square'?1.5:1));
         for (let i = 0; i < n; i++) {
             const v = victim(w, t, t.members.length);
             if (v) damage(w, v, w.rng.int(70, 160), dx, dy, true, c);
@@ -146,7 +146,10 @@ export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     let roll=w.weather==='rain'?100:280;
     if(blocked(tx,ty,dx,dy,roll))return;
     g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
-    if (behindCrest(ax, ay, t.faction)) roll *= .3;
+    if (behindCrest(ax, ay, t.faction)){
+        roll*=.3;
+        if(w.tick-([...w.news].reverse().find(n=>n.text.includes('炮弹砸在山脊'))?.tick??-1000)>900)w.say('炮弹砸在山脊上，没能弹过去',g.faction,ax,ay,1);
+    }
     w.rounds.push({ x: g.x, y: g.y, tx, ty, dx, dy, age: 0, duration: Math.max(6, Math.ceil(dd / 60)), roll, rolled: 0, speed: 24,
         gun: g, faction: g.faction, company: c.id, kills: 0, touched: [] });
     emit(w, 'fire', g, dx, dy, true);
@@ -170,8 +173,8 @@ export function resolveRounds(w: SimWorld) {
         r.rolled += step; r.speed *= .985;
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
         const source = w.companies[r.company];
-        if (r.kills < 3) w.hash.visit(px, py, 8, u => {
-            if (u.faction === r.faction || r.kills >= 3) return;
+        if (r.kills < 5) w.hash.visit(px, py, 8, u => {
+            if (u.faction === r.faction || r.kills >= (w.companies[u.company].formation==='square'?5:3)) return;
             if (inRect(layout.farm, u.x, u.y, 8) && w.rng.next() < .7) { r.roll = 0; return; }
             damage(w, u, 190, r.dx, r.dy, true, source);
             r.kills++; r.roll -= 28;

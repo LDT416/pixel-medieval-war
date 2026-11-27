@@ -16,3 +16,11 @@
 @media(max-width:980px){.mast{left:14px;gap:4px}.insignia{width:35px}.mast h1{font-size:20px}.controls{width:240px;right:9px}.segments button{padding:0 6px}.strength{width:340px;left:46%;padding-inline:11px}.headline{font-size:19px;top:200px}}
 @media(max-width:760px){.mast{display:none}.strength{left:9px;transform:none;width:min(340px,52vw)}.army{font-size:10px;gap:4px}.army strong{font-size:20px}.controls,.strength{top:8px}.hint{display:none}.home{bottom:9px;right:9px}.ticker{left:9px;bottom:9px;width:min(360px,70vw)}.sides-intel{grid-template-columns:1fr}.vs{display:none}}
 @media(max-width:530px){.strength{left:50%;transform:translateX(-50%);width:calc(100% - 18px);max-width:380px}.controls{top:auto;bottom:9px;left:9px;right:auto;width:250px}.ticker{bottom:118px}.army{font-size:12px}.home{width:32px;height:32px}.headline{top:215px;font-size:16px}}
+
+.victory-card{max-height:92dvh;overflow-y:auto;overscroll-behavior:contain}
+.battle-analysis{text-align:left;font-size:13px;line-height:1.45}
+.battle-analysis svg{width:100%;height:95px;background:#191c2180}
+.battle-analysis table{width:100%;border-collapse:collapse}
+.battle-analysis th,.battle-analysis td{padding:4px;border-bottom:1px solid #bba67844;text-align:left}
+.battle-analysis h3{font-size:15px;color:#dec294;margin:.8em 0 .3em}
+@media(max-width:530px){.victory-card{max-width:94vw;box-sizing:border-box}.battle-analysis{font-size:12px}}

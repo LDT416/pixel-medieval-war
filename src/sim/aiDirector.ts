@@ -86,7 +86,7 @@ export class Director {
                     if (s > bs) { bs = s; best = o; }
                 }
                 if (best && bs >= EAGER[trait] * (1 - Math.min(.35, w.tick / 30000))) {
-                    c.order = 'charge'; c.forced = best.id;
+                    c.charges++;c.order = 'charge'; c.forced = best.id;
                     w.say(`${c.name}拔出马刀，向${best.name}发起冲锋！`, f, c.x, c.y, 2);
                 }
             }

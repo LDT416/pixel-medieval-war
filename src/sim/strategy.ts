@@ -1,6 +1,6 @@
 import type { Soldier, Company, Formation } from './arenaTypes';
 import type { SimWorld } from './world';
-import { WIDTH, HEIGHT, inWoods, inRect, layout } from './maps';
+import { WIDTH, HEIGHT, behindCrest, inWoods, inRect, layout } from './maps';
 import { MUSKET, CANISTER, gunRange, dist, shake, volley, shoot, strike, impact, gunFire } from './combat';
 
 const SPACING: Record<Formation, [number, number]> = {
@@ -62,7 +62,7 @@ function flee(w: SimWorld, u: Soldier, c: Company) {
     const ok = moveToward(w, u, u.x + away * 200, u.y + u.jy * 3 + Math.sin((w.tick + u.id * 37) * .02) * 60, u.speed * (u.kind === 'cuirassier' ? 1.05 : 1.3));
     u.pose = 'run'; faceToward(u,away);
     if (ok && (u.x <= 4 || u.x >= WIDTH - 4)) {
-        u.hp = 0; u.moving = false;
+        u.escaped=true;u.hp = 0; u.moving = false;
         w.alive[u.faction]--; w.fled[u.faction]++; c.alive--;
     }
 }
@@ -130,15 +130,25 @@ function nearestEnemy(w: SimWorld, c: Company, filter?: (o: Company) => boolean)
     return { c: best, d: bd };
 }
 function pickTarget(w: SimWorld, c: Company) {
+    const visible=(o:Company)=>{
+        if(c.kind==='field_cannon'){
+            const dx=o.x-c.x,dy=o.y-c.y,d2=dx*dx+dy*dy||1;
+            for(const g of layout.woods){
+                const a=Math.max(0,Math.min(1,((g.x-c.x)*dx+(g.y-c.y)*dy)/d2));
+                if((c.x+a*dx-g.x)**2+(c.y+a*dy-g.y)**2<g.r*g.r)return false;
+            }
+        }else if(c.kind!=='cuirassier' && dist(c,o)>260 && behindCrest(o.x,o.y,o.faction))return false;
+        return true;
+    };
     const forced = w.companies[c.forced];
-    if (forced && forced.status !== 'gone' && forced.alive > 0) return forced;
+    if (forced && forced.status !== 'gone' && forced.alive > 0 && visible(forced)) return forced;
     c.forced = -1;
     const reach = c.kind === 'field_cannon' ? gunRange(w) : w.weather === 'fog' ? 1000 : 2600;
     let best: Company | undefined, score = Infinity;
     for (const o of w.companies) {
         if (o.faction === c.faction || o.status === 'gone' || o.alive <= 0 || o.line === 5) continue;
         const d = dist(c, o);
-        if (d > reach) continue;
+        if (d > reach || !visible(o)) continue;
         let s = d + Math.abs(o.y - c.y) * (c.kind === 'field_cannon' ? .2 : .9);
         if (c.kind === 'cuirassier') {
             s *= o.status === 'rout' ? .45 : o.formation === 'square' ? 3 : o.kind === 'field_cannon' ? .55 : o.status === 'shaken' ? .6 : o.formUntil > w.tick ? .5 : 1;
@@ -189,7 +199,7 @@ function compact(w:SimWorld,c:Company){
 }
 export function rout(w: SimWorld, c: Company, quiet = false) {
     if (c.status === 'rout' || c.status === 'gone') return;
-    c.status = 'rout'; c.engaged = false; c.order = 'rally'; c.forced = -1;
+    c.routs++; c.status = 'rout'; c.engaged = false; c.order = 'rally'; c.forced = -1;
     for (const u of c.members) { u.foe = -1; u.fireAt = -1; }
     if (quiet) return;
     if (c.kind === 'guard_grenadier') {
@@ -206,6 +216,9 @@ export function updateCompany(w: SimWorld, c: Company) {
     if (c.status === 'gone') return;
     c.vx=c.vy=0; compact(w,c);
     if (c.alive <= 0) { c.status = 'gone'; c.engaged = false; return; }
+    const wooded=inWoods(c.x,c.y);
+    if(wooded && !c.wooded && w.tick>30)w.say(c.name+'退入树林',c.faction,c.x,c.y,1);
+    c.wooded=wooded;
     const g = w.generals[c.faction];
     const near = nearestEnemy(w, c);
     // ---- 士气 ----
@@ -220,7 +233,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     if (c.status === 'rout') {
         if (w.broken[c.faction]) return;
         if (c.morale > 42 && near.d > 650 && c.alive >= Math.max(3, c.peak * .25) && c.rallied < 2) {
-            c.status = 'shaken'; c.rallied++; c.order = c.kind === 'cuirassier' ? 'rally' : 'hold';
+            c.status = 'shaken'; c.rallied++;c.rallies++; c.order = c.kind === 'cuirassier' ? 'rally' : 'hold';
             let mx = 0, my = 0; for (const u of c.members) { mx += u.x; my += u.y; }
             c.x = c.homeX = mx / c.members.length; c.y = c.homeY = my / c.members.length;
             c.hx = c.faction ? -1 : 1; c.hy = 0; setFormation(w, c, c.kind === 'cuirassier' ? 'wedge' : 'line');

@@ -62,7 +62,7 @@ export class Hud{
         <div id="intel" class="overlay" hidden><section class="intel-card glass" role="dialog" aria-labelledby="intel-title"></section></div>
         <div id="victory" class="overlay" hidden><section class="victory-card glass" role="dialog" aria-labelledby="victor"><div class="victory-mark">${laurel}</div><h2 id="victor"></h2><p id="reason" class="reason"></p>
         <dl><div><dt>交战时长</dt><dd id="duration"></dd></div><div><dt>法军伤亡/溃逃</dt><dd id="loss0"></dd></div><div><dt>联军伤亡/溃逃</dt><dd id="loss1"></dd></div></dl>
-        <p id="mvp" class="mvp"></p><p id="betresult" class="betresult"></p>
+        <section id="analysis" class="battle-analysis"></section><p id="mvp" class="mvp"></p><p id="betresult" class="betresult"></p>
         <div class="actions"><button id="again">${icon('restart')}新战局</button><button id="replay" class="ghost">${icon('replay')}重演本局</button></div></section></div>`;
         root.querySelectorAll<HTMLButtonElement>('[data-scale]').forEach(b=>b.onclick=()=>cb.scale(Number(b.dataset.scale) as Scale));
         root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach(b=>b.onclick=()=>cb.speed(Number(b.dataset.speed)));
@@ -145,6 +145,26 @@ export class Hud{
         let best:Company|null=null;for(const c of w.companies)if(c.line!==5 && (!best||c.kills>best.kills))best=c;
         this.get('mvp').innerHTML=best?`头号战功：<b>${esc(best.name)}</b>（${best.faction?'联军':'法军'}）歼敌 ${best.kills} 人`:'';
         this.get('betresult').innerHTML=bet?(delta>0?`<span class="won">押中了！赢得 ${delta} 军饷</span>`:`<span class="lost">押错了，输掉 ${-delta} 军饷</span>`)+`　余额 ${purse.points}`:'本局未押注';
+        const pct=(v:number)=>Math.round(v*100)+'%', end=Math.max(1,w.tick);
+        const sx=(tick:number)=>tick/end*360, sy=(v:number)=>84-v*80;
+        const points=w.timeline.map(p=>sx(p.tick)+','+sy(p.odds)).join(' ');
+        const name=(k:string)=>k==='decisive'?'决定性转折':'最大逆转';
+        const causes=(p:typeof w.turningPoints[number])=>p.causes.map(n=>esc(n.text)).join(' · ')||'附近无重大战报';
+        const marks=w.turningPoints.map(p=>`<g><title>${causes(p)}</title><path d="M${sx(p.tick)} 4v80" stroke="#b69c69"/><circle cx="${sx(p.tick)}" cy="${sy(p.to)}" r="3" fill="#ffcf77"/></g>`).join('');
+        const ranked=[...w.companies].filter(c=>c.line!==5).sort((a,b)=>b.kills-a.kills || a.id-b.id);
+        const worst=ranked.reduce((a,b)=>b.losses/b.peak>a.losses/a.peak?b:a);
+        const rows=ranked.slice(0,3).map(c=>`<tr><td>${c.faction?'联':'法'} · ${esc(c.name)}</td><td>${c.kills}</td><td>${c.losses}</td><td>${c.routs}/${c.rallies}</td></tr>`).join('');
+        const losses=['line_infantry','guard_grenadier','cuirassier','field_cannon'].map((kind,i)=>{
+            const sides=[0,1].map(f=>{
+                const units=w.units.filter(u=>u.faction===f && (u.kind===kind || (i===0 && u.kind==='bannerman')));
+                return units.filter(u=>u.hp<=0 && !u.escaped).length+' / '+units.filter(u=>u.escaped || u.hp>0 && w.companies[u.company].status==='rout').length;
+            });return '<tr><td>'+['步兵','近卫','骑兵','炮兵'][i]+'</td><td>'+sides.join('</td><td>')+'</td></tr>';
+        }).join('');
+        this.get('analysis').innerHTML=`<h3>法军胜率走势</h3><svg viewBox="0 0 360 90" aria-label="法军胜率随时间变化"><path d="M0 44h360" stroke="#aaa" stroke-dasharray="3 3"/><polyline fill="none" stroke="#84aed6" stroke-width="2" points="${points}"/>${marks}</svg>
+            ${w.turningPoints.map(p=>`<p><b>${formatTime(p.tick)} · ${name(p.kind)}</b>　${pct(p.from)} → ${pct(p.to)}<br>${causes(p)}</p>`).join('')}
+            <h3>战功榜</h3><table><thead><tr><th>连队</th><th>歼敌</th><th>阵亡</th><th>溃散/重整</th></tr></thead><tbody>${rows}</tbody></table>
+            <p>伤亡率最高 · ${esc(worst.name)}（${worst.losses}/${worst.peak}）</p>
+            <h3>阵亡 / 溃逃</h3><table><thead><tr><th>兵种</th><th>法军</th><th>联军</th></tr></thead><tbody>${losses}</tbody></table>`;
         this.get('victory').hidden=false;this.root.classList.add('victory-open');
     }
     hideVictory(){this.get('victory').hidden=true;this.root.classList.remove('victory-open');}

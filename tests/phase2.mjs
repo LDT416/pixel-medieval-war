@@ -18,6 +18,7 @@ function battle(world, check = true) {
         }
     }
     assert.ok(world.ended, 'battle ended');
+    assert.ok(world.turningPoints.length>=1);assert.equal(world.timeline.length,Math.floor(world.tick/30));
     assert.ok(world.winner === 0 || world.winner === 1);
     const total = world.start[0] + world.start[1] + world.reinforced[0] + world.reinforced[1];
     assert.equal(world.dead[0] + world.dead[1] + world.fled[0] + world.fled[1] + world.alive[0] + world.alive[1], total);
@@ -25,7 +26,7 @@ function battle(world, check = true) {
     times.sort((a, b) => a - b);
     return { tick: world.tick, winner: world.winner, dead: [...world.dead], fled: [...world.fled], explosive, hits, deaths,
         p99: times[Math.floor(times.length * .99)], avg: times.reduce((a, b) => a + b, 0) / times.length,
-        sig: world.units.map(u => u.hp + ',' + u.x.toFixed(2)).join(';') };
+        sig: JSON.stringify(world.turningPoints)+world.units.map(u => u.hp + ',' + u.x.toFixed(2)).join(';') };
 }
 const world = new SimWorld(1200, 7);
 for (const scale of [600, 1200, 1800]) {
