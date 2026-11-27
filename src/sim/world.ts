@@ -1,6 +1,6 @@
 import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type General,
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
-import { WIDTH, HEIGHT, CX, CY, LINE_GAP, createLayout, setLayout, ridgeLine, type Layout } from './maps';
+import { WIDTH, HEIGHT, CX, CY, LINE_GAP, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
@@ -19,9 +19,12 @@ const GENERALS: { name: string; title: string; trait: Trait }[][] = [
 const HP: Record<Kind, number> = { line_infantry: 100, guard_grenadier: 116, cuirassier: 135, bannerman: 90, field_cannon: 230 };
 const SPEED: Record<Kind, number> = { line_infantry: 64, guard_grenadier: 66, cuirassier: 125, bannerman: 64, field_cannon: 40 };
 const VALUE: Record<Kind, number> = { line_infantry: 1, guard_grenadier: 1.55, cuirassier: 1.35, bannerman: .6, field_cannon: 9 };
-export const TIMEOUT = 10800, PURSUIT = 210;
+export const TIMEOUT = 36000, PURSUIT = 210;
 
 export class SimWorld {
+    lostSectors:boolean[][]=[[],[]];
+    readonly noAssault:[boolean,boolean]=[false,false];
+    charges:{tick:number;company:number;target:number;fresh:boolean;outcome:'break'|'repulsed'|'melee'}[]=[];
     recentRouts:{tick:number;c:Company;x:number;y:number}[]=[];
     timeline:Sample[]=[];turningPoints:TurningPoint[]=[];
     units: Soldier[] = []; companies: Company[] = []; generals: General[] = []; news: News[] = [];
@@ -44,7 +47,7 @@ export class SimWorld {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
-        this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
+        this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
         const r = this.rng.next();
         this.weather = r < .55 ? 'clear' : r < .8 ? 'rain' : 'fog';
@@ -56,12 +59,12 @@ export class SimWorld {
         this.posture = [stance(this.generals[0].trait), stance(this.generals[1].trait)];
         if (this.posture[0] === 'defend' && this.posture[1] === 'defend') this.posture[this.rng.int(0, 1)] = 'attack';
         const defender: Faction | -1 = this.posture[0] === 'defend' ? 0 : this.posture[1] === 'defend' ? 1 : -1;
-        this.layout = createLayout(this.rng, defender); setLayout(this.layout);
+        this.layout = createCampaignLayout(this.rng, defender); setLayout(this.layout);
         for (const f of [0, 1] as const) this.deploy(f, scale / 2);
         this.reinforcement = null;
         if (this.rng.next() < .42) {
             const f = this.rng.int(0, 1) as Faction;
-            this.reinforcement = { faction: f, tick: this.rng.int(2600, 4800), arrived: false, count: Math.round(scale / 2 * .16),
+            this.reinforcement = { faction: f, tick: this.rng.int(10000, 18000), arrived: false, count: Math.round(scale / 2 * .16),
                 name: f ? '普鲁士比洛军' : '格鲁希元帅的右翼军' };
         }
         this.director.reset(this);
@@ -76,7 +79,7 @@ export class SimWorld {
         if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
         if (line === 5) base = 100;
         const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
-            x, y, cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
+            x,y,sector:Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))) as 0|1|2,brigade:Math.floor(this.companies.length/4),corps:f*3+Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))),ammo:0,fatigue:0,smoke:0,fireMode:'first',firingSince:-1,nextGroup:0,firstVolleyAt:-999,assaultStage:'idle',assaultUntil:0,assaultReady:0,freshAtStart:false,cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
             engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
@@ -85,11 +88,11 @@ export class SimWorld {
     }
     private soldier(c: Company, kind: Kind) {
         const u: Soldier = { id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
-            hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
+            ammo:kind==='line_infantry'||kind==='guard_grenadier'?40:0,shotsFired:0,loadedAt:0,shotTarget:-1,chance:0,kneelUntil:0,hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
             stride: this.rng.int(0, 15), speed: SPEED[kind] * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
             aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, staff:c.line===5, officer:c.members.length===0 && c.line!==5, diedAt:-999, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
         if (kind === 'bannerman') c.colors++;
-        c.members.push(u); c.alive++; c.peak++;
+        c.ammo+=u.ammo;c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;
         return u;
     }
@@ -110,10 +113,10 @@ export class SimWorld {
         const infantry: Company[] = [];
         // 战列步兵：六成上一线，其余作二线。
         const lineSizes = split(line, 32), firstN = Math.ceil(lineSizes.length * .6), secondN = lineSizes.length - firstN;
-        const band = 2250;
+        const band = HEIGHT*.78;
         lineSizes.forEach((n, i) => {
             const first = i < firstN, k = first ? i : i - firstN, m = first ? firstN : secondN;
-            const y = CY + (k - (m - 1) / 2) * Math.min(260, band / Math.max(1, m)) + (first ? 0 : 110);
+            const y = CY + (k - (m - 1) / 2) * band / Math.max(1,m) + (first ? 0 : 110);
             const x = frontX(y) - face * (first ? 0 : 330);
             infantry.push(this.company(f, 'line_infantry', lineName(), first ? 0 : 1, n, x, y, 'line', 'hold', ranks));
         });
@@ -148,7 +151,7 @@ export class SimWorld {
         // 旗手与鼓手编入步兵连
         for (let i = 0; i < banner; i++) this.soldier(infantry[i % infantry.length], 'bannerman');
         // 总司令与两名副官
-        const hq = this.company(f, 'cuirassier', `${g.title}${g.name}的参谋部`, 5, staff, frontX(CY) - face * 1000, CY, 'staff', 'hold', 1);
+        const hq = this.company(f, 'cuirassier', `${g.title}${g.name}的参谋部`, 5, staff, frontX(CY) - face * 1250, CY, 'staff', 'hold', 1);
         hq.members[0].general = true; g.unit = hq.members[0]; g.company = hq.id; g.alive = true;
         for (const c of this.companies) if (c.faction === f) {
             // 旗手排在连队最后，不占火力位置。
@@ -235,11 +238,20 @@ export class SimWorld {
         this.turningPoints=[point('decisive',cross<0?fastest:cross,cross<0?windows[fastest]:cross-1),point('swing',swing,windows[swing])];
     }
     private checkVictory() {
-        for (const f of [0, 1] as const) {
-            if (this.broken[f]) continue;
-            const total = this.start[f] + this.reinforced[f], eff = this.effective(f);
-            if (this.alive[f] === 0 || eff < total * .2) this.breakArmy(f, `${ARMY[f]}的兵力消耗殆尽`);
-            else if (this.armyMorale(f) < 21 && eff < total * .5) this.breakArmy(f, `${ARMY[f]}军心崩溃`);
+        for(const f of [0,1] as const){
+            for(const sector of [0,1,2] as const){
+                if(this.lostSectors[f][sector])continue;
+                const group=this.companies.filter(c=>c.faction===f && c.sector===sector && c.line!==5);
+                const peak=group.reduce((n,c)=>n+c.peak,0);
+                if(peak<15)continue;
+                const eff=group.reduce((n,c)=>n+(c.status==='rout'?0:c.alive),0);
+                const morale=group.reduce((n,c)=>n+c.morale*c.alive,0)/Math.max(1,group.reduce((n,c)=>n+c.alive,0));
+                if(eff>=.65*peak && morale>=25)continue;
+                this.lostSectors[f][sector]=true;
+                this.say(ARMY[f]+['左翼','中央','右翼'][sector]+'撤离战区',f,group[0].x,group[0].y,3);
+                for(const c of group)if(c.status!=='rout'&&c.alive){c.order='rally';c.forced=-1;c.homeX=c.x+(f?1:-1)*680;}
+            }
+            if(this.lostSectors[f].filter(Boolean).length>=2 && this.winner===null)this.breakArmy(f,ARMY[f]+'失守两个战区，有序撤退');
         }
         if (this.winner === null && this.tick >= TIMEOUT) {
             const loser: Faction = this.odds() < .5 ? 0 : 1;
@@ -249,7 +261,7 @@ export class SimWorld {
     breakArmy(f: Faction, why: string) {
         if (this.broken[f]) return;
         this.broken[f] = true;
-        for (const c of this.companies) if (c.faction === f) rout(this, c, true);
+        for(const c of this.companies)if(c.faction===f && c.status!=='rout' && c.alive){c.order='rally';c.homeX=c.x+(f?1:-1)*900;c.forced=-1;}
         this.say(`${ARMY[f]}全线崩溃！`, f, this.frontline().x, this.frontline().y, 3);
         if (this.winner === null) { this.winner = (1 - f) as Faction; this.endTick = this.tick; this.reason = why; }
     }

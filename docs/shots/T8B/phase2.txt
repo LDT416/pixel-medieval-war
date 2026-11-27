@@ -1,0 +1,35 @@
+600: 829s winner=1 dead=88,51 fled=6,35 cannon-kills=66 avg=0.10ms p99=0.43ms reason=法兰西帝国失守两个战区，有序撤退
+1200: 577s winner=1 dead=196,6 fled=0,32 cannon-kills=151 avg=0.20ms p99=0.62ms reason=法兰西帝国失守两个战区，有序撤退
+jitter {
+  flipsPerSec: 0.00012800385455709722,
+  poseTogglesPerSec: 0.0010141843861062318,
+  slotSwapsPerDeath: 1.0198019801980198
+}
+1800: 586s winner=1 dead=221,4 fled=26,64 cannon-kills=202 avg=0.58ms p99=2.08ms reason=法兰西帝国失守两个战区，有序撤退
+seed 1: 559s  win=0  odds0=0.56  dead=24,119 fled=48,0  headlines=19  rain 苏尔特/乌克斯布里奇 defend-attack  | 反法同盟失守两个战区，有序撤退
+seed 2: 653s  win=1  odds0=0.53  dead=60,88 fled=25,23  headlines=22  fog 格鲁希/乌克斯布里奇 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 3: 639s  win=1  odds0=0.44  dead=92,10 fled=33,0  headlines=22  fog 拿破仑/希尔 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 4: 692s  win=0  odds0=0.55  dead=91,131 fled=25,19  headlines=19  clear 苏尔特/布吕歇尔 attack-attack  | 反法同盟失守两个战区，有序撤退
+seed 5: 543s  win=0  odds0=0.54  dead=36,143 fled=9,0  headlines=23  clear 格鲁希/乌克斯布里奇 attack-attack 援军0  | 反法同盟失守两个战区，有序撤退
+seed 6: 761s  win=0  odds0=0.47  dead=204,122 fled=43,11  headlines=30  clear 内伊/布吕歇尔 attack-attack 援军1  | 反法同盟失守两个战区，有序撤退
+seed 7: 361s  win=1  odds0=0.51  dead=78,54 fled=0,0  headlines=14  rain 内伊/布吕歇尔 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 8: 663s  win=1  odds0=0.42  dead=200,6 fled=11,0  headlines=24  rain 内伊/威灵顿 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 9: 577s  win=0  odds0=0.58  dead=3,161 fled=0,0  headlines=12  rain 格鲁希/布吕歇尔 attack-attack  | 反法同盟失守两个战区，有序撤退
+seed 10: 610s  win=0  odds0=0.55  dead=3,173 fled=0,0  headlines=16  clear 苏尔特/希尔 attack-attack 援军1  | 反法同盟失守两个战区，有序撤退
+seed 11: 411s  win=1  odds0=0.48  dead=82,80 fled=0,0  headlines=12  clear 拿破仑/乌克斯布里奇 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 12: 373s  win=1  odds0=0.53  dead=7,4 fled=0,0  headlines=13  fog 内伊/乌克斯布里奇 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 13: 579s  win=0  odds0=0.54  dead=2,178 fled=0,0  headlines=14  rain 格鲁希/乌克斯布里奇 attack-attack  | 反法同盟失守两个战区，有序撤退
+seed 14: 593s  win=1  odds0=0.41  dead=188,34 fled=8,0  headlines=17  clear 拿破仑/威灵顿 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 15: 640s  win=1  odds0=0.56  dead=86,93 fled=85,12  headlines=30  fog 苏尔特/乌克斯布里奇 attack-attack 援军0  | 法兰西帝国失守两个战区，有序撤退
+seed 16: 636s  win=1  odds0=0.42  dead=141,44 fled=0,34  headlines=21  rain 拿破仑/威灵顿 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 17: 640s  win=1  odds0=0.44  dead=142,20 fled=11,16  headlines=19  clear 拿破仑/希尔 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 18: 569s  win=0  odds0=0.59  dead=0,189 fled=0,0  headlines=17  clear 格鲁希/布吕歇尔 attack-attack 援军0  | 反法同盟失守两个战区，有序撤退
+seed 19: 359s  win=0  odds0=0.53  dead=112,150 fled=0,0  headlines=13  clear 内伊/布吕歇尔 attack-attack  | 反法同盟失守两个战区，有序撤退
+seed 20: 668s  win=0  odds0=0.57  dead=50,127 fled=33,65  headlines=23  fog 格鲁希/布吕歇尔 attack-attack  | 反法同盟失守两个战区，有序撤退
+seed 21: 546s  win=1  odds0=0.43  dead=173,3 fled=0,0  headlines=12  clear 内伊/威灵顿 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 22: 360s  win=1  odds0=0.50  dead=76,54 fled=0,0  headlines=16  fog 拿破仑/乌克斯布里奇 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 23: 641s  win=1  odds0=0.43  dead=147,23 fled=17,22  headlines=20  clear 格鲁希/威灵顿 attack-attack  | 法兰西帝国失守两个战区，有序撤退
+seed 24: 640s  win=1  odds0=0.44  dead=193,25 fled=0,0  headlines=23  rain 内伊/布吕歇尔 attack-attack 援军1  | 法兰西帝国失守两个战区，有序撤退
+wins [ 10, 14 ] median 610s min 359 max 761
+cannon share 0.3910
+Battle assertions passed.

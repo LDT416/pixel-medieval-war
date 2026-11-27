@@ -1,0 +1,1 @@
+{"assaults":243,"targetBroke":28,"attackerBroke":4,"neither":211,"atkLoss":"0.014","defLoss":"0.053","holdKills":790,"assaultKills":173,"holdTicks":3241595,"assaultTicks":574199,"killsPerSecHolding":"0.0073","killsPerSecAssaulting":"0.0090"}

@@ -24,7 +24,7 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
     w.alive[u.faction]--; w.dead[u.faction]++;
     emit(w, 'death', u, dx, dy, explosive);
     const c = w.companies[u.company];
-    c.alive--;c.losses++;if(!c.alive){c.order='hold';c.forced=-1;}
+    c.ammo-=u.ammo;c.alive--;c.losses++;if(!c.alive){c.order='hold';c.forced=-1;}
     const lost = 1 - c.alive / c.peak;
     shake(c, (c.kind === 'field_cannon' ? 70 : c.kind === 'guard_grenadier' ? 62 : 95) / Math.max(6, c.peak) * (1 + lost * 1.4));
     if (u.kind === 'bannerman' && --c.colors === 0 && c.alive > 3) {
@@ -44,36 +44,57 @@ function victim(w: SimWorld, t: Company, front: number) {
     for (const v of t.members) if (v.hp > 0) return v;
     return null;
 }
-/** 整连齐射：按连计算命中率，再给每名射手排一个错开几帧的开火时刻，形成一排排的枪焰涟漪。 */
-export function volley(w: SimWorld, c: Company, t: Company) {
-    c.volleys++;const d = dist(c, t);
-    let p = .03 + .15 * Math.pow(1 - Math.min(1, d / MUSKET), 1.5);
-    if (t.formation === 'square' || t.formation === 'column') p *= 1.4;
-    if (t.kind === 'cuirassier') p *= 1.25;
-    if (c.status === 'shaken') p *= .6;
-    if (c.formUntil > w.tick) p *= .5;
-    if (c.kind === 'guard_grenadier') p *= 1.2;
-    p *= .75 * coverAt(t.x, t.y);
-    c.hitChance = p; c.target = t.id;
-    const steady = c.status === 'steady' && c.formUntil <= w.tick;
-    const rearRanksOut = c.formation === 'column' ? c.files * 2 : c.formation === 'square' ? Math.ceil(c.members.length / 2) : 9999;
-    for (const u of c.members) {
-        if (u.hp <= 0 || u.kind === 'bannerman' || u.slot >= rearRanksOut) continue;
-        const file = c.files ? u.slot % c.files : 0;
-        u.fireAt = w.tick + 1 + (steady ? Math.floor(file * .7) % 14 : w.rng.int(0, 28));
+/** 首轮齐射后切换到排或翼射击。每名射手独立保留装填与弹药状态。 */
+export function volley(w:SimWorld,c:Company,t:Company,close=false){
+    if(c.ammo<=0 || c.status==='rout')return;
+    const first=c.firingSince<0, age=w.tick-c.firingSince;
+    const mode=first?'first':c.status==='shaken'||age>2700?'free':c.faction===1 && c.id%3===0?'platoon':'rank';
+    const groups=mode==='platoon'?4:c.ranks;
+    const dx=t.x-c.x,dy=t.y-c.y,side=-dx*c.hy+dy*c.hx;
+    const facing=(dx*c.hx+dy*c.hy)/Math.max(1,Math.hypot(dx,dy));
+    const canTurn=(u:Soldier)=>!close || facing>=.5 || (facing<-.707 ? u.slot>=Math.max(0,c.capacity-c.files) : (side>0 ? u.slot%c.files>=c.files/2 : u.slot%c.files<c.files/2));
+    const shooters=c.members.filter(u=>u.hp>0 && u.ammo>0 && !u.moving && u.loadedAt<=w.tick && u.fireAt<=w.tick &&
+        (c.formation!=='column' || u.slot<c.files*2) && canTurn(u));
+    const groupOf=(u:Soldier)=>mode==='platoon'?Math.min(3,Math.floor(u.slot%c.files*4/c.files)):Math.floor(u.slot/c.files)%c.ranks;
+    let group=c.nextGroup%groups;
+    if(shooters.length && !shooters.some(u=>groupOf(u)===group))group=groupOf(shooters[0]);
+    const ready=shooters.filter(u=>first || mode==='free' || groupOf(u)===group);
+    if(!ready.length){c.reloadAt=w.tick+6;return;}
+    if(!close && !first && mode==='rank' && !shooters.some(u=>groupOf(u)!==group) && c.members.some(u=>u.hp>0 && u.ammo>0 && groupOf(u)!==group && (c.formation!=='column'||u.slot<c.files*2)) && w.tick-c.firstVolleyAt>110){
+        c.reloadAt=w.tick+6;return;
     }
-    c.reloadAt = w.tick + (c.kind === 'guard_grenadier' ? w.rng.int(55,68) : w.rng.int(60,75)) + (c.status === 'shaken' ? 20 : 0);
-    t.underFire = w.tick + 90;
-    shake(t, .9);
+    const d=dist(c,t),p=d<50?.2:d<100?.20-(d-50)*.08/50:d<150?.12-(d-100)*.05/50:.07-Math.min(80,d-150)*.04/80;
+    const base=p*.60*(first?1.6:1)*(close?1.4:1)*(mode==='free'?.7:1)*(c.status==='shaken'?.6:1)
+        *(t.formation==='column'||t.formation==='square'?1.3:1)*coverAt(t.x,t.y)
+        *(1-.45*c.smoke)*(1-.45*t.smoke)*(1-.25*c.fatigue);
+    c.fireMode=mode;c.hitChance=base;c.target=t.id;c.volleys++;
+    if(first){c.firingSince=w.tick;c.firstVolleyAt=w.tick;}
+    const cycle=Math.round(82*(c.kind==='guard_grenadier'?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)));
+    for(const u of ready){
+        u.fireAt=w.tick+1+(mode==='free'?w.rng.int(0,35):(u.slot%c.files)%5);
+        u.chance=base;u.shotTarget=t.id;
+        if(close){u.fireAt=-1;shoot(w,u,c);}
+    }
+    for(const u of c.members){
+        const rank=Math.floor(u.slot/c.files)%c.ranks;
+        if((first && rank===0)||(!first && rank<group))u.kneelUntil=w.tick+10;
+    }
+    c.nextGroup=(group+1)%groups;c.reloadAt=w.tick+(first?cycle:mode==='free'?15:Math.max(12,Math.round(cycle/groups)));
+    t.underFire=w.tick+90;
+    const losing=c.losses>Math.max(1,c.kills)*1.3;
+    shake(c,.08*(losing?1.5:1));shake(t,.20*(t.formation==='column'?.7:1)*(t.losses>Math.max(1,t.kills)*1.3?1.5:1));
 }
-export function shoot(w: SimWorld, u: Soldier, c: Company) {
-    const t = w.companies[c.target];
-    if (!t || t.status === 'gone' || c.status === 'rout') return;
+export function shoot(w:SimWorld,u:Soldier,c:Company){
+    const t=w.companies[u.shotTarget];
+    if(!t || t.status==='gone' || c.status==='rout' || u.moving || u.ammo<=0 || c.assaultStage==='rush')return;
+    u.ammo--;c.ammo--;u.shotsFired++;
+    u.loadedAt=w.tick+Math.round(w.rng.int(75,90)*(c.kind==='guard_grenadier'?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)+(u.shotsFired>15?.15:0)));
+    c.smoke=Math.min(1,c.smoke+.04);
     const dx = t.x - u.x, dy = t.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
     u.firedAt = w.tick; u.pose = 'aim';
     if (w.weather === 'rain' && w.rng.next() < .3) return;
     const fire=emit(w, 'fire', u, dx / d, dy / d, false);
-    if (w.rng.next() < c.hitChance) {
+    if (w.rng.next() < u.chance) {
         const v = victim(w, t, t.formation === 'line' ? t.files * 2 : t.members.length);
         if(v){fire.endX=v.x;fire.endY=v.y;fire.struck=true;damage(w,v,w.rng.int(55,130),dx/d,dy/d,false,c);}
     }
