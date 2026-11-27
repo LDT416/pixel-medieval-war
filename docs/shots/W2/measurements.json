@@ -1,0 +1,88 @@
+{
+  "near": [
+    {
+      "fps": 60,
+      "drawCalls": 41
+    },
+    {
+      "fps": 60,
+      "drawCalls": 41
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    },
+    {
+      "fps": 60,
+      "drawCalls": 40
+    }
+  ],
+  "far": [
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    },
+    {
+      "fps": 60,
+      "drawCalls": 4
+    }
+  ],
+  "nearMedian": 60,
+  "farMedian": 60
+}
