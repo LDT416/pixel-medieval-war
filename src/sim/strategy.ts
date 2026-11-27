@@ -89,12 +89,12 @@ function meleeStep(w: SimWorld, u: Soldier, c: Company) {
     let foe = u.foe >= 0 ? w.units[u.foe] : undefined;
     if ((w.tick + u.id) % 6 === 0 || !foe || foe.hp <= 0) {
         let best = Infinity, found: Soldier | undefined;
-        w.hash.visit(u.x, u.y, fixed || !c.engaged?16:80, o => {
-            if ((closing || c.engaged) && o.company!==c.contactId && o.foe!==u.id)return;
-            if (o.faction === u.faction || (!fixed && !closing && !c.engaged && o.foe!==u.id)) return;
+        for(const o of w.hash.factionNear(u.x,u.y,fixed || !c.engaged?16:80,1-u.faction)){
+            if ((closing || c.engaged) && o.company!==c.contactId && o.foe!==u.id)continue;
+            if (!fixed && !closing && !c.engaged && o.foe!==u.id)continue;
             const d = (o.x - u.x) ** 2 + (o.y - u.y) ** 2;
             if (d < best) { best = d; found = o; }
-        });
+        }
         foe = found as Soldier | undefined; u.foe = foe ? foe.id : -1;
     }
     if (!foe) return false;
@@ -125,7 +125,12 @@ export function advance(w: SimWorld, u: Soldier) {
     if (u.fireAt === w.tick) shoot(w, u, c);
     if (c.status === 'rout') { flee(w, u, c); return; }
     if ((c.engaged || u.foe >= 0 || (w.tick + u.id) % 6 === 0) && meleeStep(w, u, c)) return;
-    const [lat, dep] = slotOffset(c,u.slot);
+    let geometry=c.slotGeometry;
+    if(!geometry || geometry.formation!==c.formation || geometry.files!==c.files || geometry.capacity!==c.capacity){
+        geometry=c.slotGeometry={formation:c.formation,files:c.files,capacity:c.capacity,offsets:[]};
+    }
+    const offset=geometry.offsets[u.slot] ?? (geometry.offsets[u.slot]=slotOffset(c,u.slot));
+    const lat=offset[0],dep=offset[1];
     let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
     if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
     

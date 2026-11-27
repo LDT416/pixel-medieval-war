@@ -6,7 +6,7 @@ import {TacticalMiniMap} from './client/tacticalMiniMap';
 import { atlasPreview } from './client/renderer3d/spriteAtlas';
 import type { News } from './sim/arenaTypes';
 import { SimWorld } from './sim/world';
-import { scales, TICKS, type Scale, type Faction } from './sim/arenaTypes';
+import { simulationScales, TICKS, type Scale, type Faction } from './sim/arenaTypes';
 import { ArenaRenderer3d } from './client/renderer3d/arenaRenderer3d';
 import { lightings, type Lighting } from './client/renderer3d/lightingPresets';
 import { Hud, payout, type Purse, type Bet } from './client/hud';
@@ -30,7 +30,7 @@ async function start(){
     let purse=loadPurse(),bet:Bet|null=null;
     const hud=new Hud(document.querySelector('#hud')!,{zoom:f=>arena.zoomBy(f),next:()=>{
         if(hud.intelOpen || world.ended)return;
-        skipFrom=world.news.length;setSpeed(16);skipping=true;
+        skipFrom=world.news.length;setSpeed(4);skipping=true;
     },jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
@@ -83,8 +83,8 @@ async function start(){
     function toggle(){if(hud.intelOpen)return;paused=!paused;controls();}
     function cycleLighting(){arena.setLighting(lightings[(lightings.indexOf(arena.lighting)+1)%lightings.length]);controls();}
     function setLighting(mode:Lighting){if(lightings.includes(mode)){arena.setLighting(mode);controls();}}
-    function setScale(n:number){if(scales.includes(n as Scale))reset(n as Scale,world.seed);}
-    function setSpeed(n:number){deploymentPlayback=false;skipping=false;if(n===0){paused=true;controls();return;}if([.25,1,2,4,8,16].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
+    function setScale(n:number){if(simulationScales.includes(n as Scale))reset(n as Scale,world.seed);}
+    function setSpeed(n:number){deploymentPlayback=false;skipping=false;if(n===0){paused=true;controls();return;}if([.25,1,2,4].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
     window.addEventListener('keydown',e=>{
         if(e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
         if(e.code==='Space'){e.preventDefault();if(hud.intelOpen)placeBet(-1,0);else toggle();}
@@ -133,8 +133,9 @@ async function start(){
         if(now<slowUntil && !paused)dt=real*.3;else document.body.classList.remove("commander-down");
         if(!world.ended){
             accumulator+=dt*TICKS;
+            const stepLimit=Math.min(8,Math.ceil(speed*2)+1);
             let steps=0;
-            while(accumulator>=1 && !world.ended && steps<96){world.step();arena.events(world);sound.step(world);director(now);accumulator--;steps++;
+            while(accumulator>=1 && !world.ended && steps<stepLimit){world.step();arena.events(world);sound.step(world);director(now);accumulator--;steps++;
                 if(world.tick===world.deployEnd){deploymentPlayback=false;accumulator=0;controls();break;}
                 if(skipping && world.news.length>skipFrom){
                     const event=world.news.slice(skipFrom).find(n=>n.weight>=2);skipFrom=world.news.length;
@@ -142,6 +143,7 @@ async function start(){
                 }
             }
             if(world.ended)accumulator=0;
+            else if(accumulator>=1)accumulator%=1;
         }
         if(world.ended)settle();
         companyFollow.tick(now);director(now);sound.update(real,paused||world.ended);

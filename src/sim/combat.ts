@@ -43,31 +43,47 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
 export function volley(w:SimWorld,c:Company,t:Company,close=false){
     if(c.ammo<=0 || c.status==='rout')return;
     // 射击纪律：目标连里混着己方士兵（正在白刃或骑兵冲进去了），整连不向它开火。
-    let mixed=false;const reach=Math.max(40,t.files*7+20);
-    w.hash.visit(t.x,t.y,reach,o=>{if(!mixed&&o.faction===c.faction)mixed=true;});
-    if(mixed){w.ballistics.discipline.heldFire++;c.reloadAt=w.tick+15;return;}
+    const reach=Math.max(40,t.files*7+20);
+    if(w.hash.factionNear(t.x,t.y,reach,c.faction,true).length){w.ballistics.discipline.heldFire++;c.reloadAt=w.tick+15;return;}
     const first=c.firingSince<0, age=w.tick-c.firingSince;
     const mode=first?'first':c.status==='shaken'||age>2700?'free':c.faction===1 && c.id%3===0?'platoon':'rank';
     const groups=mode==='platoon'?4:c.ranks;
     const dx=t.x-c.x,dy=t.y-c.y,side=-dx*c.hy+dy*c.hx;
     const facing=(dx*c.hx+dy*c.hy)/Math.max(1,Math.hypot(dx,dy));
     // 方阵只有朝向敌人的那几面开火，不能隔着方阵内部打到对面的自己人。
-    const faceToward=(u:Soldier)=>c.formation!=='square' || ((u.x-c.x)*dx+(u.y-c.y)*dy)/Math.max(1,Math.hypot(u.x-c.x,u.y-c.y)*Math.hypot(dx,dy))>.45;
-    const canTurn=(u:Soldier)=>!close || facing>=.5 || (facing<-.707 ? u.slot>=Math.max(0,c.capacity-c.files) : (side>0 ? u.slot%c.files>=c.files/2 : u.slot%c.files<c.files/2));
-    const shooters=c.members.filter(u=>u.hp>0 && u.ammo>0 && !u.moving && u.loadedAt<=w.tick && u.fireAt<=w.tick &&
-        (c.formation!=='column' || u.slot<c.files*2) && canTurn(u) && faceToward(u));
-    const groupOf=(u:Soldier)=>mode==='platoon'?Math.min(3,Math.floor(u.slot%c.files*4/c.files)):Math.floor(u.slot/c.files)%c.ranks;
+    const shooters=w.volleyShooters;
+    shooters.length=0;
     let group=c.nextGroup%groups;
-    if(shooters.length && !shooters.some(u=>groupOf(u)===group))group=groupOf(shooters[0]);
-    const ready=shooters.filter(u=>first || mode==='free' || groupOf(u)===group);
-    if(!ready.length){c.reloadAt=w.tick+6;return;}
-    if(!close && !first && mode==='rank' && !shooters.some(u=>groupOf(u)!==group) && c.members.some(u=>u.hp>0 && u.ammo>0 && groupOf(u)!==group && (c.formation!=='column'||u.slot<c.files*2)) && w.tick-c.firstVolleyAt>110){
-        c.reloadAt=w.tick+6;return;
+    let wantedReady=false,firstGroup=-1,multipleReady=false;
+    const targetDistance=Math.hypot(dx,dy);
+    for(const u of c.members){
+        if(u.hp<=0 || u.ammo<=0 || u.moving || u.loadedAt>w.tick || u.fireAt>w.tick ||
+            (c.formation==='column' && u.slot>=c.files*2))continue;
+        if(close && facing<.5){
+            const canTurn=facing<-.707 ? u.slot>=Math.max(0,c.capacity-c.files) :
+                side>0 ? u.slot%c.files>=c.files/2 : u.slot%c.files<c.files/2;
+            if(!canTurn)continue;
+        }
+        if(c.formation==='square' && ((u.x-c.x)*dx+(u.y-c.y)*dy) /
+            Math.max(1,Math.hypot(u.x-c.x,u.y-c.y)*targetDistance)<=.45)continue;
+        const g=mode==='platoon'?Math.min(3,Math.floor(u.slot%c.files*4/c.files)):Math.floor(u.slot/c.files)%c.ranks;
+        if(firstGroup<0)firstGroup=g;
+        if(g!==firstGroup)multipleReady=true;
+        if(g===group)wantedReady=true;
+        shooters.push(u);
+    }
+    if(!shooters.length){c.reloadAt=w.tick+6;return;}
+    if(!wantedReady)group=firstGroup;
+    if(!close && !first && mode==='rank' && !multipleReady && w.tick-c.firstVolleyAt>110){
+        for(const u of c.members)if(u.hp>0 && u.ammo>0 && Math.floor(u.slot/c.files)%c.ranks!==group &&
+            (c.formation!=='column' || u.slot<c.files*2)){c.reloadAt=w.tick+6;return;}
     }
     c.fireMode=mode;c.target=t.id;c.volleys++;
     if(first){c.firingSince=w.tick;c.firstVolleyAt=w.tick;}
     const cycle=Math.round(82*(isGuard(c)?.9:1)*(1+.15*c.fatigue+(w.weather==='rain'?.15:0)));
-    for(const u of ready){
+    for(const u of shooters){
+        const g=mode==='platoon'?Math.min(3,Math.floor(u.slot%c.files*4/c.files)):Math.floor(u.slot/c.files)%c.ranks;
+        if(!first && mode!=='free' && g!==group)continue;
         u.fireAt=w.tick+1+(mode==='free'?w.rng.int(0,35):(u.slot%c.files)%5);
         u.shotTarget=t.id;
         if(close){u.fireAt=-1;shoot(w,u,c);}
