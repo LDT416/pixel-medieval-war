@@ -1,0 +1,16 @@
+{
+  "seed": 42,
+  "muteButtonStates": [
+    "true",
+    "false",
+    "true"
+  ],
+  "firstActualSignal": {
+    "tick": 10593,
+    "x": 7279.295833223379,
+    "y": 5986.1391635594455,
+    "company": 9
+  },
+  "webAudioDrumsBefore": 0,
+  "webAudioDrumsAfter": 2
+}

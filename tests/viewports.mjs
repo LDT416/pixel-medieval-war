@@ -97,5 +97,39 @@ async function strategic(){
     writeFileSync('docs/shots/W2/measurements.json',JSON.stringify({near,far,nearMedian:median(near),farMedian:median(far)},null,2));
     assert.ok(median(far)>=median(near),'全图帧率');
 }
-try{await call('Runtime.enable');await call('Page.enable');if(job!=='strategic')await mobile();if(job!=='mobile')await strategic();assert.deepEqual(errors,[]);console.log('镜头、交互与渲染验收通过');}
+async function follow(){
+    await metrics(1280,820,false);await loadPage();
+    const company=await ev('w.companies.find(c=>c.line===0)');
+    await ev(`d.panTo((${company.x}-w.layout.width/2)*.05,(${company.y}-w.layout.height/2)*.05);d.zoomTo(150)`);await wait(750);
+    let found=-1;
+    for(let y=382;y<=433&&found<0;y+=5){
+        await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,x:640,y});
+        await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,x:640,y});
+        await wait(365);found=await ev('state().following');
+    }
+    assert.ok(found>=0,'点击部队后应进入跟随状态');
+    await wait(350);mkdirSync('docs/shots/W6',{recursive:true});await shot('docs/shots/W6/follow.png');
+    await ev("document.querySelector('.company-follow button').click()");
+    assert.equal(await ev('state().following'),-1);
+}
+async function audio(){
+    await metrics(1280,820,false);await loadPage();
+    const hit=await ev(`(()=>{while(!w.ended){w.step();const e=w.events.find(v=>v.type==='drum');if(e)return {tick:w.tick,x:e.x,y:e.y,company:w.units[e.unitId].company};}return null;})()`);
+    assert.ok(hit,'完整正常战局应出现一次实际冲锋鼓事件');
+    await ev(`d.replay(42);d.startBattle();d.setSpeed(0);while(w.tick<${hit.tick}-2)w.step();d.panTo((${hit.x}-w.layout.width/2)*.05,(${hit.y}-w.layout.height/2)*.05);d.zoomTo(65)`);
+    const point=await ev("(()=>{const b=document.getElementById('battle-sound').getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2};})()");
+    const states=[await ev("document.getElementById('battle-sound').getAttribute('aria-pressed')")];
+    for(let i=0;i<2;i++){
+        await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
+        await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});
+        states.push(await ev("document.getElementById('battle-sound').getAttribute('aria-pressed')"));
+    }
+    assert.notEqual(states[0],states[1]);assert.equal(states[0],states[2]);
+    if(await ev("document.getElementById('battle-sound').getAttribute('aria-pressed')")==='false')await ev("document.getElementById('battle-sound').click()");
+    await wait(350);const before=await ev('state().chargeDrums');
+    await ev('d.setSpeed(1)');await wait(1000);await ev('d.setSpeed(0)');
+    const after=await ev('state().chargeDrums');assert.ok(after>before,'真实信号应调度可播放的 Web Audio 鼓声');
+    mkdirSync('docs/shots/W6',{recursive:true});writeFileSync('docs/shots/W6/audio.json',JSON.stringify({seed:42,muteButtonStates:states,firstActualSignal:hit,webAudioDrumsBefore:before,webAudioDrumsAfter:after},null,2));
+}
+try{await call('Runtime.enable');await call('Page.enable');if(job==='all'||job==='mobile')await mobile();if(job==='all'||job==='strategic')await strategic();if(job==='audio')await audio();if(job==='follow')await follow();assert.deepEqual(errors,[]);console.log('镜头、交互与渲染验收通过');}
 finally{ws.close();await fetch(host+'/json/close/'+tab.id);}

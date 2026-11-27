@@ -1,5 +1,7 @@
 import './style.css';
 import './client/mobileHud.css';
+import {CompanyFollow} from './client/companyFollow';
+import {BattleSound} from './client/battleSound';
 import {TacticalMiniMap} from './client/tacticalMiniMap';
 import { atlasPreview } from './client/renderer3d/spriteAtlas';
 import type { News } from './sim/arenaTypes';
@@ -33,7 +35,8 @@ async function start(){
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
     const miniMap=new TacticalMiniMap(document.querySelector('#hud')!,arena);
-    arena.tracers.installControl();
+    arena.tracers.installControl();const sound=new BattleSound(arena);
+    const companyFollow=new CompanyFollow(world,arena,canvas);
     function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
     function reset(scale:Scale,seed:number){
         skipping=false;world.reset(scale,seed);arena.reset();
@@ -85,7 +88,7 @@ async function start(){
             if(p)queue.push({n,p});
         }
         for(let i=queue.length-1;i>=0;i--)if(queue[i].n.tick<world.tick-300)queue.splice(i,1);
-        if(!auto || paused || now-arena.userAt<8000)return;
+        if(companyFollow.selected>=0 || !auto || paused || now-arena.userAt<8000)return;
         queue.sort((a,b)=>b.p-a.p || a.n.tick-b.n.tick);
         if(queue.length && (now>=focusUntil || queue[0].p>priority)){
             const {n,p}=queue.shift()!;priority=p;follow=-1;
@@ -98,7 +101,7 @@ async function start(){
         if(now>=focusUntil){follow=-1;priority=0;}
         if(now>focusUntil){focusUntil=now+1200;arena.focus(hotX,hotY,Math.max(170,Math.min(260,arena.zoom)));}
     }
-    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,camera:arena.cameraInfo,fps:Math.round(fps),drawCalls:arena.drawCalls,tracers:arena.tracers.stats,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
+    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,camera:arena.cameraInfo,fps:Math.round(fps),drawCalls:arena.drawCalls,tracers:arena.tracers.stats,chargeDrums:sound.drums,following:companyFollow.selected,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
         winner:world.winner,ended:world.ended,seed:world.seed,weather:world.weather,scale:world.scale,lighting:arena.lighting,activeSmoke:arena.smoke.count,
         odds:world.odds(),morale:[world.armyMorale(0),world.armyMorale(1)],news:world.news.length,...arena.gore.stats}),
         setScale,setLighting,setSpeed,restart:()=>reset(world.scale,newSeed()),replay:(seed:number)=>reset(world.scale,seed),startBattle:()=>placeBet(-1,0),
@@ -119,7 +122,7 @@ async function start(){
         if(!world.ended){
             accumulator+=dt*TICKS;
             let steps=0;
-            while(accumulator>=1 && !world.ended && steps<96){world.step();arena.events(world);director(now);accumulator--;steps++;
+            while(accumulator>=1 && !world.ended && steps<96){world.step();arena.events(world);sound.step(world);director(now);accumulator--;steps++;
                 if(skipping && world.news.length>skipFrom){
                     const event=world.news.slice(skipFrom).find(n=>n.weight>=2);skipFrom=world.news.length;
                     if(event){setSpeed(1);arena.focus(event.x,event.y,110);accumulator=0;break;}
@@ -128,7 +131,7 @@ async function start(){
             if(world.ended)accumulator=0;
         }
         if(world.ended)settle();
-        director(now);
+        companyFollow.tick(now);director(now);sound.update(real,paused||world.ended);
         arena.render(world,real,world.ended?real:dt,accumulator);
         fpsTime+=elapsed;frameCount++;
         if(fpsTime>=.5){fps=frameCount/fpsTime;arena.observeFps(fps);fpsTime=frameCount=0;}
