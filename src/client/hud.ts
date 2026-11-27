@@ -27,7 +27,7 @@ export const payout=(p:number)=>Math.round(Math.min(5,Math.max(1.1,.94/Math.max(
 
 export interface Purse {points:number;wins:number;losses:number;streak:number}
 export interface Bet {side:Faction;stake:number;payout:number}
-interface Controls {jump:(x:number,y:number)=>void;scale:(n:Scale)=>void;light:()=>void;pause:()=>void;speed:(n:number)=>void;restart:()=>void;replay:()=>void;home:()=>void;auto:()=>void;bet:(side:Faction|-1,stake:number)=>void}
+interface Controls {next:()=>void;zoom:(factor:number)=>void;jump:(x:number,y:number)=>void;scale:(n:Scale)=>void;light:()=>void;pause:()=>void;speed:(n:number)=>void;restart:()=>void;replay:()=>void;home:()=>void;auto:()=>void;bet:(side:Faction|-1,stake:number)=>void}
 
 function roster(w:SimWorld,f:Faction){
     const n={line:0,guard:0,cav:0,guns:0};
@@ -50,11 +50,14 @@ export class Hud{
         <div class="morale"><span><i id="m0"></i></span><em>士气</em><span class="east"><i id="m1"></i></span></div>
         <div class="odds"><span id="odds0"></span><em>战局天平</em><span id="odds1"></span></div>
         <div class="ledger"><span class="clock">${icon('time')}<time id="clock">00:00</time></span><span id="record"></span></div></section>
+        <button id="mobile-settings" class="glass mobile-ctrl" aria-label="战场设置" aria-expanded="false">⚙</button>
+        <button id="strength-toggle" class="mobile-ctrl" aria-label="展开兵力详情" aria-expanded="false"></button>
+        <div class="zoom-panel glass"><button id="zoom-in" title="放大" aria-label="放大">＋</button><button id="zoom-out" title="缩小" aria-label="缩小">－</button></div>
         <nav class="controls glass" aria-label="战场控制">
         <div class="controlrow"><div class="segments" aria-label="总兵力">${scales.map(n=>`<button data-scale="${n}" title="总兵力 ${n}">${n}</button>`).join('')}</div>
         <button id="light" class="labeled"></button></div>
-        <div class="controlrow playback"><button id="pause" class="square" aria-label="暂停"></button><div class="speeds">${[.25,1,2,4].map(n=>`<button data-speed="${n}">${n}×</button>`).join('')}</div><button id="restart" class="labeled" title="随机新战局 (R)">${icon('restart')}新战局</button></div>
-        <div class="controlrow"><button id="auto" class="labeled" title="自动导播：镜头跟随冲锋、溃败等关键时刻">${icon('camera')}<span></span></button><span id="purse" class="purse"></span></div></nav>
+        <div class="controlrow playback"><button id="pause" class="square" aria-label="暂停"></button><div class="speeds">${[.25,1,2,4,8,16].map(n=>`<button data-speed="${n}">${n}×</button>`).join('')}</div><button id="restart" class="labeled" title="随机新战局 (R)">${icon('restart')}新战局</button></div>
+        <div class="controlrow"><button id="next-event" class="labeled">跳至大事 »</button><button id="auto" class="labeled" title="自动导播：镜头跟随冲锋、溃败等关键时刻">${icon('camera')}<span></span></button><span id="purse" class="purse"></span></div></nav>
         <div id="headline" class="headline" hidden></div>
         <button id="major" class="major glass" aria-pressed="false">只看大事</button><div id="labels"></div><ol id="ticker" class="ticker" aria-live="polite"></ol>
         <div class="hint glass">${icon('pan')} 拖拽/WASD 移动 <b>·</b> 滚轮缩放 <b>·</b> 空格暂停 <b>·</b> R 新战局</div>
@@ -64,6 +67,16 @@ export class Hud{
         <dl><div><dt>交战时长</dt><dd id="duration"></dd></div><div><dt>法军伤亡/溃逃</dt><dd id="loss0"></dd></div><div><dt>联军伤亡/溃逃</dt><dd id="loss1"></dd></div></dl>
         <section id="analysis" class="battle-analysis"></section><p id="mvp" class="mvp"></p><p id="betresult" class="betresult"></p>
         <div class="actions"><button id="again">${icon('restart')}新战局</button><button id="replay" class="ghost">${icon('replay')}重演本局</button></div></section></div>`;
+        this.get('zoom-in').onclick=()=>cb.zoom(.68);this.get('zoom-out').onclick=()=>cb.zoom(1/.68);
+        this.get('next-event').onclick=cb.next;
+        for(const [id,cls] of [['mobile-settings','settings-open'],['strength-toggle','strength-open']]){
+            const b=this.get(id);b.onclick=()=>b.setAttribute('aria-expanded',String(root.classList.toggle(cls)));
+        }
+        const ticker=this.get('ticker');let y=0;
+        ticker.addEventListener('touchstart',e=>{y=e.touches[0].clientY;},{passive:true});
+        ticker.addEventListener('touchend',e=>{const dy=e.changedTouches[0].clientY-y;
+            if(dy<-25)root.classList.add('news-open');else if(dy>25 && !ticker.scrollTop)root.classList.remove('news-open');
+        },{passive:true});
         root.querySelectorAll<HTMLButtonElement>('[data-scale]').forEach(b=>b.onclick=()=>cb.scale(Number(b.dataset.scale) as Scale));
         root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach(b=>b.onclick=()=>cb.speed(Number(b.dataset.speed)));
         this.get('major').onclick=()=>{const b=this.get('major');const on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(on));this.get('ticker').classList.toggle('major-only',on);};

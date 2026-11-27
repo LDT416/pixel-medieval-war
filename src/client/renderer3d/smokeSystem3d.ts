@@ -11,6 +11,8 @@ export class SmokeSystem{
     private soil:T.InstancedMesh;private clods:{x:number;y:number;z:number;vx:number;vy:number;vz:number;age:number;s:number}[]=[];
     private flash:T.InstancedMesh;private flames:{x:number;y:number;z:number;angle:number;age:number;size:number}[]=[];
     private matrix=new T.Object3D();
+    private particleLimit=CAP;
+    reduceParticles(){this.particleLimit=Math.floor(CAP*.45);if(this.items.length>this.particleLimit)this.items.length=this.particleLimit;}
     private items:Puff[]=[];private rng=new Rng(53);private mesh:T.InstancedMesh;
     private shape:T.InstancedBufferAttribute;private style:T.InstancedBufferAttribute;
     private uniforms={uSun:{value:new T.Color()},uSky:{value:new T.Color()},uLight:{value:Array.from({length:9},()=>new T.Vector4())}};
@@ -60,7 +62,7 @@ export class SmokeSystem{
         this.mesh=new T.InstancedMesh(g,mat,CAP);this.mesh.count=0;this.mesh.frustumCulled=false;this.mesh.renderOrder=8;scene.add(this.mesh);
     }
     private add(x:number,y:number,z:number,kind:number,size:number,life:number,vx:number,vy:number,vz:number){
-        if(this.items.length>=CAP)return;
+        if(this.items.length>=this.particleLimit)return;
         this.items.push({x,y,z,kind,size,life,vx,vy,vz,age:0,seed:this.rng.next()*9});
     }
     event(e:BattleEvent){

@@ -1,4 +1,5 @@
 import './style.css';
+import './client/mobileHud.css';
 import { atlasPreview } from './client/renderer3d/spriteAtlas';
 import type { News } from './sim/arenaTypes';
 import { SimWorld } from './sim/world';
@@ -19,16 +20,20 @@ async function start(){
     const world=new SimWorld(1200,Number(params.get('seed'))||newSeed()),canvas=document.querySelector<HTMLCanvasElement>('#battlefield')!;
     const arena=await ArenaRenderer3d.create(canvas);
     let paused=true,speed=1,accumulator=0,slowmo=0,fps=0,frameCount=0,fpsTime=0,hudTime=0;
+    let skipping=false,skipFrom=0;
     let auto=true,focusUntil=0,lastFocusNews=0,hotX=world.frontline().x,hotY=world.frontline().y,settled=false;
     let priority=0,follow=-1,slowUntil=0;
     const queue:{n:News;p:number}[]=[];
     let purse=loadPurse(),bet:Bet|null=null;
-    const hud=new Hud(document.querySelector('#hud')!,{jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
+    const hud=new Hud(document.querySelector('#hud')!,{zoom:f=>arena.zoomBy(f),next:()=>{
+        if(hud.intelOpen || world.ended)return;
+        skipFrom=world.news.length;setSpeed(16);skipping=true;
+    },jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
     function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
     function reset(scale:Scale,seed:number){
-        world.reset(scale,seed);arena.reset();
+        skipping=false;world.reset(scale,seed);arena.reset();
         arena.setLighting(world.weather==='rain'?'storm':world.weather==='fog'?'fog':'golden');
         paused=true;slowmo=accumulator=0;settled=false;priority=0;follow=-1;slowUntil=0;queue.length=0;document.body.classList.remove('commander-down');bet=null;lastFocusNews=0;focusUntil=0;
         const p=world.frontline();hotX=p.x;hotY=p.y;arena.focus(p.x,p.y,330);
@@ -39,7 +44,11 @@ async function start(){
         if(side!==-1 && stake>0 && stake<=purse.points){
             const p=world.openingOdds;bet={side,stake,payout:payout(side?1-p:p)};
         }
-        hud.hideIntel();paused=false;arena.focus(hotX,hotY,210);controls();
+        hud.hideIntel();
+        if(innerWidth<=600 && innerHeight>innerWidth && !sessionStorage.getItem('1815-orientation')){
+            sessionStorage.setItem('1815-orientation','1');const tip=document.createElement('div');tip.className='orientation-tip glass';tip.textContent='横屏观战效果更佳';document.body.append(tip);setTimeout(()=>tip.remove(),3200);
+        }
+        paused=false;arena.focus(hotX,hotY,210);controls();
     }
     function settle(){
         if(settled||world.winner===null)return;settled=true;
@@ -57,7 +66,7 @@ async function start(){
     function cycleLighting(){arena.setLighting(lightings[(lightings.indexOf(arena.lighting)+1)%lightings.length]);controls();}
     function setLighting(mode:Lighting){if(lightings.includes(mode)){arena.setLighting(mode);controls();}}
     function setScale(n:number){if(scales.includes(n as Scale))reset(n as Scale,world.seed);}
-    function setSpeed(n:number){if(n===0){paused=true;controls();return;}if([.25,1,2,4].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
+    function setSpeed(n:number){skipping=false;if(n===0){paused=true;controls();return;}if([.25,1,2,4,8,16].includes(n)){speed=n;if(!hud.intelOpen)paused=false;controls();}}
     window.addEventListener('keydown',e=>{
         if(e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
         if(e.code==='Space'){e.preventDefault();if(hud.intelOpen)placeBet(-1,0);else toggle();}
@@ -86,7 +95,7 @@ async function start(){
         if(now>=focusUntil){follow=-1;priority=0;}
         if(now>focusUntil){focusUntil=now+1200;arena.focus(hotX,hotY,Math.max(170,Math.min(260,arena.zoom)));}
     }
-    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,fps:Math.round(fps),drawCalls:arena.drawCalls,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
+    const debug={atlas:()=>atlasPreview().toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,camera:arena.cameraInfo,fps:Math.round(fps),drawCalls:arena.drawCalls,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
         winner:world.winner,ended:world.ended,seed:world.seed,weather:world.weather,scale:world.scale,lighting:arena.lighting,activeSmoke:arena.smoke.count,
         odds:world.odds(),morale:[world.armyMorale(0),world.armyMorale(1)],news:world.news.length,...arena.gore.stats}),
         setScale,setLighting,setSpeed,restart:()=>reset(world.scale,newSeed()),replay:(seed:number)=>reset(world.scale,seed),startBattle:()=>placeBet(-1,0),
@@ -97,7 +106,7 @@ async function start(){
             hud.update(world,performance.now());
         },panTo:(x:number,z:number)=>{arena.userAt=performance.now();arena.panTo(x,z);},zoomTo:(d:number)=>{arena.userAt=performance.now();arena.zoomTo(d);}};
     Object.assign(window,{__arenaDebug:debug});
-    reset(1200,world.seed);document.getElementById('notice')!.hidden=true;
+    reset(arena.mobileMode?600:1200,world.seed);document.getElementById('notice')!.hidden=true;
     let last=performance.now();
     function frame(now:number){
         const elapsed=Math.max(0,(now-last)/1000);last=now;
@@ -107,18 +116,23 @@ async function start(){
         if(!world.ended){
             accumulator+=dt*TICKS;
             let steps=0;
-            while(accumulator>=1 && !world.ended && steps<12){world.step();arena.events(world);director(now);accumulator--;steps++;}
+            while(accumulator>=1 && !world.ended && steps<96){world.step();arena.events(world);director(now);accumulator--;steps++;
+                if(skipping && world.news.length>skipFrom){
+                    const event=world.news.slice(skipFrom).find(n=>n.weight>=2);skipFrom=world.news.length;
+                    if(event){setSpeed(1);arena.focus(event.x,event.y,110);accumulator=0;break;}
+                }
+            }
             if(world.ended)accumulator=0;
         }
         if(world.ended)settle();
         director(now);
         arena.render(world,real,world.ended?real:dt,accumulator);
         fpsTime+=elapsed;frameCount++;
-        if(fpsTime>=.5){fps=frameCount/fpsTime;fpsTime=frameCount=0;}
+        if(fpsTime>=.5){fps=frameCount/fpsTime;arena.observeFps(fps);fpsTime=frameCount=0;}
         hudTime+=elapsed;if(hudTime>.15){hud.update(world,now);hudTime=0;
             const host=document.getElementById('labels')!;
             host.replaceChildren();
-            if(arena.zoom<120 && !world.ended && !hud.intelOpen){
+            if(arena.zoom<90 && !world.ended && !hud.intelOpen){
                 const near=world.companies.filter(c=>c.alive && c.status!=='gone').map(c=>({c,p:arena.screen(c.x,c.y)})).filter(({p})=>Math.abs(p.x)<.97 && Math.abs(p.y)<.92 && Math.abs(p.z)<1 && p.y<.62).sort((a,b)=>a.p.x*a.p.x+a.p.y*a.p.y-b.p.x*b.p.x-b.p.y*b.p.y).slice(0,12);
                 for(const {c,p} of near){const el=document.createElement('span');el.textContent=(c.status==='rout'?'↩ ':c.formation==='square'?'□ ':c.order==='charge'?'⚔ ':'')+c.name;
                     el.style.left=(p.x+1)*50+'%';el.style.top=(1-p.y)*50+'%';el.style.setProperty('--morale',c.morale+'%');host.append(el);}
