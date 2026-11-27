@@ -1,110 +1,54 @@
-import { UNITS, rankFire } from './config';
-import type { Faction, Kind, Point, Projectile, Structure, Unit } from './types';
+import type { Soldier, BattleEvent } from './arenaTypes';
 import type { SimWorld } from './world';
-export const rangeOf = (u: Unit) => UNITS[u.kind].range * (u.tower ? 1.2 : 1);
-export const distanceTo = (p: Point, t: Point) => Math.hypot(t.x - p.x, t.y - p.y);
-export function hit(w: SimWorld, u: Unit, f: Faction, kind: Kind, damage: number, dx: number, dy: number, ranged = true, explosive = false) {
-    if (u.hp <= 0)
-        return;
-    const dealt = damage * (ranged && u.tower ? .5 : 1);
-    w.stats[f][kind].damage += Math.min(dealt, u.hp);
-    u.hp -= dealt;
-    u.morale = Math.max(0, u.morale - dealt * .14);
-    w.events.push({ type: 'hit', x: u.x, y: u.y, z: u.z, dx, dy, kind, unitId: u.id });
-    if (u.hp > 0)
-        return;
-    u.hp = 0;
-    w.dead[u.faction]++;
-    w.stats[f][kind].kills++;
-    w.events.push({ type: 'death', x: u.x, y: u.y, z: u.z, dx, dy, kind: u.kind, faction: u.faction, flag: u.kind === 'bannerman' && u.slot === 0, explosive });
+
+function emit(w: SimWorld,type: BattleEvent['type'],u: Soldier,dx:number,dy:number,explosive:boolean,x=u.x,y=u.y) {
+    w.events.push({type,x,y,dx,dy,explosive,unitId:u.id,kind:u.kind,faction:u.faction});
 }
-export function attack(w: SimWorld, u: Unit, t: Unit | Structure) {
-    if (u.kind === 'bannerman' || u.routed || u.cooldown > 0)
-        return;
-    const distance = distanceTo(u, t), dx = (t.x - u.x) / (distance || 1), dy = (t.y - u.y) / (distance || 1);
-    u.aimX = dx;
-    u.aimY = dy;
-    if (Math.abs(dx) > .06)
-        u.face = Math.sign(dx);
-    const damage = UNITS[u.kind].damage * (u.tower ? 1.35 : 1);
-    if (u.kind === 'cuirassier' || (distance < 30 && rankFire(u.kind))) {
-        u.pose = 'bayonet';
-        u.cooldown = u.kind === 'cuirassier' ? 31 : 26;
-        const thrust = u.kind === 'guard_grenadier' ? 80 : u.kind === 'cuirassier' ? damage : 32;
-        if ('kind' in t) {
-            if (u.kind === 'cuirassier' && t.pose === 'reload' && !t.tower) {
-                const company = w.groups.get(t.group);
-                if (company && w.tick > (company.scatteredUntil ?? -1000) + 90)
-                    company.scatteredUntil = w.tick + 19;
-            }
-            hit(w, t, u.faction, u.kind, thrust, dx, dy, false);
-        }
-        else
-            w.damageStructure(t, thrust, u.faction, u.kind);
-        w.events.push({ type: 'slash', x: u.x + dx * 12, y: u.y + dy * 12, dx, dy, kind: u.kind });
-        return;
+function damage(w:SimWorld,u:Soldier,amount:number,dx:number,dy:number,explosive=false) {
+    if (u.hp<=0) return;
+    u.hp=Math.max(0,u.hp-amount); u.hitAt=w.tick;
+    emit(w,'hit',u,dx,dy,explosive);
+    if (!u.hp) {
+        u.moving=false; u.vx=0; u.vy=0;
+        w.alive[u.faction]--; w.dead[u.faction]++;
+        emit(w,'death',u,dx,dy,explosive);
     }
-    const grenade = u.kind === 'guard_grenadier' && u.slot % 6 === 0 && distance < 126 && (u.grenadeAt ?? 0) <= w.tick;
-    const kind = grenade ? 'flask' : u.kind === 'field_cannon' ? 'ball' : 'bullet';
-    if (grenade)
-        u.grenadeAt = w.tick + 210;
-    u.firedAt = w.tick;
-    u.pose = grenade ? 'throw' : 'aim';
-    if (grenade)
-        u.thrownAt = w.tick;
-    u.cooldown = kind === 'ball' ? 195 : w.rng.int(108, 120);
-    let tx = t.x, ty = t.y, target = t.id;
-    if (kind === 'bullet' && 'kind' in t) {
-        // Two-dimensional spread includes vertical misses over the line.
-        if (w.rng.next() > .19) {
-            target = 0;
-            const spread = 20 + w.rng.next() * 50, side = w.rng.next() < .5 ? -1 : 1;
-            tx -= dy * spread * side;
-            ty += dx * spread * side;
-        }
-    }
-    if (kind === 'ball') {
-        tx += w.rng.int(-10, 10);
-        ty += w.rng.int(-10, 10);
-    }
-    const muzzle = kind === 'ball' ? 23 : 18;
-    const x = u.x + dx * muzzle, y = u.y + dy * muzzle;
-    const ticks = Math.max(2, Math.ceil(distance / (kind === 'bullet' ? 54 : kind === 'ball' ? 32 : 13)));
-    const z = u.z + 12, gravity = grenade ? .85 : 0;
-    w.projectiles.push({ id: w.next++, x, y, z, vx: (tx - x) / ticks, vy: (ty - y) / ticks,
-        vz: (-z / ticks) + gravity * (ticks - 1) / 2, gravity, remaining: ticks, target, kind, source: u.kind,
-        damage: grenade ? 94 * (u.tower ? 1.35 : 1) : damage, faction: u.faction });
-    if (!grenade)
-        w.events.push({ type: 'fire', x: u.x, y: u.y, z: u.z, dx, dy, kind: u.kind, unitId: u.id });
 }
-function impact(w: SimWorld, p: Projectile) {
-    const t = w.byUnit.get(p.target), s = w.byStructure.get(p.target);
-    if (p.kind === 'bullet') {
-        if (t && t.hp > 0 && distanceTo(p, t) < 19)
-            hit(w, t, p.faction, p.source, p.damage, p.vx, p.vy);
+export function strike(w:SimWorld,u:Soldier,t:Soldier,dx:number,dy:number) {
+    u.firedAt=w.tick;
+    if (u.kind==='field_cannon') {
+        u.pose='recoil'; u.cooldown=w.rng.int(155,215);
+        // Prefer the most occupied of a few nearby cells for a battery's point of aim.
+        let tx=t.x,ty=t.y,best=-1;
+        for (let i=0;i<4;i++) {
+            const x=t.x+w.rng.int(-45,45), y=t.y+w.rng.int(-40,40);
+            let n=0; w.hash.visit(x,y,37,v=>{if(v.faction!==u.faction)n++;});
+            if(n>best){best=n;tx=x;ty=y;}
+        }
+        w.rounds.push({x:u.x,y:u.y,tx,ty,age:0,duration:Math.max(5,Math.ceil(Math.hypot(tx-u.x,ty-u.y)/42)),gun:u});
+        emit(w,'fire',u,dx,dy,true); return;
     }
-    else {
-        w.events.push({ type: 'impact', x: p.x, y: p.y, dx: p.vx, dy: p.vy, kind: p.source, power: p.kind === 'ball' ? 6 : 3 });
-        const radius = p.kind === 'ball' ? 39 : 28;
-        w.hash.visit(p.x, p.y, radius, u => {
-            if (u.faction !== p.faction)
-                hit(w, u, p.faction, p.source, p.damage * (1 - .28 * distanceTo(p, u) / radius), u.x - p.x, u.y - p.y, true, true);
+    if (u.charge) {
+        emit(w,'slash',u,dx,dy,false);
+        damage(w,t,w.rng.int(32,u.kind==='cuirassier'?100:72),dx,dy);
+        u.cooldown=w.rng.int(26,50);
+    } else {
+        u.pose='aim'; emit(w,'fire',u,dx,dy,false);
+        if (w.rng.next()<.79) damage(w,t,w.rng.int(65,124),dx,dy);
+        // Company beats keep adjacent firing ranks in loose volleys.
+        u.cooldown=80-((w.tick+u.company*7)%26)+w.rng.int(0,12);
+    }
+}
+export function resolveRounds(w:SimWorld) {
+    for (let i=w.rounds.length-1;i>=0;i--) {
+        if (!w.alive[0] || !w.alive[1]) break;
+        const r=w.rounds[i]; if (++r.age<r.duration) continue;
+        emit(w,'impact',r.gun,0,0,true,r.tx,r.ty);
+        w.hash.visit(r.tx,r.ty,51,u=>{
+            if(u.faction===r.gun.faction)return;
+            const dx=u.x-r.tx,dy=u.y-r.ty,d=Math.max(1,Math.hypot(dx,dy));
+            damage(w,u,155-d*1.9,dx/d,dy/d,true);
         });
+        w.rounds.splice(i,1);
     }
-    if (s && s.hp > 0 && s.faction !== p.faction)
-        w.damageStructure(s, p.damage, p.faction, p.source);
-}
-export function updateProjectiles(w: SimWorld) {
-    let live = 0;
-    for (const p of w.projectiles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.z += p.vz;
-        p.vz -= p.gravity;
-        if (--p.remaining <= 0)
-            impact(w, p);
-        else
-            w.projectiles[live++] = p;
-    }
-    w.projectiles.length = live;
 }

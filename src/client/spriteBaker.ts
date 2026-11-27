@@ -357,7 +357,7 @@ function cannon(p:Pixels,f:Faction,a:Action,frame:number,dx:number,dy:number,cre
 function heading(dx:number,dy:number){
     return ((Math.round(Math.atan2(dy,dx)*16/circle)%16)+16)%16;
 }
-function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:number,crewCount:number,flash:boolean):Result {
+export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:number,crewCount:number,flash:boolean):Result {
     const key=[kind,f,a,dir,frame,role,crewCount,Number(flash)].join('/');
     const known=cache.get(key);if(known)return known;
     const gun=kind==='field_cannon', mounted=kind==='cuirassier',band=kind==='bannerman';

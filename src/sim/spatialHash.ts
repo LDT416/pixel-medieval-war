@@ -1,5 +1,5 @@
 import {WIDTH,HEIGHT} from './maps';
-import type { Unit } from './types';
+import type { Soldier as Unit } from './arenaTypes';
 const SIZE = 64, STRIDE = Math.ceil(WIDTH/SIZE), ROWS=Math.ceil(HEIGHT/SIZE);
 export class SpatialHash {
     private buckets: Unit[][] = Array.from({ length: STRIDE * ROWS }, () => []);
