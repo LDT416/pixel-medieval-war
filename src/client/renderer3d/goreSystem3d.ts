@@ -61,7 +61,7 @@ class Batch {
         mesh.count=0;mesh.frustumCulled=false;mesh.receiveShadow=true;mesh.renderOrder=this.layer;
         mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);this.scene.add(mesh);this.pages.push({mesh,uv,dirty:Infinity,end:0});
     }
-    put(sheet:number,frame:number,x:number,y:number,z:number,size:number,angle:number,tilt=0,index=this.count){
+    put(sheet:number,frame:number,x:number,y:number,z:number,size:number,angle:number,tilt=0,index=this.count,aspect=1){
         const p=Math.floor(index/this.capacity),slot=index%this.capacity;
         if(p>=this.pages.length)this.allocate();
         const page=this.pages[p];page.mesh.count=Math.max(slot+1,page.mesh.count);
@@ -70,7 +70,7 @@ class Batch {
             normalAt(x,z,normal);o.quaternion.setFromUnitVectors(up,normal);o.rotateY(angle);
             y=terrainHeight(x,z)+.018+this.layer*.023+(slot%200)*.00018;
         }else{o.rotation.set(-.23+tilt,0,angle,'XYZ');}
-        o.position.set(x,y,z);o.scale.setScalar(size);o.updateMatrix();
+        o.position.set(x,y,z);o.scale.set(size*aspect,size,size);o.updateMatrix();
         page.mesh.setMatrixAt(slot,o.matrix);tile(page.uv,slot,sheet,frame);
         page.dirty=Math.min(page.dirty,slot);page.end=Math.max(page.end,slot+1);
         return index;
@@ -85,7 +85,7 @@ class Batch {
 interface Piece {sheet:number;frame:number;x:number;y:number;z:number;vx:number;vy:number;vz:number;size:number;angle:number;spin:number;bounces:number}
 interface PoolGrowth {x:number;z:number;size:number;ang:number;index:number;frame:number;age:number}
 export class GoreSystem {
-    private air:Piece[]=[];private blasts:{x:number;y:number;z:number;age:number;size:number}[]=[];
+    private air:Piece[]=[];private fallen:{e:BattleEvent;age:number}[]=[];
     private growth:PoolGrowth[]=[];private pools:Batch;private craters:Batch;private corpses:Batch;private debris:Batch;private flying:Batch;
     private rng=new Rng(1815);private wet:T.MeshStandardMaterial;
     private constructor(scene:T.Scene,tex:T.Texture,private lights:BattlefieldLight){
@@ -101,19 +101,17 @@ export class GoreSystem {
         const index=this.pools.put(7,frame,x,0,z,grow?size*.45:size,ang);
         if(grow)this.growth.push({x,z,size,ang,index,frame,age:0});
     }
-    private blast(x:number,z:number,size:number){
-        const y=terrainHeight(x,z);this.blasts.push({x,z,y:y+size*.43,age:0,size});
-        this.craters.put(7,this.rng.int(8,11),x,0,z,size*.88,this.rng.next()*6.28);
-        this.lights.flash(x,y,z,true);
-    }
     event(e:BattleEvent) {
         const x=toX(e.x),z=toZ(e.y),h=terrainHeight(x,z);
-        if(e.type==='impact'){this.blast(x,z,4.1);return;}
+        if(e.type==='impact'||e.type==='bounce'){
+            const length=e.type==='impact'?3:1.5;
+            this.craters.put(7,this.rng.int(8,11),x,0,z,.52,-Math.atan2(e.dy,e.dx),0,this.craters.count,length/.52);return;
+        }
         if(e.type!=='death')return;
         const random=()=>this.rng.next();
-        if(e.explosive)this.blast(x,z,2.6+random()*1.2);
+        if(e.explosive)this.blood(x,z,1.55,true);
         else{
-            this.corpses.put(e.faction?5:4,this.rng.int(0,15),x,0,z,e.kind==='cuirassier'?3.2:2.5,random()*6.28);
+            this.fallen.push({e,age:0});
             this.blood(x,z,2.3+random()*.9,true);
         }
         const spawn=(sheet:number,count:number)=>{
@@ -145,10 +143,10 @@ export class GoreSystem {
             }
             this.flying.put(p.sheet,p.frame,p.x,p.y,p.z,p.size,p.angle,Math.sin(p.angle)*.55);
         }
-        for(let i=this.blasts.length-1;i>=0;i--){
-            const b=this.blasts[i];b.age+=dt;
-            if(b.age>=.64){this.blasts.splice(i,1);continue;}
-            this.flying.put(6,Math.min(15,Math.floor(b.age*25)),b.x,b.y,b.z,b.size,0);
+        for(let i=this.fallen.length-1;i>=0;i--){
+            const p=this.fallen[i];p.age+=dt;if(p.age<.4)continue;
+            const e=p.e;this.corpses.put(e.faction?5:4,this.rng.int(0,15),toX(e.x),0,toZ(e.y),e.kind==='cuirassier'?3.2:2.5,this.rng.next()*6.28);
+            this.fallen.splice(i,1);
         }
         for(let i=this.growth.length-1;i>=0;i--){
             const p=this.growth[i];p.age=Math.min(1,p.age+dt*1.6);
@@ -158,6 +156,6 @@ export class GoreSystem {
         this.wet.roughness=this.lights.mode==='storm'?.095:.14;
         for(const batch of [this.pools,this.corpses,this.craters,this.debris,this.flying])batch.sync();
     }
-    reset(){this.air.length=this.blasts.length=this.growth.length=0;this.rng.state=1815;
+    reset(){this.air.length=this.fallen.length=this.growth.length=0;this.rng.state=1815;
         for(const b of [this.pools,this.corpses,this.craters,this.debris,this.flying])b.clear();}
 }
