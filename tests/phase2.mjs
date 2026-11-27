@@ -33,6 +33,11 @@ for (const scale of [600, 1200, 1800]) {
     assert.deepEqual(world.alive, [scale / 2, scale / 2]);
     const a = battle(world);
     console.log(`${scale}: ${(a.tick / 30).toFixed(0)}s winner=${a.winner} dead=${a.dead} fled=${a.fled} cannon-kills=${a.explosive} avg=${a.avg.toFixed(2)}ms p99=${a.p99.toFixed(2)}ms reason=${world.reason}`);
+    if(scale===1200){
+        const j=world.jitter;
+        console.log('jitter',j);
+        assert.ok(j.flipsPerSec<.05 && j.poseTogglesPerSec<.1 && j.slotSwapsPerDeath<=2);
+    }
     if (scale === 1800) assert.ok(a.p99 < 8, '1800-unit tick p99 exceeded 8 ms');
     if (scale <= 1200) { world.reset(scale, 42); assert.equal(battle(world).sig, a.sig, 'deterministic replay'); }
 }

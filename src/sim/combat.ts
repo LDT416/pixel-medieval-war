@@ -69,7 +69,7 @@ export function shoot(w: SimWorld, u: Soldier, c: Company) {
     const t = w.companies[c.target];
     if (!t || t.status === 'gone' || c.status === 'rout') return;
     const dx = t.x - u.x, dy = t.y - u.y, d = Math.max(1, Math.hypot(dx, dy));
-    u.firedAt = w.tick; u.pose = 'aim'; u.face = dx < 0 ? -1 : 1;
+    u.firedAt = w.tick; u.pose = 'aim';
     if (w.weather === 'rain' && w.rng.next() < .3) return;
     emit(w, 'fire', u, dx / d, dy / d, false);
     if (w.rng.next() < c.hitChance) {

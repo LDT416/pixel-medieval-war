@@ -26,6 +26,11 @@ export class SimWorld {
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
     hash = new SpatialHash(); rng = new Rng(1815); director = new Director();
+    stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
+    get jitter(){
+        const seconds=Math.max(1,this.stationaryFrames/30);
+        return {flipsPerSec:this.flips/seconds, poseTogglesPerSec:this.toggles/seconds, slotSwapsPerDeath:this.slotMoves/Math.max(1,this.dead[0]+this.dead[1])};
+    }
     tick = 0; scale: Scale = 1200; seed = 1815;
     weather: Weather = 'clear'; posture: [Posture, Posture] = ['attack', 'defend']; layout!: Layout;
     reinforcement: Reinforcement | null = null; openingOdds = .5;
@@ -34,7 +39,7 @@ export class SimWorld {
     reset(scale: Scale = this.scale, seed = this.seed) {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
-        this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
+        this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
         this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
         const r = this.rng.next();
@@ -66,7 +71,7 @@ export class SimWorld {
         if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
         if (line === 5) base = 100;
         const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
-            x, y, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
+            x, y, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
             engaged: false, checkedAt: -999, chargeAt: -999, line, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
@@ -77,7 +82,7 @@ export class SimWorld {
         const u: Soldier = { id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
             hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
             stride: this.rng.int(0, 15), speed: SPEED[kind] * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
-            general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
+            px:c.x, py:c.y, turnFrames:0, marchUntil:0, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
         if (kind === 'bannerman') c.colors++;
         c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;
@@ -177,11 +182,20 @@ export class SimWorld {
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
         if (this.tick % 30 === 1 && this.winner === null) this.director.update(this);
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
+        for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
         resolveRounds(this);
         const n = this.units.length, start = this.tick % 2 * (n >> 1);
         for (let i = 0; i < n; i++) {
             const u = this.units[(i + start) % n];
-            if (u.hp > 0) advance(this, u);
+            u.px=u.x; u.py=u.y;
+            if (u.hp <= 0) continue;
+            const c=this.companies[u.company], face=u.face, pose=u.pose;
+            advance(this,u);
+            if(!c.engaged && c.status!=='rout' && c.formUntil<=this.tick && c.vx===0 && c.vy===0){
+                this.stationaryFrames++;
+                if(face!==u.face)this.flips++;
+                if((pose==='march' && u.pose==='stand')||(pose==='stand' && u.pose==='march'))this.toggles++;
+            }
         }
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
         if (this.winner !== null && this.tick - this.endTick >= PURSUIT) {

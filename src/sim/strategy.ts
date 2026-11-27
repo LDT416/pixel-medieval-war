@@ -19,7 +19,7 @@ export function filesFor(c: Company, n: number) {
 function slotOffset(c: Company, i: number): [number, number] {
     const [sp, dp] = SPACING[c.formation];
     if (c.formation === 'square') {
-        const n = Math.max(4, c.members.length), side = Math.ceil(n / 4), half = (side - 1) * sp / 2;
+        const n = Math.max(4, c.capacity), side = Math.ceil(n / 4), half = (side - 1) * sp / 2;
         const edge = Math.floor(i / side) % 4, j = i % side, t = j * sp - half;
         return edge === 0 ? [t, -half] : edge === 1 ? [half, t] : edge === 2 ? [-t, half] : [-half, -t];
     }
@@ -30,11 +30,13 @@ function slotOffset(c: Company, i: number): [number, number] {
 /** 按当前队形把全连士兵直接摆到位（开局与援军入场时使用）。 */
 export function formUp(c: Company) {
     c.files = filesFor(c, c.members.length);
+    c.capacity=c.members.length;
     c.members.forEach((u, i) => {
         u.slot = i;
         const [lat, dep] = slotOffset(c, i);
         u.x = Math.min(WIDTH - 3, Math.max(3, c.x - lat * c.hy - dep * c.hx + u.jx));
         u.y = Math.min(HEIGHT - 3, Math.max(3, c.y + lat * c.hx - dep * c.hy + u.jy));
+        u.px=u.x; u.py=u.y;
     });
 }
 function moveToward(w: SimWorld, u: Soldier, tx: number, ty: number, speed: number) {
@@ -43,17 +45,22 @@ function moveToward(w: SimWorld, u: Soldier, tx: number, ty: number, speed: numb
     if (inWoods(u.x, u.y)) sp *= u.kind === 'cuirassier' ? .45 : .75;
     if (w.weather === 'rain') sp *= .88;
     const step = Math.min(d, sp / 30);
-    if (step < .35) { u.vx = u.vy = 0; u.moving = false; return false; }
+    if (d < (u.moving ? 1 : 3)) { u.vx = u.vy = 0; u.moving = false; return false; }
     u.vx = dx / d * step * 30; u.vy = dy / d * step * 30;
     u.x = Math.min(WIDTH - 2, Math.max(2, u.x + u.vx / 30));
     u.y = Math.min(HEIGHT - 2, Math.max(2, u.y + u.vy / 30));
     u.moving = true; u.stride += step;
     return true;
 }
+function faceToward(u:Soldier, dx:number){
+    const dir=Math.sign(dx);
+    if(dir===u.face || dir===0){u.turnFrames=0;return;}
+    if(++u.turnFrames>=10){u.face=dir;u.turnFrames=0;}
+}
 function flee(w: SimWorld, u: Soldier, c: Company) {
     const away = u.faction ? 1 : -1;
     const ok = moveToward(w, u, u.x + away * 200, u.y + u.jy * 3 + Math.sin((w.tick + u.id * 37) * .02) * 60, u.speed * (u.kind === 'cuirassier' ? 1.05 : 1.3));
-    u.pose = 'run'; u.face = away;
+    u.pose = 'run'; faceToward(u,away);
     if (ok && (u.x <= 4 || u.x >= WIDTH - 4)) {
         u.hp = 0; u.moving = false;
         w.alive[u.faction]--; w.fled[u.faction]++; c.alive--;
@@ -64,8 +71,8 @@ function meleeStep(w: SimWorld, u: Soldier, c: Company) {
     let foe = u.foe >= 0 ? w.units[u.foe] : undefined;
     if ((w.tick + u.id) % 6 === 0 || !foe || foe.hp <= 0) {
         let best = Infinity, found: Soldier | undefined;
-        w.hash.visit(u.x, u.y, c.engaged ? 80 : 26, o => {
-            if (o.faction === u.faction) return;
+        w.hash.visit(u.x, u.y, c.engaged ? 80 : 16, o => {
+            if (o.faction === u.faction || (!c.engaged && o.foe!==u.id)) return;
             const d = (o.x - u.x) ** 2 + (o.y - u.y) ** 2;
             if (d < best) { best = d; found = o; }
         });
@@ -74,7 +81,8 @@ function meleeStep(w: SimWorld, u: Soldier, c: Company) {
     if (!foe) return false;
     const reach = u.kind === 'cuirassier' ? 22 : 16;
     const d = Math.hypot(foe.x - u.x, foe.y - u.y);
-    u.face = foe.x < u.x ? -1 : 1;
+    if(!c.engaged && (d>16 || foe.foe!==u.id)){u.foe=-1;return false;}
+    faceToward(u,foe.x-u.x);
     if (d <= reach) {
         u.moving = false; u.vx = u.vy = 0; u.pose = 'thrust';
         if (!u.cooldown) strike(w, u, foe);
@@ -97,13 +105,14 @@ export function advance(w: SimWorld, u: Soldier) {
     const far = Math.abs(tx - u.x) + Math.abs(ty - u.y) > 30;
     const charging = c.order === 'charge' || (c.order === 'assault' && dist(c, w.companies[c.target] ?? c) < 320);
     const moved = moveToward(w, u, tx, ty, u.speed * (far ? 1.3 : 1.1) * (charging ? 1.45 : 1));
+    faceToward(u,c.hx);
     if (moved) {
+        u.marchUntil=w.tick+12;
         u.pose = u.kind === 'cuirassier' || charging ? 'run' : 'march';
-        u.face = Math.abs(u.vx) > 4 ? Math.sign(u.vx) : u.face;
+
         return;
     }
-    const t = w.companies[c.target];
-    if (t && t.status !== 'gone') u.face = t.x < u.x ? -1 : 1;
+    if(u.pose==='march' && w.tick<u.marchUntil && w.tick-u.firedAt>70 && u.fireAt<w.tick)return;
     const since = w.tick - u.firedAt;
     if (u.kind === 'field_cannon') u.pose = since < 14 ? 'recoil' : u.cooldown > 30 ? 'load' : 'aim';
     else if (u.fireAt > w.tick && u.fireAt - w.tick < 26) u.pose = 'aim';
@@ -144,15 +153,39 @@ function pickTarget(w: SimWorld, c: Company) {
 }
 function setFormation(w: SimWorld, c: Company, f: Formation) {
     if (c.formation === f) return;
+    c.capacity=c.members.length; c.margin=0; c.lastShrink=w.tick;
+    c.members.forEach((u,i)=>u.slot=i);
     c.formation = f;
     c.formUntil = w.tick + Math.round((f === 'square' ? (c.kind === 'guard_grenadier' ? 36 : 58) : 55) * (c.status === 'shaken' ? 1.5 : 1));
     c.files = filesFor(c, c.members.length);
 }
-function compact(c: Company) {
-    if (c.members.length === c.alive) return;
-    c.members = c.members.filter(u => u.hp > 0);
-    c.members.forEach((u, i) => u.slot = i);
-    if (c.formation !== 'column' && (c.members.length <= c.files * (c.ranks - 1) || c.files > c.members.length)) c.files = filesFor(c, c.members.length);
+function compact(w:SimWorld,c:Company){
+    const lost=c.members.length!==c.alive;
+    if(lost)c.members=c.members.filter(u=>u.hp>0);
+    if(!c.alive || c.status==='rout')return;
+    const width=c.files, rows=Math.ceil(c.capacity/width);
+    const shrink=c.formation!=='square' && width-2*c.margin>2 && w.tick-c.lastShrink>=90
+        && c.alive<=(width-2*c.margin)*rows*.7;
+    if(!lost && !shrink)return;
+    const occupied=new Map(c.members.map(u=>[u.slot,u]));
+    function move(u:Soldier,slot:number){occupied.delete(u.slot);u.slot=slot;occupied.set(slot,u);w.slotMoves++;}
+    if(c.formation==='square')return; // 空出的边位保留到下次变阵
+    if(lost)for(const u of c.members.slice().sort((a,b)=>a.slot-b.slot)){
+        if(u.slot>=width && !occupied.has(u.slot-width))move(u,u.slot-width);
+    }
+    if(!shrink)return;
+    const edge=c.margin, holes:number[]=[];
+    for(let row=0;row<rows;row++)for(let file=edge+1;file<width-edge-1;file++){
+        const slot=row*width+file;
+        if(!occupied.has(slot))holes.push(slot);
+    }
+    const wings=c.members.filter(u=>u.slot%width===edge || u.slot%width===width-edge-1);
+    if(holes.length<wings.length)return;
+    for(const u of wings){
+        holes.sort((a,b)=>Math.abs(b-u.slot)-Math.abs(a-u.slot));
+        move(u,holes.pop()!);
+    }
+    c.margin++; c.lastShrink=w.tick;
 }
 export function rout(w: SimWorld, c: Company, quiet = false) {
     if (c.status === 'rout' || c.status === 'gone') return;
@@ -171,7 +204,7 @@ export function rout(w: SimWorld, c: Company, quiet = false) {
 /** 连队大脑，每 6 帧轮询一次：士气、目标、队形、移动、开火。 */
 export function updateCompany(w: SimWorld, c: Company) {
     if (c.status === 'gone') return;
-    compact(c);
+    c.vx=c.vy=0; compact(w,c);
     if (c.alive <= 0) { c.status = 'gone'; c.engaged = false; return; }
     const g = w.generals[c.faction];
     const near = nearestEnemy(w, c);
@@ -238,7 +271,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     const gd = Math.hypot(gx - c.x, gy - c.y);
     if (gd > 1 && lag < 55) {
         const step = Math.min(gd, speed * 6 / 30);
-        c.x += (gx - c.x) / gd * step; c.y += (gy - c.y) / gd * step;
+        c.vx=(gx-c.x)/gd*step*5; c.vy=(gy-c.y)/gd*step*5;
     }
     // 朝向：转向目标，每次最多转 0.1 弧度（整连在原地“轮转”）。
     const face = c.faction ? -1 : 1;
@@ -303,7 +336,7 @@ function updateStaff(w: SimWorld, c: Company, threat: number) {
     const g = w.generals[c.faction], face = c.faction ? -1 : 1;
     if (threat < 380) { c.homeX -= face * 25; c.homeX = Math.min(WIDTH - 80, Math.max(80, c.homeX)); }
     const gd = Math.hypot(c.homeX - c.x, c.homeY - c.y);
-    if (gd > 1) { const s = Math.min(gd, c.speed * 6 / 30); c.x += (c.homeX - c.x) / gd * s; c.y += (c.homeY - c.y) / gd * s; }
+    if (gd > 1) { const s = Math.min(gd, c.speed * 6 / 30); c.vx=(c.homeX-c.x)/gd*s*5; c.vy=(c.homeY-c.y)/gd*s*5; }
     c.hx = face; c.hy = 0;
     if (!g.alive && c.alive > 0 && threat > 900) c.order = 'hold';
 }
