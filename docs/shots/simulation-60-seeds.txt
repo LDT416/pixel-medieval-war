@@ -1,0 +1,75 @@
+
+> napoleon-1815@6.0.0 test
+> node tests/phase2.mjs
+
+600: 87s winner=0 dead=53,145 fled=0,25 cannon-kills=16 avg=0.45ms p99=1.03ms reason=反法同盟的兵力消耗殆尽
+1200: 180s winner=0 dead=302,283 fled=117,186 cannon-kills=167 avg=0.49ms p99=0.86ms reason=反法同盟的兵力消耗殆尽
+jitter {
+  flipsPerSec: 0.001721653689360385,
+  poseTogglesPerSec: 0.017708437947706816,
+  slotSwapsPerDeath: 0.7128205128205128
+}
+1800: 122s winner=0 dead=122,419 fled=46,272 cannon-kills=86 avg=0.51ms p99=0.91ms reason=反法同盟的兵力消耗殆尽
+seed 1: 186s  win=1  odds0=0.54  dead=354,215 fled=113,20  headlines=18  rain 苏尔特/乌克斯布里奇 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 2: 226s  win=1  odds0=0.54  dead=280,339 fled=200,68  headlines=28  fog 格鲁希/乌克斯布里奇 defend-attack  | 法兰西帝国的兵力消耗殆尽
+seed 3: 219s  win=0  odds0=0.42  dead=443,415 fled=12,66  headlines=28  fog 拿破仑/希尔 attack-attack 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 4: 205s  win=0  odds0=0.59  dead=359,422 fled=70,48  headlines=33  clear 苏尔特/布吕歇尔 attack-attack  | 反法同盟的兵力消耗殆尽
+seed 5: 220s  win=1  odds0=0.54  dead=414,391 fled=77,28  headlines=23  clear 格鲁希/乌克斯布里奇 defend-attack 援军1 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 6: 110s  win=0  odds0=0.47  dead=161,314 fled=33,121  headlines=26  clear 内伊/布吕歇尔 attack-defend 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 7: 181s  win=1  odds0=0.51  dead=327,250 fled=137,119  headlines=29  rain 内伊/布吕歇尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 8: 175s  win=1  odds0=0.44  dead=414,147 fled=69,42  headlines=28  rain 内伊/威灵顿 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 9: 296s  win=1  odds0=0.59  dead=364,360 fled=78,104  headlines=22  rain 格鲁希/布吕歇尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 10: 301s  win=1  odds0=0.57  dead=385,445 fled=72,86  headlines=39  clear 苏尔特/希尔 attack-attack 援军1 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 11: 214s  win=1  odds0=0.48  dead=355,292 fled=182,137  headlines=48  clear 拿破仑/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 12: 180s  win=1  odds0=0.51  dead=421,272 fled=152,142  headlines=33  fog 内伊/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 13: 123s  win=1  odds0=0.57  dead=329,203 fled=152,0  headlines=18  rain 格鲁希/乌克斯布里奇 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 14: 185s  win=1  odds0=0.41  dead=389,246 fled=100,85  headlines=30  clear 拿破仑/威灵顿 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 15: 307s  win=0  odds0=0.54  dead=437,378 fled=93,88  headlines=48  fog 苏尔特/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 16: 220s  win=0  odds0=0.40  dead=291,395 fled=30,103  headlines=27  rain 拿破仑/威灵顿 attack-defend  | 反法同盟的兵力消耗殆尽
+seed 17: 139s  win=1  odds0=0.41  dead=405,208 fled=73,39  headlines=20  clear 拿破仑/希尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 18: 256s  win=1  odds0=0.59  dead=396,370 fled=78,34  headlines=34  clear 格鲁希/布吕歇尔 defend-attack 援军1 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 19: 150s  win=1  odds0=0.49  dead=383,235 fled=92,169  headlines=31  clear 内伊/布吕歇尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 20: 251s  win=0  odds0=0.56  dead=372,377 fled=88,104  headlines=32  fog 格鲁希/布吕歇尔 attack-attack 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 21: 186s  win=0  odds0=0.46  dead=349,400 fled=63,65  headlines=27  clear 内伊/威灵顿 attack-defend 援军0  | 反法同盟的兵力消耗殆尽
+seed 22: 152s  win=0  odds0=0.47  dead=172,375 fled=78,75  headlines=36  fog 拿破仑/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 23: 172s  win=0  odds0=0.44  dead=235,435 fled=12,54  headlines=22  clear 格鲁希/威灵顿 attack-defend  | 反法同盟的兵力消耗殆尽
+seed 24: 172s  win=0  odds0=0.47  dead=250,304 fled=101,167  headlines=31  rain 内伊/布吕歇尔 attack-defend 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 25: 222s  win=1  odds0=0.56  dead=367,342 fled=78,30  headlines=27  clear 苏尔特/希尔 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 26: 244s  win=0  odds0=0.56  dead=231,441 fled=114,83  headlines=32  rain 苏尔特/希尔 attack-attack 援军1 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 27: 193s  win=0  odds0=0.48  dead=316,331 fled=139,150  headlines=36  fog 拿破仑/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 28: 158s  win=0  odds0=0.55  dead=282,417 fled=50,50  headlines=26  clear 苏尔特/希尔 attack-attack 援军0  | 反法同盟的兵力消耗殆尽
+seed 29: 185s  win=1  odds0=0.44  dead=392,242 fled=87,72  headlines=29  fog 拿破仑/希尔 attack-attack  | 法兰西帝国的兵力消耗殆尽
+seed 30: 262s  win=1  odds0=0.40  dead=407,341 fled=69,145  headlines=34  rain 拿破仑/希尔 attack-attack 援军1  | 法兰西帝国的兵力消耗殆尽
+seed 31: 157s  win=1  odds0=0.43  dead=344,183 fled=140,46  headlines=30  clear 内伊/希尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 32: 200s  win=1  odds0=0.56  dead=348,230 fled=134,86  headlines=19  rain 格鲁希/布吕歇尔 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 33: 300s  win=0  odds0=0.57  dead=448,423 fled=85,58  headlines=37  fog 苏尔特/乌克斯布里奇 attack-attack 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 34: 157s  win=1  odds0=0.56  dead=369,152 fled=111,15  headlines=14  fog 苏尔特/乌克斯布里奇 defend-attack  | 法兰西帝国的兵力消耗殆尽
+seed 35: 209s  win=0  odds0=0.57  dead=287,407 fled=107,44  headlines=26  clear 拿破仑/布吕歇尔 attack-attack  | 反法同盟的兵力消耗殆尽
+seed 36: 160s  win=0  odds0=0.44  dead=275,367 fled=59,105  headlines=28  clear 内伊/威灵顿 attack-defend 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 37: 186s  win=0  odds0=0.45  dead=279,403 fled=60,88  headlines=19  clear 内伊/威灵顿 attack-defend  | 反法同盟的兵力消耗殆尽
+seed 38: 197s  win=1  odds0=0.41  dead=407,305 fled=77,119  headlines=26  clear 拿破仑/希尔 attack-defend 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 39: 166s  win=1  odds0=0.42  dead=438,227 fled=35,41  headlines=26  clear 拿破仑/威灵顿 attack-attack  | 法兰西帝国的兵力消耗殆尽
+seed 40: 176s  win=1  odds0=0.56  dead=418,202 fled=72,44  headlines=27  fog 拿破仑/布吕歇尔 defend-attack 援军1  | 法兰西帝国的兵力消耗殆尽
+seed 41: 181s  win=1  odds0=0.52  dead=441,236 fled=47,126  headlines=28  fog 内伊/布吕歇尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 42: 210s  win=1  odds0=0.50  dead=390,313 fled=73,90  headlines=31  fog 拿破仑/威灵顿 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 43: 335s  win=1  odds0=0.44  dead=399,303 fled=67,159  headlines=42  rain 内伊/希尔 attack-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 44: 160s  win=1  odds0=0.45  dead=392,224 fled=87,96  headlines=33  clear 拿破仑/布吕歇尔 attack-attack 援军1  | 法兰西帝国的兵力消耗殆尽
+seed 45: 230s  win=0  odds0=0.56  dead=250,491 fled=77,61  headlines=38  clear 苏尔特/乌克斯布里奇 attack-attack 援军1  | 反法同盟的兵力消耗殆尽
+seed 46: 189s  win=0  odds0=0.48  dead=280,472 fled=75,63  headlines=48  clear 内伊/乌克斯布里奇 attack-attack 援军1 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 47: 160s  win=1  odds0=0.44  dead=458,190 fled=19,46  headlines=19  clear 苏尔特/希尔 attack-attack  | 法兰西帝国的兵力消耗殆尽
+seed 48: 198s  win=0  odds0=0.59  dead=181,436 fled=73,114  headlines=37  fog 苏尔特/布吕歇尔 attack-attack 援军1 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 49: 198s  win=1  odds0=0.48  dead=368,387 fled=117,72  headlines=37  fog 拿破仑/布吕歇尔 attack-attack 援军1 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 50: 227s  win=0  odds0=0.44  dead=315,356 fled=106,187  headlines=27  clear 内伊/希尔 attack-defend 援军1 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 51: 349s  win=1  odds0=0.55  dead=343,459 fled=145,83  headlines=42  rain 拿破仑/布吕歇尔 attack-attack 援军1  | 法兰西帝国的兵力消耗殆尽
+seed 52: 210s  win=0  odds0=0.55  dead=178,438 fled=43,30  headlines=29  rain 格鲁希/布吕歇尔 attack-attack 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 53: 158s  win=0  odds0=0.46  dead=248,393 fled=41,133  headlines=26  clear 内伊/希尔 attack-defend 援军1 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 54: 212s  win=1  odds0=0.54  dead=333,353 fled=151,69  headlines=28  clear 拿破仑/乌克斯布里奇 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 55: 136s  win=0  odds0=0.46  dead=259,304 fled=116,169  headlines=20  clear 内伊/布吕歇尔 attack-defend  | 反法同盟的兵力消耗殆尽
+seed 56: 192s  win=0  odds0=0.42  dead=374,339 fled=49,129  headlines=26  clear 内伊/威灵顿 attack-defend 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 57: 150s  win=1  odds0=0.43  dead=374,196 fled=64,50  headlines=26  clear 格鲁希/威灵顿 attack-attack 援军1  | 法兰西帝国的兵力消耗殆尽
+seed 58: 209s  win=1  odds0=0.56  dead=328,325 fled=145,84  headlines=23  clear 格鲁希/乌克斯布里奇 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+seed 59: 165s  win=0  odds0=0.46  dead=268,385 fled=53,60  headlines=34  clear 内伊/威灵顿 attack-defend 援军0 将领阵亡  | 反法同盟的兵力消耗殆尽
+seed 60: 127s  win=1  odds0=0.55  dead=254,249 fled=206,62  headlines=27  clear 拿破仑/乌克斯布里奇 defend-attack 将领阵亡  | 法兰西帝国的兵力消耗殆尽
+wins [ 26, 34 ] median 192s min 110 max 349
+cannon share 0.2889
+Battle assertions passed.
