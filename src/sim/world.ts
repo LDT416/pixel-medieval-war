@@ -20,6 +20,7 @@ const VALUE: Record<Kind, number> = { line_infantry: 1, guard_grenadier: 1.55, c
 export const TIMEOUT = 10800, PURSUIT = 210;
 
 export class SimWorld {
+    recentRouts:{tick:number;c:Company;x:number;y:number}[]=[];
     timeline:Sample[]=[];turningPoints:TurningPoint[]=[];
     units: Soldier[] = []; companies: Company[] = []; generals: General[] = []; news: News[] = [];
     events: BattleEvent[] = []; rounds: Round[] = [];
@@ -41,7 +42,7 @@ export class SimWorld {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
-        this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
+        this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
         const r = this.rng.next();
         this.weather = r < .55 ? 'clear' : r < .8 ? 'rain' : 'fog';
@@ -83,7 +84,7 @@ export class SimWorld {
         const u: Soldier = { id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
             hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
             stride: this.rng.int(0, 15), speed: SPEED[kind] * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
-            aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
+            aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, staff:c.line===5, officer:c.members.length===0 && c.line!==5, diedAt:-999, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
         if (kind === 'bannerman') c.colors++;
         c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;

@@ -1,4 +1,6 @@
 import './style.css';
+import { atlasPreview } from './client/renderer3d/spriteAtlas';
+import type { News } from './sim/arenaTypes';
 import { SimWorld } from './sim/world';
 import { scales, TICKS, type Scale, type Faction } from './sim/arenaTypes';
 import { ArenaRenderer3d } from './client/renderer3d/arenaRenderer3d';
@@ -18,15 +20,17 @@ async function start(){
     const arena=await ArenaRenderer3d.create(canvas);
     let paused=true,speed=1,accumulator=0,slowmo=0,fps=0,frameCount=0,fpsTime=0,hudTime=0;
     let auto=true,focusUntil=0,lastFocusNews=0,hotX=world.frontline().x,hotY=world.frontline().y,settled=false;
+    let priority=0,follow=-1,slowUntil=0;
+    const queue:{n:News;p:number}[]=[];
     let purse=loadPurse(),bet:Bet|null=null;
-    const hud=new Hud(document.querySelector('#hud')!,{scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
+    const hud=new Hud(document.querySelector('#hud')!,{jump:(x,y)=>{arena.userAt=performance.now();arena.focus(x,y,95);},scale:setScale,light:cycleLighting,pause:toggle,speed:setSpeed,
         restart:()=>reset(world.scale,newSeed()),replay:()=>reset(world.scale,world.seed),home:()=>{arena.userAt=performance.now();arena.home(world);},
         auto:()=>{auto=!auto;controls();},bet:placeBet});
     function controls(){hud.controls(world.scale,arena.lighting,paused,speed,auto,purse,bet);}
     function reset(scale:Scale,seed:number){
         world.reset(scale,seed);arena.reset();
         arena.setLighting(world.weather==='rain'?'storm':world.weather==='fog'?'fog':'golden');
-        paused=true;slowmo=accumulator=0;settled=false;bet=null;lastFocusNews=0;focusUntil=0;
+        paused=true;slowmo=accumulator=0;settled=false;priority=0;follow=-1;slowUntil=0;queue.length=0;document.body.classList.remove('commander-down');bet=null;lastFocusNews=0;focusUntil=0;
         const p=world.frontline();hotX=p.x;hotY=p.y;arena.focus(p.x,p.y,330);
         history.replaceState(null,'','?seed='+seed);
         hud.intel(world,purse);controls();hud.update(world,performance.now());
@@ -63,21 +67,35 @@ async function start(){
     /** 自动导播：大事件推近镜头，平时跟着伤亡最集中的地方走。 */
     function director(now:number){
         for(const e of world.events)if(e.type==='death'){hotX+=(e.x-hotX)*.03;hotY+=(e.y-hotY)*.03;}
-        if(!auto || paused || now-arena.userAt<8000)return;
-        for(let i=world.news.length-1;i>=0 && world.news[i].tick>lastFocusNews;i--){
-            const n=world.news[i];
-            if(n.weight>=2 && now>focusUntil-2500){
-                lastFocusNews=n.tick;focusUntil=now+(n.weight>=3?6000:4200);
-                arena.focus(n.x,n.y,n.weight>=3?105:135);return;
-            }
+        while(lastFocusNews<world.news.length){
+            const n=world.news[lastFocusNews++];
+            const p=/全军震动|全线崩溃/.test(n.text)?6:/近卫军.*(出击|退却)|预备队从/.test(n.text)?5:/兑现了诺言|终于赶到/.test(n.text)?4:/全面崩溃/.test(n.text)?3:/马刀|撞进|七零八落/.test(n.text)?2:/上刺刀/.test(n.text)?1:0;
+            if(p)queue.push({n,p});
         }
+        for(let i=queue.length-1;i>=0;i--)if(queue[i].n.tick<world.tick-300)queue.splice(i,1);
+        if(!auto || paused || now-arena.userAt<8000)return;
+        queue.sort((a,b)=>b.p-a.p || a.n.tick-b.n.tick);
+        if(queue.length && (now>=focusUntil || queue[0].p>priority)){
+            const {n,p}=queue.shift()!;priority=p;follow=-1;
+            focusUntil=now+(p===2?4000:3500);
+            if(/全军震动/.test(n.text)){slowUntil=now+1200;document.body.classList.add('commander-down');}
+            if(p===2)follow=world.companies.find(c=>n.text.startsWith(c.name))?.id??-1;
+            arena.focus(n.x,n.y,p===6?70:p===3?160:p===2?110:125);return;
+        }
+        if(now<focusUntil && follow>=0){const c=world.companies[follow];arena.focus(c.x,c.y);return;}
+        if(now>=focusUntil){follow=-1;priority=0;}
         if(now>focusUntil){focusUntil=now+1200;arena.focus(hotX,hotY,Math.max(170,Math.min(260,arena.zoom)));}
     }
-    const debug={getState:()=>({tick:world.tick,jitter:world.jitter,fps:Math.round(fps),drawCalls:arena.drawCalls,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
+    const debug={atlas:()=>atlasPreview.toDataURL(),getState:()=>({tick:world.tick,jitter:world.jitter,fps:Math.round(fps),drawCalls:arena.drawCalls,alive:[...world.alive],dead:[...world.dead],fled:[...world.fled],
         winner:world.winner,ended:world.ended,seed:world.seed,weather:world.weather,scale:world.scale,lighting:arena.lighting,activeSmoke:arena.smoke.count,
         odds:world.odds(),morale:[world.armyMorale(0),world.armyMorale(1)],news:world.news.length,...arena.gore.stats}),
         setScale,setLighting,setSpeed,restart:()=>reset(world.scale,newSeed()),replay:(seed:number)=>reset(world.scale,seed),startBattle:()=>placeBet(-1,0),
-        world,panTo:(x:number,z:number)=>{arena.userAt=performance.now();arena.panTo(x,z);},zoomTo:(d:number)=>{arena.userAt=performance.now();arena.zoomTo(d);}};
+        world,stepFrames:(n:number)=>{
+            if(!paused || !Number.isFinite(n))return;
+            for(let i=0;i<Math.min(15000,n) && !world.ended;i++){world.step();arena.events(world);arena.advanceEffects(world,1/TICKS);}
+            if(world.ended)settle();
+            hud.update(world,performance.now());
+        },panTo:(x:number,z:number)=>{arena.userAt=performance.now();arena.panTo(x,z);},zoomTo:(d:number)=>{arena.userAt=performance.now();arena.zoomTo(d);}};
     Object.assign(window,{__arenaDebug:debug});
     reset(1200,world.seed);document.getElementById('notice')!.hidden=true;
     let last=performance.now();
@@ -85,6 +103,7 @@ async function start(){
         const elapsed=Math.max(0,(now-last)/1000);last=now;
         const real=Math.min(.2,elapsed);let dt=paused?0:real*speed;
         if(world.winner!==null && !world.ended && !paused){slowmo+=elapsed;if(slowmo<1.8)dt=real*.3;}
+        if(now<slowUntil && !paused)dt=real*.3;else document.body.classList.remove("commander-down");
         if(!world.ended){
             accumulator+=dt*TICKS;
             let steps=0;
@@ -96,7 +115,14 @@ async function start(){
         arena.render(world,real,world.ended?real:dt,accumulator);
         fpsTime+=elapsed;frameCount++;
         if(fpsTime>=.5){fps=frameCount/fpsTime;fpsTime=frameCount=0;}
-        hudTime+=elapsed;if(hudTime>.15){hud.update(world,now);hudTime=0;}
+        hudTime+=elapsed;if(hudTime>.15){hud.update(world,now);hudTime=0;
+            const host=document.getElementById('labels')!;
+            host.replaceChildren();
+            if(arena.zoom<120 && !world.ended && !hud.intelOpen){
+                const near=world.companies.filter(c=>c.alive && c.status!=='gone').map(c=>({c,p:arena.screen(c.x,c.y)})).filter(({p})=>Math.abs(p.x)<.97 && Math.abs(p.y)<.92 && Math.abs(p.z)<1 && p.y<.62).sort((a,b)=>a.p.x*a.p.x+a.p.y*a.p.y-b.p.x*b.p.x-b.p.y*b.p.y).slice(0,12);
+                for(const {c,p} of near){const el=document.createElement('span');el.textContent=(c.status==='rout'?'↩ ':c.formation==='square'?'□ ':c.order==='charge'?'⚔ ':'')+c.name;
+                    el.style.left=(p.x+1)*50+'%';el.style.top=(1-p.y)*50+'%';el.style.setProperty('--morale',c.morale+'%');host.append(el);}
+            }}
         requestAnimationFrame(frame);
     }
     document.addEventListener('visibilitychange',()=>{last=performance.now();});

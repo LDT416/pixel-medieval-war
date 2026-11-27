@@ -19,7 +19,7 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
     u.hp = Math.max(0, u.hp - amount); u.hitAt = w.tick;
     emit(w, 'hit', u, dx, dy, explosive);
     if (u.hp > 0) return false;
-    u.moving = false; u.vx = 0; u.vy = 0;
+    u.diedAt=w.tick;u.moving = false; u.vx = 0; u.vy = 0;
     w.alive[u.faction]--; w.dead[u.faction]++;
     emit(w, 'death', u, dx, dy, explosive);
     const c = w.companies[u.company];
@@ -172,6 +172,7 @@ export function resolveRounds(w: SimWorld) {
         const step = Math.min(r.speed, r.roll - r.rolled);
         r.rolled += step; r.speed *= .985;
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
+        if(Math.floor(r.rolled/120)>Math.floor((r.rolled-step)/120))emit(w,'bounce',r.gun,r.dx,r.dy,true,px,py);
         const source = w.companies[r.company];
         if (r.kills < 5) w.hash.visit(px, py, 8, u => {
             if (u.faction === r.faction || r.kills >= (w.companies[u.company].formation==='square'?5:3)) return;

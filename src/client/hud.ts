@@ -27,7 +27,7 @@ export const payout=(p:number)=>Math.round(Math.min(5,Math.max(1.1,.94/Math.max(
 
 export interface Purse {points:number;wins:number;losses:number;streak:number}
 export interface Bet {side:Faction;stake:number;payout:number}
-interface Controls {scale:(n:Scale)=>void;light:()=>void;pause:()=>void;speed:(n:number)=>void;restart:()=>void;replay:()=>void;home:()=>void;auto:()=>void;bet:(side:Faction|-1,stake:number)=>void}
+interface Controls {jump:(x:number,y:number)=>void;scale:(n:Scale)=>void;light:()=>void;pause:()=>void;speed:(n:number)=>void;restart:()=>void;replay:()=>void;home:()=>void;auto:()=>void;bet:(side:Faction|-1,stake:number)=>void}
 
 function roster(w:SimWorld,f:Faction){
     const n={line:0,guard:0,cav:0,guns:0};
@@ -56,7 +56,7 @@ export class Hud{
         <div class="controlrow playback"><button id="pause" class="square" aria-label="暂停"></button><div class="speeds">${[.25,1,2,4].map(n=>`<button data-speed="${n}">${n}×</button>`).join('')}</div><button id="restart" class="labeled" title="随机新战局 (R)">${icon('restart')}新战局</button></div>
         <div class="controlrow"><button id="auto" class="labeled" title="自动导播：镜头跟随冲锋、溃败等关键时刻">${icon('camera')}<span></span></button><span id="purse" class="purse"></span></div></nav>
         <div id="headline" class="headline" hidden></div>
-        <ol id="ticker" class="ticker" aria-live="polite"></ol>
+        <button id="major" class="major glass" aria-pressed="false">只看大事</button><div id="labels"></div><ol id="ticker" class="ticker" aria-live="polite"></ol>
         <div class="hint glass">${icon('pan')} 拖拽/WASD 移动 <b>·</b> 滚轮缩放 <b>·</b> 空格暂停 <b>·</b> R 新战局</div>
         <button id="home" class="home glass" title="回到交战中心 (Home)" aria-label="回到交战中心">${icon('home')}</button>
         <div id="intel" class="overlay" hidden><section class="intel-card glass" role="dialog" aria-labelledby="intel-title"></section></div>
@@ -66,6 +66,7 @@ export class Hud{
         <div class="actions"><button id="again">${icon('restart')}新战局</button><button id="replay" class="ghost">${icon('replay')}重演本局</button></div></section></div>`;
         root.querySelectorAll<HTMLButtonElement>('[data-scale]').forEach(b=>b.onclick=()=>cb.scale(Number(b.dataset.scale) as Scale));
         root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach(b=>b.onclick=()=>cb.speed(Number(b.dataset.speed)));
+        this.get('major').onclick=()=>{const b=this.get('major');const on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',String(on));this.get('ticker').classList.toggle('major-only',on);};
         for(const [id,fn] of Object.entries({light:cb.light,pause:cb.pause,restart:cb.restart,again:cb.restart,replay:cb.replay,home:cb.home,auto:cb.auto}))this.get(id).onclick=fn;
     }
     controls(scale:Scale,light:Lighting,paused:boolean,speed:number,auto:boolean,purse:Purse,bet:Bet|null){
@@ -127,11 +128,13 @@ export class Hud{
             const list=this.get('ticker');
             for(const n of w.news.slice(this.shownNews)){
                 if(n.weight<1)continue;
-                const li=document.createElement('li');li.className='f'+n.faction+' w'+n.weight;
-                li.innerHTML=`<time>${formatTime(n.tick)}</time>${esc(n.text)}`;list.prepend(li);
+                const category=n.text.replace(/^.*?(?=拔出马刀|上刺刀|掉转马头|丢下火枪|在.*喝令下重整)/,'').split('，')[0];
+                const prior=Array.from(list.children).find(el=>(el as HTMLElement).dataset.key===category && Number((el as HTMLElement).dataset.tick)>=n.tick-150 && el.classList.contains('f'+n.faction)) as HTMLElement|undefined;
+                const li=prior??document.createElement('li');li.dataset.key=category;li.dataset.tick=String(n.tick);li.dataset.count=String(Number(li.dataset.count||0)+1);li.className='f'+n.faction+' w'+n.weight;
+                li.innerHTML=`<time>${formatTime(n.tick)}</time>${esc(n.text)}${Number(li.dataset.count)>1?" ×"+li.dataset.count:""}`;li.tabIndex=0;li.onclick=()=>this.cb.jump(n.x,n.y);li.onkeydown=e=>{if(e.key==="Enter")li.click()};list.prepend(li);
                 if(n.weight>=3){const h=this.get('headline');h.textContent=n.text;h.className='headline f'+n.faction;h.hidden=false;this.headlineUntil=now+4200;}
             }
-            while(list.children.length>6)list.lastElementChild!.remove();
+            while(list.children.length>32)list.lastElementChild!.remove();
             this.shownNews=w.news.length;
         }
         if(now>this.headlineUntil)this.get('headline').hidden=true;

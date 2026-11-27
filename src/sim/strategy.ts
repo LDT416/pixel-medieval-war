@@ -27,15 +27,24 @@ function slotOffset(c: Company, i: number): [number, number] {
     return [(file - (files - 1) / 2) * sp, rank * dp];
 }
 
+/** 农庄守军在两栋建筑之间列队，进驻时随连中心平滑走入院内。 */
+function courtyard(c:Company,slot:number){
+    const f=layout.farm!;
+    const cols=7, rows=Math.max(1,Math.ceil(c.capacity/cols));
+    const facing=layout.ridgeOwner===0 || layout.ridgeOwner===-1 && c.homeX<WIDTH/2?-1:1;
+    return [c.x+((Math.floor(slot/cols)-(rows-1)/2)*9-10)*facing,
+        c.y+((slot%cols-3)*9+8)*facing];
+}
 /** 按当前队形把全连士兵直接摆到位（开局与援军入场时使用）。 */
 export function formUp(c: Company) {
     c.files = filesFor(c, c.members.length);
     c.capacity=c.members.length;
     c.members.forEach((u, i) => {
         u.slot = i;
-        const [lat, dep] = slotOffset(c, i);
+        const [lat, dep] = slotOffset(c,i);
         u.x = Math.min(WIDTH - 3, Math.max(3, c.x - lat * c.hy - dep * c.hx + u.jx));
         u.y = Math.min(HEIGHT - 3, Math.max(3, c.y + lat * c.hx - dep * c.hy + u.jy));
+        if(c.line===6 && layout.farm)[u.x,u.y]=courtyard(c,i);
         u.px=u.x; u.py=u.y;
     });
 }
@@ -100,8 +109,9 @@ export function advance(w: SimWorld, u: Soldier) {
     if (u.fireAt === w.tick) shoot(w, u, c);
     if (c.status === 'rout') { flee(w, u, c); return; }
     if ((c.engaged || u.foe >= 0 || (w.tick + u.id) % 6 === 0) && meleeStep(w, u, c)) return;
-    const [lat, dep] = slotOffset(c, u.slot);
-    const tx = c.x - lat * c.hy - dep * c.hx + u.jx, ty = c.y + lat * c.hx - dep * c.hy + u.jy;
+    const [lat, dep] = slotOffset(c,u.slot);
+    let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
+    if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
     const far = Math.abs(tx - u.x) + Math.abs(ty - u.y) > 30;
     const charging = c.order === 'charge' || (c.order === 'assault' && dist(c, w.companies[c.target] ?? c) < 320);
     const moved = moveToward(w, u, tx, ty, u.speed * (far ? 1.3 : 1.1) * (charging ? 1.45 : 1));
@@ -175,11 +185,20 @@ function compact(w:SimWorld,c:Company){
     if(!c.alive || c.status==='rout')return;
     const width=c.files, rows=Math.ceil(c.capacity/width);
     const shrink=c.formation!=='square' && width-2*c.margin>2 && w.tick-c.lastShrink>=90
-        && c.alive<=(width-2*c.margin)*rows*.7;
+        && (c.alive<=(width-2*c.margin)*rows*.7 || (lost && rows>1 && !c.members.some(u=>u.slot>=width*(rows-1))));
     if(!lost && !shrink)return;
     const occupied=new Map(c.members.map(u=>[u.slot,u]));
     function move(u:Soldier,slot:number){occupied.delete(u.slot);u.slot=slot;occupied.set(slot,u);w.slotMoves++;}
-    if(c.formation==='square')return; // 空出的边位保留到下次变阵
+    if(c.formation==='square'){
+        // 前边缺员，只由后边同列补上，其余三边保持原位。
+        const side=Math.ceil(c.capacity/4);
+        for(let j=0;j<side;j++){
+            if(occupied.has(j))continue;
+            const rear=occupied.get(3*side-1-j);
+            if(rear)move(rear,j);
+        }
+        return;
+    }
     if(lost)for(const u of c.members.slice().sort((a,b)=>a.slot-b.slot)){
         if(u.slot>=width && !occupied.has(u.slot-width))move(u,u.slot-width);
     }
@@ -201,6 +220,16 @@ export function rout(w: SimWorld, c: Company, quiet = false) {
     if (c.status === 'rout' || c.status === 'gone') return;
     c.routs++; c.status = 'rout'; c.engaged = false; c.order = 'rally'; c.forced = -1;
     for (const u of c.members) { u.foe = -1; u.fireAt = -1; }
+    if(!w.broken[c.faction] && c.line!==5){
+        w.recentRouts=w.recentRouts.filter(r=>r.tick>=w.tick-300 && r.c!==c);
+        w.recentRouts.push({tick:w.tick,c,x:c.x,y:c.y});
+        const near=w.recentRouts.filter(r=>r.c.faction===c.faction && Math.hypot(r.x-c.x,r.y-c.y)<=500);
+        if(near.length>=3){
+            const x=near.reduce((a,r)=>a+r.x,0)/near.length,y=near.reduce((a,r)=>a+r.y,0)/near.length;
+            w.say((c.faction?'联军':'法军')+(y<HEIGHT/3?'左翼':y>HEIGHT*2/3?'右翼':'中央')+'全面崩溃！',c.faction,x,y,3);
+            w.recentRouts=w.recentRouts.filter(r=>!near.includes(r));
+        }
+    }
     if (quiet) return;
     if (c.kind === 'guard_grenadier') {
         w.say(c.faction ? '近卫军退却了！整条战线为之一震' : '“近卫军退却了！”（La Garde recule!）恐慌在法军中蔓延', c.faction, c.x, c.y, 3);
@@ -326,7 +355,12 @@ export function updateCompany(w: SimWorld, c: Company) {
     }
     if ((c.order === 'assault' || c.order === 'charge') && d < contact && t.status !== 'rout' && !c.engaged) {
         c.engaged = true; t.engaged = true; c.chargeAt = w.tick;
+        if(c.order==='assault')c.charges++;
+        
         impact(w, c, t);
+        if(t.kind==='field_cannon' && t.morale<18 && t.status!=='gone' && t.alive>0){
+            c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
+        }
     }
     if (c.engaged) {
         if (d > contact + 90 || t.status === 'gone') c.engaged = false;

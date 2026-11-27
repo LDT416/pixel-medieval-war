@@ -46,6 +46,7 @@ export class ArenaRenderer3d{
         this.renderer.setPixelRatio(dpr);this.renderer.setSize(w,h,false);this.post.size(Math.floor(w*dpr),Math.floor(h*dpr));
         this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
     }
+    screen(x:number,y:number){const sx=toX(x),sz=toZ(y);return new T.Vector3(sx,terrainHeight(sx,sz)+3,sz).project(this.camera);}
     panTo(x:number,z:number){this.goal.set(T.MathUtils.clamp(x,-HALF_W,HALF_W),0,T.MathUtils.clamp(z,-HALF_H,HALF_H));}
     zoomTo(d:number){this.desired=T.MathUtils.clamp(d,28,420);}
     /** 自动导播：平滑推到模拟坐标 (x,y)。 */
@@ -54,6 +55,7 @@ export class ArenaRenderer3d{
     setLighting(mode:Lighting){this.lights.set(mode);this.standees.rim.value.copy(this.lights.rim);}
     /** 新一局：地形随地图种子重建，清空残留。 */
     reset(){this.terrain.rebuild();this.gore.reset();this.smoke.reset();this.lights.reset();this.balls.count=0;this.panTo(0,0);}
+    advanceEffects(w:SimWorld,dt:number){this.gore.update(dt);this.smoke.update(w.ended?[]:w.units,dt);}
     events(w:SimWorld){for(const e of w.events){this.gore.event(e);this.smoke.event(e);}}
     private controls(){
         const c=this.canvas,touch=()=>{this.userAt=performance.now();};
@@ -84,7 +86,7 @@ export class ArenaRenderer3d{
         this.target.y=terrainHeight(this.target.x,this.target.z);
         this.camera.position.copy(this.target);this.camera.position.y+=this.distance*Math.sin(elevation);this.camera.position.z+=this.distance*Math.cos(elevation);this.camera.lookAt(this.target);
         this.terrain.wind.value+=dt;this.lights.update(this.target,this.distance,this.camera.aspect,dt);
-        this.standees.draw(w.units,w.tick,alpha);this.gore.update(dt);this.smoke.update(w.ended?[]:w.units,dt);
+        this.standees.draw(w.units,w.companies,w.tick,alpha);this.advanceEffects(w,dt);
         this.balls.count=Math.min(w.rounds.length,this.balls.instanceMatrix.count);
         for(let i=0;i<this.balls.count;i++){
             const p=roundPosition(w.rounds[i],alpha),x=toX(p.x),z=toZ(p.y);

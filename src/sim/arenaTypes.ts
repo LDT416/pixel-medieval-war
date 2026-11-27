@@ -19,7 +19,7 @@ export interface Soldier {
     face: number; moving: boolean; pose: Action; hitAt: number; firedAt: number; fireAt: number;
     stride: number; speed: number; cooldown: number; foe: number;
     aimTarget:number; aimX:number; aimY:number; rangeError:number; shotsOnTarget:number;
-    px:number; py:number; turnFrames:number; marchUntil:number; escaped:boolean; general: boolean; jx: number; jy: number;
+    px:number; py:number; turnFrames:number; marchUntil:number; staff:boolean; officer:boolean; diedAt:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
@@ -38,7 +38,7 @@ export interface Sample {tick:number; odds:number; eff:[number,number]; morale:[
 export interface TurningPoint {tick:number; kind:"decisive"|"swing"; delta:number; from:number; to:number; causes:News[]}
 export interface News { odds:number; tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
 export interface BattleEvent {
-    type: 'fire'|'hit'|'death'|'impact'|'slash';
+    type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash';
     x: number; y: number; dx: number; dy: number; faction: Faction; kind: Kind;
     explosive: boolean; unitId: number;
 }

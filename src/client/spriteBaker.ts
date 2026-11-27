@@ -30,9 +30,9 @@ class Pixels {
 }
 
 function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:number,dy:number,role=-1) {
-    const [dark,coat,edge]=shades(f), steps=[-2,0,2,0];
+    const [dark,coat,edge]=shades(f), steps=[-2,-1,0,1,2,1,0,-1];
     const walking=a==='march'||a==='run'||a==='thrust', loading=a==='load', back=dy<-.37;
-    const stride=walking?steps[frame%4]*(a==='run'||a==='thrust'?1.45:1):0;
+    const stride=walking?steps[frame%8]*(a==='run'||a==='thrust'?1.45:1):0;
     const rise=walking&&frame%2===1?-1:0;
     const lean=a==='thrust'?3:a==='run'?2:0;
     const headX=lean+(loading?1:0), headY=rise+(loading?1:0);
@@ -79,7 +79,7 @@ function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:numb
             p.box('#563c32',0,-11+rise,9,8);p.box('#ba7844',1,-10+rise,7,5);
             for(let i=0;i<3;i++)p.line(ivory,i*3,-10+rise,i*3+2,-5+rise);
             p.box(ivory,0,-12+rise,9,2);p.box(brass,0,-5+rise,9,2);
-            const beat=frame%2?2:-2;p.line(walnut,-3,-13+rise,4,-15+rise+beat);p.line(gilt,7,-14+rise,2,-13+rise-beat);
+            const beat=[-3,-1,2,3,1,-2][frame%6];p.line(walnut,-3,-13+rise,4,-15+rise+beat);p.line(gilt,7,-14+rise,2,-13+rise-beat);
             hand(-3,-13+rise);hand(6,-14+rise);
         }
         if(role===2){
@@ -114,7 +114,7 @@ function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:numb
         if(frame<2){p.oval(ink,handX,handY-2,2,2);p.box('#bd9d6c',handX+1,handY-5);}
     }else if(loading){
         p.box(walnut,5,-18,2,15);p.box(steel,5,-21,1,12);p.box(brass,6,-11);
-        const arm=[-19,-22,-18,-14,-12,-16][frame%6];
+        const arm=[-16,-17,-21,-23,-19,-14,-12,-15][frame%8];
         p.box(glint,6,arm-5,1,11);p.line(coat,2,-13,4,arm+1);hand(5,arm);
         p.line(edge,-2,-11,4,-10);hand(4,-10);
     }else if(a==='run'){
@@ -125,13 +125,14 @@ function infantry(p:Pixels,f:Faction,guard:boolean,a:Action,frame:number,dx:numb
     }
 }
 
-function cavalry(p:Pixels,f:Faction,frame:number,moving:boolean,thrust:boolean){
+function cavalry(p:Pixels,f:Faction,frame:number,moving:boolean,thrust:boolean,role=0){
     // 与步兵完全统一的 16-bit 精细像素画风：1px ink 深墨勾边 + 3 阶明暗 + 高清装备细节
-    const [dark,coat,edge]=shades(f), g=moving?frame%4:1;
+    const [dark,coat,edge]=shades(f), g=moving?Math.floor(frame/2)%4:1;
     const frontFoot=moving?[[-3,-1],[3,-4],[7,-2],[1,0]][g]:[1,0];
     const rearFoot=moving?[[5,-2],[-2,0],[-6,-3],[1,-1]][g]:[-1,0];
-    const bob=moving?[0,-2,-1,0][g]:0;
-    const hDark=f?'#4a2c1c':'#362218', hMid=f?'#7e4e31':'#5e3d2b', hLit=f?'#ad754c':'#8a6045';
+    const bob=moving?[0,-1,-2,-2,-1,0,1,0][frame%8]:0;
+    const pale=role===4 || (f && role===0);
+    const hDark=pale?'#716e67':f?'#4a2c1c':'#362218', hMid=pale?'#b5b4a7':f?'#7e4e31':'#5e3d2b', hLit=pale?'#e3e0ce':f?'#ad754c':'#8a6045';
 
     // 远侧马腿（ink 描边 + 暗部着色 + 铁蹄）
     p.line(ink,-9,-12+bob,-10+rearFoot[0]*.6,-5+bob);
@@ -357,8 +358,8 @@ function cannon(p:Pixels,f:Faction,a:Action,frame:number,dx:number,dy:number,cre
 function heading(dx:number,dy:number){
     return ((Math.round(Math.atan2(dy,dx)*16/circle)%16)+16)%16;
 }
-export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:number,crewCount:number,flash:boolean):Result {
-    const key=[kind,f,a,dir,frame,role,crewCount,Number(flash)].join('/');
+export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:number,crewCount:number,flash:boolean,flee=false):Result {
+    const key=[kind,f,a,dir,frame,role,crewCount,Number(flash),Number(flee)].join('/');
     const known=cache.get(key);if(known)return known;
     const gun=kind==='field_cannon', mounted=kind==='cuirassier',band=kind==='bannerman';
     const art=document.createElement('canvas');
@@ -370,10 +371,30 @@ export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:n
     if(dx<-.001){c.scale(-1,1);c.translate(-1,0);}
     const p=new Pixels(c);
     if(gun)cannon(p,f,a,frame,Math.abs(dx),dy,crewCount);
-    else if(mounted)cavalry(p,f,frame,a==='march'||a==='run',a==='thrust');
+    else if(mounted)cavalry(p,f,frame,a==='march'||a==='run',a==='thrust',role);
     else{
-        infantry(p,f,kind==='guard_grenadier',a,frame,Math.abs(dx),dy,band?role:-1);
+        infantry(p,f,kind==='guard_grenadier',a,frame,Math.abs(dx),dy,band?role:flee?4:role===3?3:-1);
         if(band&&role===0)c.drawImage(banner(f,frame),2,-36,21,37);
+    }
+    if(mounted && role>0){
+        if(role===2){p.line(walnut,3,-15,18,-36);p.line(gilt,4,-15,19,-36);for(let j=0;j<4;j++)p.box(j<2?'#bd4040':ivory,16-j,-33+j,7-j);}
+        else if(role===4 || role===5 || role===3){p.box(ink,-5,-33,10,2);p.box(ink,-3,-35,6,3);p.box(gilt,1,-33,2);p.box(role===4?'#535a50':shades(f)[1],-4,-23,7,5);}
+        else{p.box(f?'#233549':'#ac8549',-2,-24,6,6);p.box(gilt,-1,-24,3);}
+    }else if(!gun && !band){
+        if(role===3){
+            c.clearRect(-5,-30,13,12);p.box(ink,-5,-21,11,2);p.box(ink,-2,-24,5,4);p.box(gilt,1,-22,2);
+            p.box(gilt,-4,-14,3,2);p.line(glint,3,-11,a==='aim'||a==='run'?16:10,a==='aim'||a==='run'?-14:-23+(frame%3));p.box(brass,3,-12,3);
+        }else if(role===1 || role===2){
+            const plume=f?'#66844d':role===1?'#d74d42':'#c8ba48';
+            p.box(plume,-4,-26,2,6);p.box(plume,-3,-14,3,2);
+            if(f && role===2){p.box('#354f40',-4,-8,8,5);p.box('#976550',-2,-8,1,5);p.box('#84916c',-4,-6,8);}
+            if(f && kind==='guard_grenadier'){p.box('#304b35',-3,-14,5,7);p.line('#9aa778',-2,-14,1,-9);}
+        }
+    }else if(gun && role>0){p.box(role===3?gilt:steel,-16,-19,4,2);p.box(ink,-17,-17,6);}
+    if(band && role===1 && !f){p.box('#a75738',-3,-14,4,5);p.box(gilt,-3,-14,3);}
+    if(flee && !gun && !mounted){
+        c.clearRect(-5,-32,16,14);p.box('#58463b',0,-19,5,2);
+        p.line(shades(f)[1],1,-13,5,-11+frame%3);p.box(skin,5,-11+frame%3,2,2);
     }
     if(flash){c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-atop';p.box('#e5b7a72e',0,0,art.width,art.height);}
     const result={art,footX,footY};cache.set(key,result);return result;
