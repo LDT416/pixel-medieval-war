@@ -5,13 +5,13 @@ import { toX,toZ,terrainHeight } from './terrain3d';
 
 type Motion=Action|'die'|'flee';
 const counts:Record<Motion,number>={march:8,run:8,load:8,recoil:8,thrust:6,aim:2,stand:2,die:6,flee:8};
-const variants=(k:string)=>k==='bannerman'?[0,1]:k==='cuirassier'?[0,1,2,3,4,5]:k==='guard_grenadier'||k==='field_cannon'?[0,1,3]:[0,1,2,3];
+const variants=(k:string)=>k==='bannerman'?[0,1,2]:k==='cuirassier'?[0,1,2,3,4,5]:k==='guard_grenadier'||k==='field_cannon'?[0,1,3]:[0,1,2,3];
 const actions:Motion[]=['stand','march','aim','load','thrust','recoil','run','die','flee'];
-const cells=new Map<string,number>(), cols=42, cw=96,ch=80, foot=57;
+const cells=new Map<string,number>(), cols=44, cw=92,ch=78, foot=56;
 const frameCount=(k:string,a:Motion)=>k==='bannerman' && (a==='aim'||a==='stand')?6:counts[a];
 const rows=Math.ceil(2*kinds.reduce((n,k)=>n+variants(k).length*actions.reduce((sum,a)=>sum+frameCount(k,a),0),0)/cols);
 function key(f:number,k:string,a:string,frame:number,role:number){return [f,k,a,frame,role].join('/');}
-export let atlasPreview:HTMLCanvasElement;
+let atlasCanvas:HTMLCanvasElement;
 function atlas(){
     const canvas=document.createElement('canvas');canvas.width=cols*cw;canvas.height=rows*ch;
     const c=canvas.getContext('2d')!;c.imageSmoothingEnabled=false;
@@ -38,16 +38,23 @@ function atlas(){
             cells.set(key(f,k,a,fr,role),i++);
         }
     }
-    const guide=document.createElement('canvas'); guide.width=160+actions.length*cw;guide.height=2*kinds.reduce((n,k)=>n+variants(k).length,0)*ch;
+    atlasCanvas=canvas;
+    const t=new T.CanvasTexture(canvas);t.minFilter=t.magFilter=T.NearestFilter;t.generateMipmaps=false;t.colorSpace=T.SRGBColorSpace;return t;
+}
+export function atlasPreview(){
+    const canvas=atlasCanvas;
+    const guide=document.createElement('canvas'); guide.width=160+actions.length*cw;guide.height=40+2*kinds.reduce((n,k)=>n+variants(k).length,0)*ch;
     const ctx=guide.getContext('2d')!;ctx.fillStyle='#242b30';ctx.fillRect(0,0,guide.width,guide.height);ctx.font='14px sans-serif';ctx.fillStyle='#efdfc3';
+    ctx.fillText('1815 · 角色图鉴',8,24);
+    ['站立','行军','瞄准','装填','突刺','后坐','奔跑','阵亡','溃逃'].forEach((label,i)=>ctx.fillText(label,193+i*cw,24));
+    ctx.translate(0,40);
     let row=0;
     for(const f of [0,1])for(const k of kinds)for(const role of variants(k)){
-        ctx.fillText((f?'联军':'法军')+' '+({line_infantry:'步兵',guard_grenadier:'近卫',field_cannon:'炮组',bannerman:'军乐旗组',cuirassier:'骑兵'}[k])+' '+(['一','二','三','军官','统帅','参谋'][role]),8,row*ch+40);
-        actions.forEach((a,col)=>{const i=cells.get(key(f,k,a,0,role))!;ctx.drawImage(canvas,(i%cols)*cw,Math.floor(i/cols)*ch,cw,ch,160+col*cw,row*ch,cw,ch)});
+        ctx.fillText((f?'联军':'法军')+' '+({line_infantry:'步兵',guard_grenadier:'近卫',field_cannon:'炮组',bannerman:'军乐旗组',cuirassier:'骑兵'}[k])+' '+(k==='bannerman'?['旗手','鼓手','团旗'][role]:['一','二','三','军官','统帅','参谋'][role]),8,row*ch+40);
+        actions.forEach((a,col)=>{const pose=a==='die'?5:a==='load'?3:a==='march'?2:0;const i=cells.get(key(f,k,a,pose,role))!;ctx.drawImage(canvas,(i%cols)*cw,Math.floor(i/cols)*ch,cw,ch,160+col*cw,row*ch,cw,ch)});
         row++;
     }
-    atlasPreview=guide;
-    const t=new T.CanvasTexture(canvas);t.minFilter=t.magFilter=T.NearestFilter;t.generateMipmaps=false;t.colorSpace=T.SRGBColorSpace;return t;
+    return guide;
 }
 export function attribute(g:T.BufferGeometry,name:string,count:number,size:number){
     const a=new T.InstancedBufferAttribute(new Float32Array(count*size),size).setUsage(T.DynamicDrawUsage);
@@ -104,7 +111,7 @@ export class Standees {
             const offset=u.officer && u.hp>0 && !c.engaged && c.status!=='rout' && (c.formation==='line'||c.formation==='column');
             const ox=offset?c.hx*6+c.hy*13:0,oy=offset?c.hy*6-c.hx*13:0;
             const x=toX(ox+u.px+(u.x-u.px)*alpha),z=toZ(oy+u.py+(u.y-u.py)*alpha),h=terrainHeight(x,z);
-            const role=u.general?4:u.kind==='cuirassier' && u.staff?5:u.officer?3:u.kind==='bannerman'?(u.id%3===0?1:0):u.id%(u.kind==='guard_grenadier'||u.kind==='field_cannon'?2:3);
+            const role=u.general?4:u.kind==='cuirassier' && u.staff?5:u.officer?3:u.kind==='bannerman'?(u.id%3===0?1:u.faction && u.id%2?2:0):u.id%(u.kind==='guard_grenadier'||u.kind==='field_cannon'?2:3);
             const motion:Motion=u.hp<=0?'die':c.status==='rout'?'flee':u.pose;
             const phase=motion==='die'?(tick-u.diedAt)/2:u.moving?u.stride/4:motion==='load'?(tick-u.firedAt)/7:motion==='recoil'?(tick-u.firedAt)/2:(tick+u.id)/5;
             const fr=Math.floor(phase)%frameCount(u.kind,motion);

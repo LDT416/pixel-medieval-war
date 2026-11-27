@@ -373,8 +373,11 @@ export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:n
     if(gun)cannon(p,f,a,frame,Math.abs(dx),dy,crewCount);
     else if(mounted)cavalry(p,f,frame,a==='march'||a==='run',a==='thrust',role);
     else{
-        infantry(p,f,kind==='guard_grenadier',a,frame,Math.abs(dx),dy,band?role:flee?4:role===3?3:-1);
-        if(band&&role===0)c.drawImage(banner(f,frame),2,-36,21,37);
+        infantry(p,f,kind==='guard_grenadier',a,frame,Math.abs(dx),dy,band?(role===2?0:role):flee?4:role===3?3:-1);
+        if(band && role!==1){
+            c.drawImage(banner(f,frame),2,-36,21,37);
+            if(role===2 && f){p.box('#a45338',10,-31,10,10);p.box(gilt,14,-28,2,4);p.box(gilt,12,-27,6,1);}
+        }
     }
     if(mounted && role>0){
         if(role===2){p.line(walnut,3,-15,18,-36);p.line(gilt,4,-15,19,-36);for(let j=0;j<4;j++)p.box(j<2?'#bd4040':ivory,16-j,-33+j,7-j);}
@@ -387,7 +390,7 @@ export function bake(kind:Kind,f:Faction,a:Action,dir:number,frame:number,role:n
         }else if(role===1 || role===2){
             const plume=f?'#66844d':role===1?'#d74d42':'#c8ba48';
             p.box(plume,-4,-26,2,6);p.box(plume,-3,-14,3,2);
-            if(f && role===2){p.box('#354f40',-4,-8,8,5);p.box('#976550',-2,-8,1,5);p.box('#84916c',-4,-6,8);}
+            if(f && role===2){p.box(ink,-4,-23,8,5);p.box('#c9b9a0',-3,-24,3);p.box('#354f40',-4,-8,8,5);p.box('#976550',-2,-8,1,5);p.box('#84916c',-4,-6,8);}
             if(f && kind==='guard_grenadier'){p.box('#304b35',-3,-14,5,7);p.line('#9aa778',-2,-14,1,-9);}
         }
     }else if(gun && role>0){p.box(role===3?gilt:steel,-16,-19,4,2);p.box(ink,-17,-17,6);}
