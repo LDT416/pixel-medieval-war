@@ -1,8 +1,10 @@
 import * as T from 'three';
-export type Lighting='golden'|'storm';
+export type Lighting='golden'|'storm'|'fog';
+export const lightings:Lighting[]=['golden','storm','fog'];
 const presets={
-    golden:{sun:0xffd296,power:2.6,sky:0xe3e9e4,earth:0x818057,fill:1.38,fog:0xe4ce9f,density:.00165,zenith:0x9bafb3,rim:0xedbb77},
-    storm:{sun:0x9bb7d4,power:1.7,sky:0x9fb1c4,earth:0x454a49,fill:1.28,fog:0x83929d,density:.0037,zenith:0x3b4b5c,rim:0xa6c9f0}
+    golden:{sun:0xffd296,power:2.6,sky:0xe3e9e4,earth:0x818057,fill:1.38,fog:0xe4ce9f,density:.00125,zenith:0x9bafb3,rim:0xedbb77},
+    storm:{sun:0x9bb7d4,power:1.7,sky:0x9fb1c4,earth:0x454a49,fill:1.28,fog:0x83929d,density:.0029,zenith:0x3b4b5c,rim:0xa6c9f0},
+    fog:{sun:0xe2dccb,power:1.35,sky:0xd0d3cb,earth:0x6c6f5d,fill:1.55,fog:0xc3c6bb,density:.0042,zenith:0xa3aba6,rim:0xddd6c0}
 };
 export class BattlefieldLight {
     sun=new T.DirectionalLight(); hemi=new T.HemisphereLight();
@@ -36,7 +38,7 @@ export class BattlefieldLight {
             if(p.intensity<light.intensity)light=p;
         }
         light.position.set(x,y+1.35,z);light.distance=big?17:7;
-        light.intensity=Math.max(light.intensity,(big?95:16)*(this.mode==='storm'?1.55:1));
+        light.intensity=Math.max(light.intensity,(big?95:16)*(this.mode==='golden'?1:1.55));
     }
     update(target:T.Vector3,distance:number,aspect:number,dt:number){
         for(const p of this.flashes){p.intensity*=Math.exp(-dt*13);if(p.intensity<.02)p.intensity=0;}

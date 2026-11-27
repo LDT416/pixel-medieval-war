@@ -40,7 +40,7 @@ export class Standees {
     private frames=new Map<string,number[]>();
     private unitFrames=new WeakMap<Soldier,Record<Action,number[]>>();
     constructor(scene:T.Scene) {
-        const tex=atlas(),cap=2200,g=new T.PlaneGeometry(cw*.084,ch*.084);
+        const tex=atlas(),cap=2400,g=new T.PlaneGeometry(cw*.084,ch*.084);
         g.translate(0,(foot-ch/2)*.084,0);g.rotateX(-8*Math.PI/180);
         this.uv=attribute(g,'aUvRect',cap,4);this.flip=attribute(g,'aFlipFlash',cap,2);
         const tint=attribute(g,'aTint',cap,3);
@@ -69,8 +69,8 @@ export class Standees {
         }
     }
     draw(units:Soldier[],tick:number,alpha:number){
-        let n=0;const o=this.o;
-        for(const u of units)if(u.hp>0){
+        let n=0;const o=this.o,cap=this.mesh.instanceMatrix.count;
+        for(const u of units)if(u.hp>0 && n<cap){
             const x=toX(u.x+u.vx*alpha/30),z=toZ(u.y+u.vy*alpha/30),h=terrainHeight(x,z);
             const role=u.kind==='bannerman' && u.id%3===0?1:0;
             const fr=(u.moving?Math.floor(u.stride/7):Math.floor((tick-u.firedAt)/4))&3;
@@ -83,7 +83,8 @@ export class Standees {
             const i=animation[u.pose][fr];
             this.uv.setXYZW(n,(i%cols+.0)/cols,1-(Math.floor(i/cols)+1)/18,1/cols,1/18);
             this.flip.setXY(n,Number(u.face<0),Math.max(0,1-(tick-u.hitAt)/4));
-            o.position.set(x,h+.045,z);o.scale.set(1,1,1);o.updateMatrix();this.mesh.setMatrixAt(n,o.matrix);
+            // 总司令放大 1.3 倍，方便在千军之中一眼找到。
+            o.position.set(x,h+.045,z);o.scale.setScalar(u.general?1.3:1);o.updateMatrix();this.mesh.setMatrixAt(n,o.matrix);
             const big=u.kind==='cuirassier'||u.kind==='field_cannon';
             o.scale.set(big?3.7:1.7,1,big?1.5:.91);o.updateMatrix();this.ao.setMatrixAt(n,o.matrix);n++;
         }

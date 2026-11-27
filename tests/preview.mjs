@@ -71,6 +71,9 @@ try {
     await call('Page.bringToFront');
     await call('Page.navigate', { url: preview });
 
+    await waitFor(s => s.tick === 0);
+    // 开局停在战前情报卡，跳过押注直接开战。
+    await evaluate('window.__arenaDebug.startBattle()');
     const initial = await waitFor(s => s.tick >= 3);
     assert.equal(initial.scale, 1200);
     assert.equal(initial.goreTexturesLoaded, 7);
@@ -86,6 +89,7 @@ try {
     assert.equal((await state()).tick, frozen.tick);
 
     await evaluate(`window.__arenaDebug.setScale(${battleScale});
+        window.__arenaDebug.startBattle();
         window.__arenaDebug.setLighting('storm');
         window.__arenaDebug.zoomTo(48);
         window.__arenaDebug.panTo(0,0);
@@ -94,9 +98,9 @@ try {
     assert.equal(combat.lighting, 'storm');
     console.log('Combat', combat);
 
-    const final = await waitFor(s => s.winner !== null, 180000);
-    assert.equal(final.alive[1 - final.winner], 0);
-    await delay(2500);
+    const final = await waitFor(s => s.ended, 240000);
+    assert.ok(final.winner === 0 || final.winner === 1);
+    await delay(800);
     assert.equal(await evaluate('document.querySelector("#victory").hidden'), false);
     const settled = await state();
     assert.ok(settled.bloodPools >= combat.bloodPools && settled.landedGore >= combat.landedGore);

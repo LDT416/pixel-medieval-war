@@ -55,16 +55,17 @@ export class SmokeSystem{
         const gun=e.explosive,mx=x+e.dx*(gun?1.65:1.2),mz=z+e.dy;
         this.lights.flash(mx,y,mz,gun);
         this.add(mx,y+1.1,mz,4,gun?2.6:.92,.105,e.dx*1.5,0,e.dy);
+        if(!gun && this.items.length>3200)return;
         for(let i=0;i<(gun?11:3);i++){
             const speed=(gun?2.8:1.2)*r();
             this.add(mx+(r()-.5)*.3,y+1.06,mz,gun?3:2,(gun?1.8:.65)*(1+r()*.55),(gun?3.4:2.1)+r(),e.dx*speed+.33,.32+r()*.62,e.dy*speed+.13);
         }
     }
     update(units:Soldier[],dt:number){
-        const r=()=>this.rng.next();
+        const r=()=>this.rng.next(),emitDt=Math.min(dt,.05);
         for(const u of units)if(u.hp>0 && u.moving){
             const horse=u.kind==='cuirassier', rate=horse?3.4:u.pose==='run'?1.75:.70;
-            if(r()>dt*rate)continue;
+            if(r()>emitDt*rate)continue;
             const speed=Math.max(1,Math.hypot(u.vx,u.vy)), offset=horse?1.2:.37;
             const x=toX(u.x)-u.vx/speed*offset+(r()-.5)*.32,z=toZ(u.y)-u.vy/speed*offset;
             this.add(x,terrainHeight(x,z)+.08+r()*.17,z,horse?1:0,horse?1.32:u.pose==='run'?.85:.55,
