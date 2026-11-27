@@ -1,3 +1,4 @@
+import {Scenery} from './scenery3d';
 import * as T from 'three';
 import { Rng } from '../../sim/rng';
 import { WIDTH, HEIGHT, layout, ridge, inRect } from '../../sim/maps';
@@ -62,58 +63,6 @@ function meadowTexture(){
     return texture;
 }
 
-const ART=['farmhouse','oak','beech','spruce','bush','haystack','hedge'] as const;
-type Art=typeof ART[number];
-/** 农庄与树林：用仓库里现成的 px_*.png 像素画做成立牌，随每局地图重新摆放。 */
-class Scenery {
-    private group=new T.Group();private mats=new Map<Art,{mat:T.Material;depth:T.Material;aspect:number}>();
-    private plane=new T.PlaneGeometry(1,1).translate(0,.5,0).rotateX(-8*Math.PI/180);
-    constructor(scene:T.Scene){scene.add(this.group);}
-    async load(){
-        const loader=new T.TextureLoader();
-        await Promise.all(ART.map(async name=>{
-            try{
-                const t=await loader.loadAsync('./art/px_'+name+'.png');
-                t.magFilter=t.minFilter=T.NearestFilter;t.generateMipmaps=false;t.colorSpace=T.SRGBColorSpace;
-                const img=t.image as {width:number;height:number};
-                this.mats.set(name,{aspect:img.width/Math.max(1,img.height),
-                    mat:new T.MeshLambertMaterial({map:t,alphaTest:.5,side:T.DoubleSide}),
-                    depth:new T.MeshDepthMaterial({depthPacking:T.RGBADepthPacking,map:t,alphaTest:.5,side:T.DoubleSide})});
-            }catch{/* 缺图时直接跳过该装饰 */}
-        }));
-    }
-    private put(name:Art,x:number,z:number,height:number,flip=false){
-        const m=this.mats.get(name);if(!m)return;
-        const mesh=new T.Mesh(this.plane,m.mat);mesh.customDepthMaterial=m.depth as T.MeshDepthMaterial;
-        mesh.castShadow=mesh.receiveShadow=true;
-        mesh.position.set(x,terrainHeight(x,z)-.15,z);mesh.scale.set(height*m.aspect*(flip?-1:1),height,1);
-        this.group.add(mesh);
-    }
-    rebuild(){
-        this.group.clear();
-        const rng=new Rng(Math.floor(layout.seed*1000)+7);
-        const f=layout.farm;
-        if(f){
-            const x=toX(f.x),z=toZ(f.y);
-            this.put('farmhouse',x,z-1,f.w*SCALE*.95);
-            this.put('haystack',x+f.w*SCALE*.55,z+2.5,2.8);
-            this.put('haystack',x-f.w*SCALE*.6,z+3.2,2.4,true);
-            for(let i=-2;i<=2;i++)this.put('hedge',x+i*f.w*SCALE*.24,z+f.h*SCALE*.62,1.3,i%2===0);
-        }
-        const kinds:Art[]=['oak','beech','spruce','oak','bush'];
-        for(const g of layout.woods){
-            const n=Math.round(g.r*g.r/2300);
-            const list:{x:number;z:number;h:number;a:Art}[]=[];
-            for(let i=0;i<n;i++){
-                const a=rng.next()*Math.PI*2,r=Math.sqrt(rng.next())*g.r;
-                list.push({x:toX(g.x+Math.cos(a)*r),z:toZ(g.y+Math.sin(a)*r*.9),h:5.5+rng.next()*4,a:kinds[rng.int(0,kinds.length-1)]});
-            }
-            list.sort((p,q)=>p.z-q.z);
-            for(const t of list)this.put(t.a,t.x,t.z,t.a==='bush'?t.h*.45:t.h,rng.next()<.5);
-        }
-    }
-}
-
 export function createTerrain(scene:T.Scene) {
     const tex=meadowTexture(), g=new T.PlaneGeometry(700,560,460,370);
     g.rotateX(-Math.PI/2);
@@ -144,7 +93,7 @@ export function createTerrain(scene:T.Scene) {
     const spots=Array.from({length:tufts.count},()=>[(rng.next()-.5)*(HALF_W*2+40),(rng.next()-.5)*(HALF_H*2+30),rng.next()*6.28,.55+rng.next()*.95]);
     for(let i=0;i<tufts.count;i++)tufts.setColorAt(i,c.setHex([0x7f8648,0xa89c55,0x657648,0xabaa68][i%4]));
     tufts.receiveShadow=true;tufts.castShadow=true;scene.add(tufts);
-    const scenery=new Scenery(scene);
+    const scenery=new Scenery(scene,time);
     function rebuild(){
         for(let i=0;i<pos.count;i++){
             const x=pos.getX(i),z=pos.getZ(i),h=terrainHeight(x,z);pos.setY(i,h);
