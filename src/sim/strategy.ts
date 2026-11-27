@@ -245,6 +245,19 @@ export function updateCompany(w: SimWorld, c: Company) {
         else if (c.formation !== 'square') setFormation(w, c, c.order === 'advance' && d > 600 && !sheltered ? 'column' : 'line');
     }
     // ---- 移动目标 ----
+    if(c.kind==='field_cannon'){
+        c.order='hold';
+        if(!c.relocated){
+            let sum=0,count=0;
+            for(const p of w.companies)if(p.faction===c.faction && p.line===0 && p.alive && p.status!=='rout'){sum+=p.x;count++;}
+            const front=sum/count, face=c.faction?-1:1;
+            if(count && (front-c.initialFront)*face>600){
+                c.homeX=front-face*170; c.limbered=true; c.relocated=true;
+            }
+        }else if(c.limbered && Math.hypot(c.x-c.homeX,c.y-c.homeY)<2){
+            c.limbered=false;c.deployUntil=w.tick+90;
+        }
+    }
     let gx = c.homeX, gy = c.homeY;
     const range = c.kind === 'field_cannon' ? gunRange(w) * .8 : MUSKET * .78;
     if (t && c.order === 'advance') {
@@ -266,6 +279,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     mx /= c.members.length; my /= c.members.length;
     lag = Math.hypot(mx - c.x, my - c.y);
     let speed = c.speed * (c.formation === 'column' ? 1.05 : c.formation === 'square' ? .3 : c.formation === 'line' ? .85 : 1) * (c.status === 'shaken' ? .75 : 1);
+    if(c.limbered)speed*=.7;
     if (c.order === 'charge') speed *= 1.35; else if (c.order === 'assault' && d < 320) speed *= 1.45;
     if (c.formUntil > w.tick && c.formation !== 'column') speed *= .3;
     const gd = Math.hypot(gx - c.x, gy - c.y);
@@ -314,7 +328,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     }
     // ---- 开火 ----
     if (c.kind === 'field_cannon') {
-        if (lag < 30 && gd < 5) for (const gun of c.members) if (gun.hp > 0 && !gun.cooldown && !gun.moving) {
+        if (!c.limbered && w.tick>=c.deployUntil && lag < 30 && gd < 5) for (const gun of c.members) if (gun.hp > 0 && !gun.cooldown && !gun.moving) {
             const gt = d < CANISTER ? t : pickTarget(w, c) ?? t;
             if (dist(gun, gt) < gunRange(w)) gunFire(w, gun, c, gt);
         }

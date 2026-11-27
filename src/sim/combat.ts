@@ -2,8 +2,8 @@ import type { Soldier, BattleEvent, Company, Round } from './arenaTypes';
 import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, coverAt, behindCrest, inRect, layout } from './maps';
 
-export const MUSKET = 230, CANISTER = 400;
-export const gunRange = (w: SimWorld) => w.weather === 'fog' ? 1050 : 1750;
+export const MUSKET = 230, CANISTER = 320;
+export const gunRange = (w: SimWorld) => w.weather === 'fog' ? 1350 : 2480;
 export const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export function emit(w: SimWorld, type: BattleEvent['type'], u: Soldier, dx: number, dy: number, explosive: boolean, x = u.x, y = u.y) {
@@ -52,7 +52,7 @@ export function volley(w: SimWorld, c: Company, t: Company) {
     if (c.status === 'shaken') p *= .6;
     if (c.formUntil > w.tick) p *= .5;
     if (c.kind === 'guard_grenadier') p *= 1.2;
-    p *= coverAt(t.x, t.y);
+    p *= .75 * coverAt(t.x, t.y);
     c.hitChance = p; c.target = t.id;
     const steady = c.status === 'steady' && c.formUntil <= w.tick;
     const rearRanksOut = c.formation === 'column' ? c.files * 2 : c.formation === 'square' ? Math.ceil(c.members.length / 2) : 9999;
@@ -61,7 +61,7 @@ export function volley(w: SimWorld, c: Company, t: Company) {
         const file = c.files ? u.slot % c.files : 0;
         u.fireAt = w.tick + 1 + (steady ? Math.floor(file * .7) % 14 : w.rng.int(0, 28));
     }
-    c.reloadAt = w.tick + (c.kind === 'guard_grenadier' ? 84 : 96) + w.rng.int(0, 14) + (c.status === 'shaken' ? 30 : 0);
+    c.reloadAt = w.tick + (c.kind === 'guard_grenadier' ? w.rng.int(55,68) : w.rng.int(60,75)) + (c.status === 'shaken' ? 20 : 0);
     t.underFire = w.tick + 90;
     shake(t, .9);
 }
@@ -112,32 +112,45 @@ export function impact(w: SimWorld, c: Company, t: Company) {
 
 export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     const d = dist(g, t);
-    g.firedAt = w.tick; g.pose = 'recoil';
+    const blocked=(x:number,y:number,dx:number,dy:number,roll:number)=>w.companies.some(p=>{
+        if(p===c || p.faction!==c.faction || !p.alive) return false;
+        const along=Math.max(0,Math.min(roll,(p.x-x)*dx+(p.y-y)*dy));
+        return Math.abs((p.x-g.x)*dy-(p.y-g.y)*dx)<80 && Math.hypot(p.x-x-along*dx,p.y-y-along*dy)<150;
+    });
+    if(blocked(t.x,t.y,(t.x-g.x)/Math.max(1,d),(t.y-g.y)/Math.max(1,d),0))return;
+    g.pose = 'recoil';
     if (d < CANISTER) {
         // 霰弹：近距离一炮扫倒一片。
         const dx = (t.x - g.x) / Math.max(1, d), dy = (t.y - g.y) / Math.max(1, d);
-        emit(w, 'fire', g, dx, dy, true);
-        const n = w.rng.int(2, 6);
+        g.firedAt=w.tick; emit(w, 'fire', g, dx, dy, true);
+        const n = w.rng.int(2, 4);
         for (let i = 0; i < n; i++) {
             const v = victim(w, t, t.members.length);
-            if (v) damage(w, v, w.rng.int(70, 160), dx, dy, false, c);
+            if (v) damage(w, v, w.rng.int(70, 160), dx, dy, true, c);
         }
         shake(t, 6);
-        g.cooldown = w.rng.int(105, 150);
+        g.cooldown = w.rng.int(150,190);
         return;
     }
     const aim = victim(w, t, t.members.length) ?? t;
-    const spread = 22 + d * .045;
-    const ax = aim.x + (w.rng.next() + w.rng.next() - 1) * spread, ay = aim.y + (w.rng.next() + w.rng.next() - 1) * spread;
-    const ddx = ax - g.x, ddy = ay - g.y, dd = Math.max(1, Math.hypot(ddx, ddy)), dx = ddx / dd, dy = ddy / dd;
-    const short = w.rng.int(0, 110);
-    const tx = ax - dx * short, ty = ay - dy * short;
-    let roll = (w.weather === 'rain' ? 120 : 360) + w.rng.int(-40, 40);
+    if(g.aimTarget!==t.id || Math.hypot(t.x-g.aimX,t.y-g.aimY)>150){
+        g.aimTarget=t.id;g.aimX=t.x;g.aimY=t.y;g.shotsOnTarget=0;
+        g.rangeError=(w.rng.next()<.5?-1:1)*w.rng.int(120,260)*(w.weather==='fog'?2:1);
+    }
+    for(const o of c.members)if(o.hp>0 && o.shotsOnTarget>0 && o.aimTarget===t.id && Math.hypot(t.x-o.aimX,t.y-o.aimY)<=150 && Math.abs(o.rangeError)<Math.abs(g.rangeError))g.rangeError=o.rangeError;
+    const lx=(t.x-g.x)/d, ly=(t.y-g.y)/d;
+    const lateral=(w.rng.next()+w.rng.next()-1)*(14+d*.03)*(g.shotsOnTarget<2?1.8:1);
+    const ax=aim.x+lx*g.rangeError-ly*lateral, ay=aim.y+ly*g.rangeError+lx*lateral;
+    const dd=Math.max(1,Math.hypot(ax-g.x,ay-g.y)),dx=(ax-g.x)/dd,dy=(ay-g.y)/dd;
+    const tx=ax,ty=ay;
+    let roll=w.weather==='rain'?100:280;
+    if(blocked(tx,ty,dx,dy,roll))return;
+    g.firedAt=w.tick;g.rangeError*=w.weather==='fog'?.7:.55;g.shotsOnTarget++;
     if (behindCrest(ax, ay, t.faction)) roll *= .3;
     w.rounds.push({ x: g.x, y: g.y, tx, ty, dx, dy, age: 0, duration: Math.max(6, Math.ceil(dd / 60)), roll, rolled: 0, speed: 24,
         gun: g, faction: g.faction, company: c.id, kills: 0, touched: [] });
     emit(w, 'fire', g, dx, dy, true);
-    g.cooldown = w.rng.int(180, 250) + (w.weather === 'rain' ? 20 : 0);
+    g.cooldown = w.rng.int(210,270);
 }
 export function roundPosition(r: Round, alpha = 0) {
     if (r.age + alpha < r.duration) {
@@ -157,8 +170,8 @@ export function resolveRounds(w: SimWorld) {
         r.rolled += step; r.speed *= .985;
         const px = r.tx + r.dx * r.rolled, py = r.ty + r.dy * r.rolled;
         const source = w.companies[r.company];
-        if (r.kills < 4) w.hash.visit(px, py, 8, u => {
-            if (u.faction === r.faction || r.kills >= 4) return;
+        if (r.kills < 3) w.hash.visit(px, py, 8, u => {
+            if (u.faction === r.faction || r.kills >= 3) return;
             if (inRect(layout.farm, u.x, u.y, 8) && w.rng.next() < .7) { r.roll = 0; return; }
             damage(w, u, 190, r.dx, r.dy, true, source);
             r.kills++; r.roll -= 28;

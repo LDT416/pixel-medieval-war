@@ -49,7 +49,7 @@ export class Director {
             const e = (1 - f) as Faction;
             if (w.armyMorale(e) < 38 || w.effective(f) > w.effective(e) * 1.35 || w.tick > 7800) {
                 w.posture[f] = 'attack'; this.advanced[f] = true;
-                for (const c of own) if (c.line !== 6 && c.line !== 5 && c.kind !== 'cuirassier' && c.status !== 'rout') c.order = 'advance';
+                for (const c of own) if (c.line !== 6 && c.line !== 5 && c.line !== 4 && c.kind !== 'cuirassier' && c.status !== 'rout') c.order = 'advance';
                 w.say(f ? `${leader}挥舞帽子：全线前进！` : `${leader}下令：全线反击！`, f, w.frontline().x, w.frontline().y, 3);
             }
         }

@@ -71,7 +71,7 @@ export class SimWorld {
         if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
         if (line === 5) base = 100;
         const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
-            x, y, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
+            x, y, relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
             engaged: false, checkedAt: -999, chargeAt: -999, line, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
@@ -82,7 +82,7 @@ export class SimWorld {
         const u: Soldier = { id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
             hp: HP[kind], face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
             stride: this.rng.int(0, 15), speed: SPEED[kind] * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
-            px:c.x, py:c.y, turnFrames:0, marchUntil:0, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
+            aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
         if (kind === 'bannerman') c.colors++;
         c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;
@@ -96,7 +96,7 @@ export class SimWorld {
         const guard = Math.round(total * (.09 + r() * .08));
         const banner = Math.round(total * .035), staff = 3;
         const line = total - guns - cav - guard - banner - staff;
-        const frontX = (y: number) => defending ? ridgeLine(y) - face * 75 : CX - face * LINE_GAP;
+        const frontX = (y: number) => defending ? ridgeLine(y) + face * 170 : CX - face * LINE_GAP;
         const ranks = f ? 2 : 3;
         let num = this.rng.int(3, 18);
         const nextNum = () => (num += this.rng.int(1, 4));
@@ -137,8 +137,8 @@ export class SimWorld {
         const letters = 'ABCDEFGHIJKLMN';
         split(guns, 5).forEach((n, i, all) => {
             const y = CY + (i - (all.length - 1) / 2) * Math.min(520, band / all.length);
-            const x = defending ? ridgeLine(y) + face * 10 : frontX(y) + face * 110;
-            this.company(f, 'field_cannon', f ? `皇家炮兵${letters[i]}连` : `第${i + 1}近卫炮兵连`, 4, n, x, y, 'battery', this.posture[f] === 'attack' ? 'advance' : 'hold', 1);
+            const x = frontX(y) - face * 170;
+            this.company(f, 'field_cannon', f ? `皇家炮兵${letters[i]}连` : `第${i + 1}近卫炮兵连`, 4, n, x, y, 'battery', 'hold', 1);
         });
         // 旗手与鼓手编入步兵连
         for (let i = 0; i < banner; i++) this.soldier(infantry[i % infantry.length], 'bannerman');
@@ -165,7 +165,7 @@ export class SimWorld {
             born.push(this.company(f, 'line_infantry', f ? `普鲁士第${num += 3}团` : `格鲁希军第${num += 3}团`, 7, n, CX - face * (250 + i * 170), y0 + ys * (i % 2) * 60, 'column', 'advance', ranks));
         }
         if (cav) born.push(this.company(f, 'cuirassier', f ? '普鲁士枪骑兵团' : '格鲁希军龙骑兵团', 3, cav, CX - face * (250 + k * 170), y0, 'wedge', 'hold', 2));
-        if (guns) born.push(this.company(f, 'field_cannon', f ? '普鲁士炮兵连' : '格鲁希军炮兵连', 4, guns, CX - face * 650, y0 + ys * 80, 'battery', 'advance', 1));
+        if (guns) born.push(this.company(f, 'field_cannon', f ? '普鲁士炮兵连' : '格鲁希军炮兵连', 4, guns, CX - face * 650, y0 + ys * 80, 'battery', 'hold', 1));
         for (const c of born) { c.hx = 0; c.hy = ys; formUp(c); c.hx = face; c.hy = 0; this.reinforced[f] += c.alive; }
         this.say(f ? `${r.name}从侧翼杀到！布吕歇尔兑现了诺言` : `${r.name}终于赶到战场！`, f, CX - face * 400, y0, 3);
         for (const c of this.companies) if (c.status !== 'gone') {

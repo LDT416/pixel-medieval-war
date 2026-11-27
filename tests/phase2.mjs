@@ -42,10 +42,12 @@ for (const scale of [600, 1200, 1800]) {
     if (scale <= 1200) { world.reset(scale, 42); assert.equal(battle(world).sig, a.sig, 'deterministic replay'); }
 }
 // 胜率与时长分布
+const ratios=[];
 const N = Number(process.env.SEEDS || 24), wins = [0, 0], lens = [], events = {};
 for (let s = 1; s <= N; s++) {
     world.reset(1200, s * 7919);
     const r = battle(world, false);
+    assert.ok(r.deaths>0); ratios.push(r.explosive/r.deaths);
     wins[r.winner]++; lens.push(r.tick / 30);
     const tags = [world.weather, world.generals[0].name + '/' + world.generals[1].name, world.posture.join('-')];
     if (world.reinforcement?.arrived) tags.push('援军' + world.reinforcement.faction);
@@ -56,5 +58,8 @@ for (let s = 1; s <= N; s++) {
 }
 lens.sort((a, b) => a - b);
 console.log('wins', wins, 'median', lens[Math.floor(N / 2)].toFixed(0) + 's', 'min', lens[0].toFixed(0), 'max', lens[N - 1].toFixed(0));
+const ratio=ratios.reduce((a,b)=>a+b,0)/N;
+console.log('cannon share',ratio.toFixed(4));
+if(N>=60){assert.ok(ratio>=.22 && ratio<=.38);assert.ok(wins.every(w=>w/N>=.4 && w/N<=.6));assert.ok(lens[0]>=70 && lens[Math.floor(N/2)]>=120 && lens[Math.floor(N/2)]<=200);}
 if (process.env.VERBOSE) console.log(events);
 console.log('Battle assertions passed.');

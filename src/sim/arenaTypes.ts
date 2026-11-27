@@ -18,11 +18,13 @@ export interface Soldier {
     x: number; y: number; vx: number; vy: number; hp: number;
     face: number; moving: boolean; pose: Action; hitAt: number; firedAt: number; fireAt: number;
     stride: number; speed: number; cooldown: number; foe: number;
+    aimTarget:number; aimX:number; aimY:number; rangeError:number; shotsOnTarget:number;
     px:number; py:number; turnFrames:number; marchUntil:number; general: boolean; jx: number; jy: number;
 }
 export interface Company {
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
     x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;
+    relocated:boolean; limbered:boolean; deployUntil:number; initialFront:number;
     vx:number; vy:number; capacity:number; lastShrink:number; margin:number; formation: Formation; formUntil: number; files: number; ranks: number;
     order: Order; status: Status; morale: number; base: number;
     target: number; forced: number; reloadAt: number; hitChance: number;
