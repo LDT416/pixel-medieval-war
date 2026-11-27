@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {Rng} from '../../sim/rng';
+import {treesFor} from '../../sim/sceneryLayout';
 import {layout} from '../../sim/maps';
 import {toX,toZ,SCALE,terrainHeight} from './terrain3d';
 const ART=['farmhouse','oak','beech','spruce','bush','haystack','hedge'] as const;
@@ -82,17 +83,16 @@ export class Scenery{
         if(this.fallback){this.flat.rebuild();return;}
         if(!this.models.size)return;
         for(const m of this.batches){this.scene.remove(m);m.dispose();}this.batches=[];
-        const groups=new Map<string,T.Matrix4[]>(),rng=new Rng(Math.floor(layout.seed*1000)+7),o=new T.Object3D();
+        const groups=new Map<string,T.Matrix4[]>(),o=new T.Object3D();
         const put=(name:string,x:number,z:number,scale:number,yaw:number)=>{
             o.position.set(x,terrainHeight(x,z)-.08,z);o.rotation.y=yaw;o.scale.setScalar(scale);o.updateMatrix();
             if(!groups.has(name))groups.set(name,[]);groups.get(name)!.push(o.matrix.clone());
         };
-        for(const f of layout.farms){put('Farm',toX(f.x),toZ(f.y),f.w*SCALE/9.5,layout.farmOwner===0?Math.PI:0);}
-        for(const g of layout.woods)for(let i=0;i<Math.round(g.r*g.r/2300);i++){
-            const a=rng.next()*Math.PI*2,r=Math.sqrt(rng.next())*g.r,x=toX(g.x+Math.cos(a)*r),z=toZ(g.y+Math.sin(a)*r);
-            const size=.8+rng.next()*.45,yaw=rng.next()*Math.PI*2;
-            put('Trunk',x,z,size,yaw);put('Crown'+rng.int(0,2),x,z,size,yaw);
-            if(i%3===0)put(i%9===0?'Rock':'Shrub',x+1.1,z-.8,size,yaw);
+        for(const f of layout.farms){put('Farm',toX(f.x),toZ(f.y),f.w*SCALE/9.5,layout.ridgeOwner===0?Math.PI:0);}
+        for(const tree of treesFor(layout)){
+            const x=toX(tree.x),z=toZ(tree.y);
+            put('Trunk',x,z,tree.size,tree.yaw);put('Crown'+tree.crown,x,z,tree.size,tree.yaw);
+            if(tree.understory)put(tree.understory,x+1.1,z-.8,tree.size,tree.yaw);
         }
         for(const [name,matrices] of groups){
             const src=this.models.get(name)!,batch=new T.InstancedMesh(src.geometry,src.material,matrices.length);

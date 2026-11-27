@@ -1,7 +1,7 @@
 import type { Soldier, Company, Formation } from './arenaTypes';
 import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, movementAt, behindCrest, inWoods, inRect, layout } from './maps';
-import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, impact, gunFire } from './combat';
+import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, gunFire } from './combat';
 
 import {PACE} from './scale';
 
@@ -375,12 +375,29 @@ export function updateCompany(w: SimWorld, c: Company) {
         const e = nearestEnemy(w, c).c;
         gx = c.x + (e ? Math.sign(e.x - c.x) : c.faction ? -1 : 1) * 160; gy = e ? c.y + Math.sign(e.y - c.y) * 40 : c.y;
     } else if (c.order === 'rally' && dist(c, { x: c.homeX, y: c.homeY }) < 40 && c.morale > 55) c.order = 'hold';
+    if(c.order!=='charge' && c.assaultStage!=='rush' && Math.hypot(gx-c.x,gy-c.y)>80){
+        const len=Math.hypot(gx-c.x,gy-c.y),dx=(gx-c.x)/len,dy=(gy-c.y)/len;
+        for(const other of w.companies){
+            if(other===c || other.faction!==c.faction || !other.alive || other.status==='rout')continue;
+            const rx=other.x-c.x,ry=other.y-c.y,ahead=rx*dx+ry*dy,side=rx*dy-ry*dx;
+            const width=Math.min(110,(c.files+other.files)*4+16);
+            if(ahead<4 || ahead>120 || Math.abs(side)>=width)continue;
+            const offset=(width-Math.abs(side))*(side>0?1:side<0?-1:c.id<other.id?1:-1);
+            gx=c.x+dx*35-dy*offset;gy=c.y+dy*35+dx*offset;break;
+        }
+    }
     c.gx = gx; c.gy = gy;
     // ---- 行进：阵形中心不能跑得比士兵快太多 ----
     let lag = 0, mx = 0, my = 0;
     for (const u of c.members) { mx += u.x; my += u.y; }
     mx /= c.members.length; my /= c.members.length;
-    lag = Math.hypot(mx - c.x, my - c.y);
+    // The anchor is at the front rank. Compare the group with its expected centroid.
+    let sx=0,sy=0;
+    for(const u of c.members){
+        const [lat,depth]=slotOffset(c,u.slot);
+        sx-=lat*c.hy+depth*c.hx;sy+=lat*c.hx-depth*c.hy;
+    }
+    lag = Math.hypot(mx-c.x-sx/c.members.length,my-c.y-sy/c.members.length);
     const mounted=c.kind==='cuirassier';
     if(mounted && c.order==='charge' && d<250 && c.fatigue<.7 && w.tick>=c.sprintReady){
         c.sprintUntil=w.tick+PACE.sprintTicks;c.sprintReady=c.sprintUntil+450;
@@ -393,8 +410,8 @@ export function updateCompany(w: SimWorld, c: Company) {
     if(c.limbered && w.tick<c.deployUntil)speed=0;
     if (c.formUntil > w.tick && c.formation !== 'column') speed *= .3;
     const gd = Math.hypot(gx - c.x, gy - c.y);
-    if (gd > 1 && lag < 55) {
-        const step = Math.min(gd, speed * 6 / 30);
+    if (gd > 1 && lag < 95) {
+        const step = Math.min(gd, speed * Math.min(1,(95-lag)/28) * 6 / 30);
         c.vx=(gx-c.x)/gd*step*5; c.vy=(gy-c.y)/gd*step*5;
     }
     // 朝向：转向目标，每次最多转 0.1 弧度（整连在原地“轮转”）。
@@ -410,33 +427,18 @@ export function updateCompany(w: SimWorld, c: Company) {
     if (!t) return;
     // ---- 接敌 ----
 
-    if(c.assaultStage==='rush' && d<=62 && t.status!=='rout'){
-        const dx=(c.x-t.x)/Math.max(1,d),dy=(c.y-t.y)/Math.max(1,d);
-        const angle=Math.acos(Math.max(-1,Math.min(1,dx*t.hx+dy*t.hy)))*180/Math.PI;
-        const loaded=t.members.some(u=>u.hp>0 && u.ammo>0 && u.loadedAt<=w.tick && !u.moving);
-        if(loaded)volley(w,t,c,true);
-        const bonus=(c.formation==='column'?15:-10)+(c.members.some(u=>u.officer&&u.hp>0)?8:0)+(c.colors?6:0)+(c.members.some(u=>u.kind==='bannerman'&&u.id%3===0)?4:0);
-        const attack=c.morale+bonus+(angle>135?35:angle>60?20:0)+w.rng.int(-12,12);
-        const defence=t.morale+(inRect(layout.farm,t.x,t.y)?22:inWoods(t.x,t.y)?10:0)+(loaded?10:0)+(t.kind==='guard_grenadier'?9:0)-40*(1-t.alive/t.peak)+w.rng.int(-12,12);
-        const bias=Math.max(-.21,Math.min(.21,(attack-defence)*.003));
-        const roll=w.rng.next();
-        const outcome=roll<.35+bias?'break':roll<.75?'repulsed':'melee';
-        w.charges.push({tick:w.tick,company:c.id,target:t.id,fresh:c.freshAtStart,outcome});
-        if(outcome==='melee'){c.assaultStage='melee';c.assaultUntil=w.tick+w.rng.int(90,240);c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;}
-        else{
-            if(outcome==='break'){w.say(t.name+'在'+c.name+'的刺刀面前崩溃！',c.faction,t.x,t.y,2);rout(w,t,true);}
-            else{shake(c,10);w.say(c.name+'冲锋受阻，停步交火',c.faction,c.x,c.y,1);}
-            c.homeX=c.x;c.homeY=c.y;c.order='hold';c.forced=-1;c.assaultStage='idle';c.assaultReady=w.tick+720;
-        }
+    if(c.assaultStage==='rush' && d<=62){
+        c.assaultStage='melee';
+        c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;
+        w.charges.push({tick:w.tick,company:c.id,target:t.id,fresh:c.freshAtStart,outcome:'melee'});
     }
-    if(c.assaultStage==='melee' && w.tick>=c.assaultUntil){
-        const loser=c.morale+c.alive*.3<t.morale+t.alive*.3?c:t, victor=loser===c?t:c;
-        rout(w,loser,true);victor.formUntil=w.tick+60;victor.order='hold';victor.homeX=victor.x;victor.homeY=victor.y;
+    if(c.assaultStage==='melee' && (t.status==='rout'||t.status==='gone'||d>150)){
         c.assaultStage='idle';c.assaultReady=w.tick+720;
+        c.homeX=c.x;c.homeY=c.y;c.order='hold';c.forced=-1;
     }
     if ((c.order === 'assault' || c.order === 'charge') && d < contact && t.status !== 'rout' && c.chargeOpponent!==t.id) {
         c.chargeOpponent=t.id;c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;c.chargeAt=w.tick;
-        impact(w, c, t);
+
         if(t.kind==='field_cannon' && t.morale<18 && t.status!=='gone' && t.alive>0){
             c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
         }

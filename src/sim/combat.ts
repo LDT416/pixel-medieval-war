@@ -117,24 +117,6 @@ export function strike(w: SimWorld, u: Soldier, foe: Soldier) {
     u.firedAt = w.tick;
 }
 /** 冲击瞬间：骑兵撞上未结阵的步兵会当场撕开缺口。 */
-export function impact(w: SimWorld, c: Company, t: Company) {
-    if (c.kind !== 'cuirassier') { shake(t, 8); return; }
-    const formedSquare = t.formation === 'square' && t.formUntil <= w.tick && t.status !== 'rout';
-    if (formedSquare) {
-        shake(c, 16);
-        if (w.rng.next() < .5) w.say(`${t.name}结成方阵，${c.name}的冲锋撞得人仰马翻`, t.faction, t.x, t.y, 1);
-        return;
-    }
-    const caught = t.formUntil > w.tick;
-    const n = Math.round(t.alive * (caught ? .24 : .15) * c.alive / Math.max(1, c.peak));
-    for (let i = 0; i < n; i++) {
-        const v = victim(w, t, t.members.length);
-        if (v) damage(w, v, w.rng.int(80, 150), c.hx, c.hy, false, c);
-    }
-    shake(t, t.kind === 'field_cannon' ? 45 : caught ? 40 : 26);
-    w.say(caught ? `${t.name}来不及结阵，被${c.name}冲得七零八落！` : `${c.name}撞进了${t.name}的阵线！`, c.faction, t.x, t.y, 2);
-}
-
 export function gunFire(w: SimWorld, g: Soldier, c: Company, t: Company) {
     const d = dist(g, t);
     const blocked=(x:number,y:number,dx:number,dy:number,roll:number)=>w.companies.some(p=>{

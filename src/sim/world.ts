@@ -2,6 +2,7 @@ import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleE
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
+import {Crowd} from './crowd';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
 import { LegacyDirector } from './legacyDirector';
@@ -38,7 +39,7 @@ export class SimWorld {
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
-    hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
+    crowd=new Crowd(); hash = new SpatialHash(); rng = new Rng(1815); director = new Director(); logistics=new CampaignLogistics(); objectives=new CampaignObjectives();
     stationaryFrames=0; flips=0; toggles=0; slotMoves=0;
     get jitter(){
         const seconds=Math.max(1,this.stationaryFrames/30);
@@ -65,7 +66,7 @@ export class SimWorld {
         this.posture = [stance(this.generals[0].trait), stance(this.generals[1].trait)];
         if (this.posture[0] === 'defend' && this.posture[1] === 'defend') this.posture[this.rng.int(0, 1)] = 'attack';
         const defender: Faction | -1 = this.posture[0] === 'defend' ? 0 : this.posture[1] === 'defend' ? 1 : -1;
-        this.layout = createCampaignLayout(this.rng, defender); setLayout(this.layout);
+        this.layout = createCampaignLayout(this.rng, defender); setLayout(this.layout);this.crowd.reset(this.layout);
         for (const f of [0, 1] as const) this.deploy(f, scale / 2);
         this.reinforcement = null;
         if (this.rng.next() < .42) {
@@ -74,6 +75,7 @@ export class SimWorld {
                 name: f ? '普鲁士比洛军' : '格鲁希元帅的右翼军' };
         }
         this.plans=prepareDeployment(this);
+        this.crowd.step(this);
         this.director.reset(this);
         if(this.legacySide!==null){
             const next=this.rng.state;
@@ -203,7 +205,7 @@ export class SimWorld {
         if(activeLayout!==this.layout)setLayout(this.layout);
         this.tick++;
         if(this.tick<=this.deployEnd){
-            marchDeployment(this);
+            marchDeployment(this);this.crowd.step(this);
             if(this.tick%30===0)this.sampleTimeline();
             return;
         }
@@ -231,6 +233,7 @@ export class SimWorld {
                 if((pose==='march' && u.pose==='stand')||(pose==='stand' && u.pose==='march'))this.toggles++;
             }
         }
+        this.crowd.step(this);
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
         if(this.tick%30===0){
             if(this.winner===null)this.objectives.update(this);

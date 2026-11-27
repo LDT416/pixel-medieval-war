@@ -1,0 +1,46 @@
+
+> napoleon-1815@6.0.0 test
+> node tests/phase2.mjs && node tests/pace-probe.mjs && node tests/crowd-probe.mjs && node tests/scenarios/crowd.mjs
+
+600 275.5s 法兰西帝国失守两个战区，有序撤退 avg 0.84ms p99 1.55ms
+1200 314.0s 法兰西帝国失守两个战区，有序撤退 avg 1.48ms p99 2.19ms
+1800 1200.0s 夜幕降临，法兰西帝国趁夜撤离战场 avg 3.19ms p99 4.62ms
+seed 23757 129s winner 1 loss 0.237 cannon 0.023 法兰西帝国失守两个战区，有序撤退
+seed 31676 158s winner 1 loss 0.343 cannon 0.089 法兰西帝国失守两个战区，有序撤退
+seed 15838 297s winner 0 loss 0.447 cannon 0.154 反法同盟失守两个战区，有序撤退
+seed 47514 100s winner 0 loss 0.328 cannon 0.029 反法同盟失守两个战区，有序撤退
+seed 55433 427s winner 1 loss 0.383 cannon 0.010 法兰西帝国失守两个战区，有序撤退
+seed 87109 163s winner 0 loss 0.282 cannon 0.338 反法同盟失守两个战区，有序撤退
+seed 79190 252s winner 1 loss 0.320 cannon 0.182 法兰西帝国失守两个战区，有序撤退
+seed 7919 600s winner 0 loss 0.217 cannon 0.039 法兰西帝国持续控制多数战略要点
+seed 63352 572s winner 1 loss 0.317 cannon 0.092 法兰西帝国失守两个战区，有序撤退
+seed 110866 237s winner 1 loss 0.407 cannon 0.133 法兰西帝国失守两个战区，有序撤退
+seed 142542 163s winner 1 loss 0.237 cannon 0.180 法兰西帝国失守两个战区，有序撤退
+seed 95028 230s winner 1 loss 0.362 cannon 0.101 法兰西帝国失守两个战区，有序撤退
+seed 174218 81s winner 0 loss 0.312 cannon 0.062 反法同盟失守两个战区，有序撤退
+seed 118785 575s winner 0 loss 0.300 cannon 0.020 反法同盟失守两个战区，有序撤退
+seed 150461 122s winner 1 loss 0.325 cannon 0.035 法兰西帝国失守两个战区，有序撤退
+seed 182137 128s winner 1 loss 0.258 cannon 0.052 法兰西帝国失守两个战区，有序撤退
+seed 39595 1200s winner 0 loss 0.338 cannon 0.379 夜幕降临，反法同盟趁夜撤离战场
+seed 71271 157s winner 0 loss 0.412 cannon 0.027 反法同盟失守两个战区，有序撤退
+seed 102947 179s winner 0 loss 0.313 cannon 0.025 反法同盟失守两个战区，有序撤退
+seed 134623 133s winner 1 loss 0.347 cannon 0.109 法兰西帝国失守两个战区，有序撤退
+seed 126704 1200s winner 1 loss 0.217 cannon 0.035 夜幕降临，法兰西帝国趁夜撤离战场
+seed 158380 124s winner 0 loss 0.165 cannon 0.000 反法同盟失守两个战区，有序撤退
+seed 190056 126s winner 1 loss 0.282 cannon 0.033 法兰西帝国失守两个战区，有序撤退
+seed 166299 572s winner 0 loss 0.342 cannon 0.097 反法同盟失守两个战区，有序撤退
+{
+  seeds: 24,
+  medianSeconds: 170.75,
+  minSeconds: 81,
+  maxSeconds: 1200,
+  loserLossFraction: 0.31201388888888887,
+  generalDeathFraction: 0.041666666666666664,
+  wins: [ 11, 13 ],
+  cannonShare: 0.09351230209495288,
+  pooledCannonShare: 0.10031347962382445
+}
+Battle assertions passed.
+{"seed":23757,"frames":3855,"firstGun":14.133333333333333,"firstCasualty":30.366666666666667,"idleFraction":0.09416342412451362,"movement":{"line_infantry":{"count":750183,"mean":64.67332625306888,"max":121.74864620688356},"cuirassier":{"count":115885,"mean":116.13855933965155,"max":151.33245654676884},"field_cannon":{"count":16467,"mean":57.61887960586809,"max":119.70000000001562},"bannerman":{"count":41325,"mean":66.7147679222261,"max":121.1267236310212},"guard_grenadier":{"count":95166,"mean":61.21443049443322,"max":119.70000000001974},"footRush":{"count":11962,"mean":84.0209161617553,"max":114.00000000001481}}}
+{"samples":116,"mean":0,"peak":0,"steadySamples":116,"steadyMean":0,"jitter":{"flipsPerSec":0,"poseTogglesPerSec":0.005969848438559354,"slotSwapsPerDeath":1.1568627450980393}}
+S9 controlled passage {"crossed":3,"peak":0,"final":[[760,555],[760,565],[760,575],[760,625],[760,635],[760,645],[885,588],[885,600],[885,612]]}
