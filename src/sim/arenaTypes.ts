@@ -24,6 +24,8 @@ export interface Soldier {
 export interface Company {
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
     x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;
+    cavalryDistances:Map<number,number>; lastHorse:number; leftSquare:number; formedSquareAt:number;
+    chargeOpponent:number; lastMelee:number; contactId:number; contactAt:number; blownUntil:number;
     relocated:boolean; limbered:boolean; deployUntil:number; initialFront:number;
     vx:number; vy:number; capacity:number; lastShrink:number; margin:number; formation: Formation; formUntil: number; files: number; ranks: number;
     order: Order; status: Status; morale: number; base: number;

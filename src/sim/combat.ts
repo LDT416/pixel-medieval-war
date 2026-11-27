@@ -24,7 +24,7 @@ export function damage(w: SimWorld, u: Soldier, amount: number, dx: number, dy: 
     w.alive[u.faction]--; w.dead[u.faction]++;
     emit(w, 'death', u, dx, dy, explosive);
     const c = w.companies[u.company];
-    c.alive--;c.losses++;
+    c.alive--;c.losses++;if(!c.alive){c.order='hold';c.forced=-1;}
     const lost = 1 - c.alive / c.peak;
     shake(c, (c.kind === 'field_cannon' ? 70 : c.kind === 'guard_grenadier' ? 62 : 95) / Math.max(6, c.peak) * (1 + lost * 1.4));
     if (u.kind === 'bannerman' && --c.colors === 0 && c.alive > 3) {

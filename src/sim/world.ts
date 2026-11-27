@@ -73,7 +73,7 @@ export class SimWorld {
         if (trait === 'steadfast' && kind !== 'cuirassier') base += 9;
         if (line === 5) base = 100;
         const c: Company = { id: this.companies.length, faction: f, kind, name, members: [], alive: 0, peak: 0,
-            x, y, relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
+            x, y, cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0, hitChance: 0,
             engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: SPEED[kind] * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
@@ -132,7 +132,7 @@ export class SimWorld {
         split(cav, 22).forEach((n, i) => {
             const wing = i % 2 ? 1 : -1, row = Math.floor(i / 2);
             const y = CY + wing * (band / 2 + 160 + (row % 2) * 120);
-            const x = frontX(CY) - face * (180 + row * 120);
+            const x = frontX(CY) - face * (560 + row * 140);
             this.company(f, 'cuirassier', f ? `第${cavNum += this.rng.int(1, 4)}龙骑兵团` : `第${cavNum += this.rng.int(1, 3)}胸甲骑兵团`, 3, n, x, y, 'wedge', 'hold', 2);
         });
         // 炮兵部署在阵前或山脊顶
@@ -219,7 +219,7 @@ export class SimWorld {
         attacker.line=6;attacker.order='hold';attacker.forced=-1;attacker.homeX=farm.x;attacker.homeY=farm.y;
         this.layout.farmOwner=attacker.faction;attacker.captures++;
         this.say(attacker.name+'攻占了农庄！',attacker.faction,farm.x,farm.y,2);
-        const relief=this.companies.filter(c=>c.faction===owner && c.line===1 && c.status==='steady').sort((a,b)=>distance(a)-distance(b))[0];
+        const relief=this.companies.filter(c=>c.faction===owner && c.line===1 && c.alive>0 && c.status==='steady').sort((a,b)=>distance(a)-distance(b))[0];
         if(relief){relief.order='assault';relief.forced=attacker.id;}
     }
     private summarize(){

@@ -28,7 +28,7 @@ export class Director {
     }
     private army(w: SimWorld, f: Faction) {
         const g = w.generals[f], trait = g.trait, attack = w.posture[f] === 'attack', face = f ? -1 : 1;
-        const own = w.companies.filter(c => c.faction === f && c.status !== 'gone');
+        const own = w.companies.filter(c => c.faction === f && c.alive>0 && c.status !== 'gone');
         const leader = g.alive ? g.title + g.name : '代理指挥官';
         // ---- 全线推进 ----
         if (attack && !this.advanced[f] && w.tick >= this.cannonadeEnd[f]) {
@@ -70,15 +70,15 @@ export class Director {
         // ---- 骑兵寻找战机 ----
         if (w.tick > (attack ? this.cannonadeEnd[f] + 150 : 800)) {
             for (const c of own) {
-                if (c.kind !== 'cuirassier' || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52) continue;
+                if (c.kind !== 'cuirassier' || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52 || w.tick<c.blownUntil) continue;
                 if (w.rng.next() > .4) continue;
                 let best: Company | undefined, bs = 0;
                 for (const o of w.companies) {
-                    if (o.faction === f || o.status === 'gone' || o.alive < 4 || o.line === 5) continue;
+                    if (o.faction === f || o.status === 'gone' || o.status === 'rout' || o.alive < 4 || o.line === 5) continue;
                     const d = dist(c, o);
                     if (d > 1600 || inWoods(o.x, o.y, 30) || inRect(layout.farm, o.x, o.y, 40)) continue;
                     if (o.formation === 'square' && o.formUntil <= w.tick) continue;
-                    let s = o.status === 'rout' ? 2.4 : o.status === 'shaken' ? 2 : o.formUntil > w.tick ? 2.4 : 0;
+                    let s = o.status === 'shaken' ? 2 : o.formUntil > w.tick && o.formation!=='square' && w.tick-o.leftSquare>300 ? 2.4 : 0;
                     if (o.kind === 'field_cannon' && !w.companies.some(p => p.faction === o.faction && p.kind !== 'field_cannon' && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
                     if (o.kind === 'line_infantry' && o.formation === 'line' && w.tick - o.reloadAt > -40 && w.tick < o.reloadAt) s = Math.max(s, 1.15);
                     if (o.kind === 'cuirassier' && o.order === 'charge' && d < 700) s = Math.max(s, 1.8);

@@ -76,12 +76,15 @@ function flee(w: SimWorld, u: Soldier, c: Company) {
     }
 }
 function meleeStep(w: SimWorld, u: Soldier, c: Company) {
-    if (u.kind === 'field_cannon') return false;
+    if (u.kind === 'field_cannon' || c.order==='rally') return false;
+    const fixed=c.formation==='square' && c.formUntil<=w.tick;
+    const closing=c.contactId>=0 && w.tick-c.contactAt<=45;
     let foe = u.foe >= 0 ? w.units[u.foe] : undefined;
     if ((w.tick + u.id) % 6 === 0 || !foe || foe.hp <= 0) {
         let best = Infinity, found: Soldier | undefined;
-        w.hash.visit(u.x, u.y, c.engaged ? 80 : 16, o => {
-            if (o.faction === u.faction || (!c.engaged && o.foe!==u.id)) return;
+        w.hash.visit(u.x, u.y, fixed || !c.engaged?16:80, o => {
+            if ((closing || c.engaged) && o.company!==c.contactId && o.foe!==u.id)return;
+            if (o.faction === u.faction || (!fixed && !closing && !c.engaged && o.foe!==u.id)) return;
             const d = (o.x - u.x) ** 2 + (o.y - u.y) ** 2;
             if (d < best) { best = d; found = o; }
         });
@@ -90,14 +93,21 @@ function meleeStep(w: SimWorld, u: Soldier, c: Company) {
     if (!foe) return false;
     const reach = u.kind === 'cuirassier' ? 22 : 16;
     const d = Math.hypot(foe.x - u.x, foe.y - u.y);
-    if(!c.engaged && (d>16 || foe.foe!==u.id)){u.foe=-1;return false;}
+    if((fixed && d>16) || (!fixed && !closing && !c.engaged && (d>16 || foe.foe!==u.id))){u.foe=-1;return false;}
     faceToward(u,foe.x-u.x);
     if (d <= reach) {
         u.moving = false; u.vx = u.vy = 0; u.pose = 'thrust';
+        if(w.companies[foe.company].status!=='rout' && w.tick-u.firedAt<30 && w.tick-foe.firedAt<30 && foe.pose==='thrust'){
+
+            if(foe.foe===u.id && dist(c,w.companies[foe.company])<=120){
+                c.lastMelee=w.tick;c.contactId=foe.company;
+                const other=w.companies[foe.company];other.lastMelee=w.tick;other.contactId=c.id;
+            }
+        }
         if (!u.cooldown) strike(w, u, foe);
         return true;
     }
-    if (!c.engaged && d > 30) { u.foe = -1; return false; }
+    if ((!closing && !c.engaged && d > 30) || fixed) { u.foe = -1; return false; }
     moveToward(w, u, foe.x - (foe.x - u.x) / d * reach * .8, foe.y - (foe.y - u.y) / d * reach * .8, u.speed * 1.15);
     u.pose = 'run';
     return true;
@@ -159,9 +169,9 @@ function pickTarget(w: SimWorld, c: Company) {
         if (o.faction === c.faction || o.status === 'gone' || o.alive <= 0 || o.line === 5) continue;
         const d = dist(c, o);
         if (d > reach || !visible(o)) continue;
-        let s = d + Math.abs(o.y - c.y) * (c.kind === 'field_cannon' ? .2 : .9);
+        let s = d + Math.abs(o.homeY-c.homeY)*.48 + Math.abs(o.y - c.y) * (c.kind === 'field_cannon' ? .2 : .9);
         if (c.kind === 'cuirassier') {
-            s *= o.status === 'rout' ? .45 : o.formation === 'square' ? 3 : o.kind === 'field_cannon' ? .55 : o.status === 'shaken' ? .6 : o.formUntil > w.tick ? .5 : 1;
+            s *= o.status === 'rout' ? .45 : o.formation === 'square' ? 3 : o.kind === 'field_cannon' ? .55 : o.status === 'shaken' ? .6 : o.formUntil > w.tick && w.tick-o.leftSquare>300 ? .5 : 1;
             if (inWoods(o.x, o.y) || inRect(layout.farm, o.x, o.y, 30)) s *= 5;
         } else if (c.kind === 'field_cannon') {
             s *= o.formation === 'square' || o.formation === 'column' ? .6 : o.kind === 'field_cannon' ? .85 : 1;
@@ -174,10 +184,25 @@ function pickTarget(w: SimWorld, c: Company) {
 function setFormation(w: SimWorld, c: Company, f: Formation) {
     if (c.formation === f) return;
     c.capacity=c.members.length; c.margin=0; c.lastShrink=w.tick;
-    c.members.forEach((u,i)=>u.slot=i);
+    const squareChange=c.formation==='square' || f==='square';
+    if(c.formation==='square')c.leftSquare=w.tick;
+    if(f==='square')c.formedSquareAt=w.tick;
     c.formation = f;
     c.formUntil = w.tick + Math.round((f === 'square' ? (c.kind === 'guard_grenadier' ? 36 : 58) : 55) * (c.status === 'shaken' ? 1.5 : 1));
     c.files = filesFor(c, c.members.length);
+    if(!squareChange){c.members.forEach((u,i)=>u.slot=i);return;}
+    const free=c.members.map((_,i)=>{
+        const [lat,dep]=slotOffset(c,i);
+        return {i,x:c.x-lat*c.hy-dep*c.hx,y:c.y+lat*c.hx-dep*c.hy};
+    });
+    for(const u of c.members){
+        let best=0,min=Infinity;
+        for(let i=0;i<free.length;i++){
+            const p=free[i],d=(p.x-u.x)**2+(p.y-u.y)**2;
+            if(d<min){min=d;best=i;}
+        }
+        u.slot=free[best].i;free.splice(best,1);
+    }
 }
 function compact(w:SimWorld,c:Company){
     const lost=c.members.length!==c.alive;
@@ -218,7 +243,7 @@ function compact(w:SimWorld,c:Company){
 }
 export function rout(w: SimWorld, c: Company, quiet = false) {
     if (c.status === 'rout' || c.status === 'gone') return;
-    c.routs++; c.status = 'rout'; c.engaged = false; c.order = 'rally'; c.forced = -1;
+    c.contactId=-1;c.lastMelee=-9999; c.routs++; c.status = 'rout'; c.engaged = false; c.order = 'rally'; c.forced = -1;
     for (const u of c.members) { u.foe = -1; u.fireAt = -1; }
     if(!w.broken[c.faction] && c.line!==5){
         w.recentRouts=w.recentRouts.filter(r=>r.tick>=w.tick-300 && r.c!==c);
@@ -248,6 +273,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     const wooded=inWoods(c.x,c.y);
     if(wooded && !c.wooded && w.tick>30)w.say(c.name+'退入树林',c.faction,c.x,c.y,1);
     c.wooded=wooded;
+    c.engaged=w.tick-c.lastMelee<30;
     const g = w.generals[c.faction];
     const near = nearestEnemy(w, c);
     // ---- 士气 ----
@@ -265,7 +291,7 @@ export function updateCompany(w: SimWorld, c: Company) {
             c.status = 'shaken'; c.rallied++;c.rallies++; c.order = c.kind === 'cuirassier' ? 'rally' : 'hold';
             let mx = 0, my = 0; for (const u of c.members) { mx += u.x; my += u.y; }
             c.x = c.homeX = mx / c.members.length; c.y = c.homeY = my / c.members.length;
-            c.hx = c.faction ? -1 : 1; c.hy = 0; setFormation(w, c, c.kind === 'cuirassier' ? 'wedge' : 'line');
+            c.hx = c.faction ? -1 : 1; c.hy = 0; if(c.kind==='cuirassier')c.blownUntil=w.tick+450; if(c.formation!=='square')setFormation(w,c,c.kind==='cuirassier'?'wedge':'line');
             if (c.peak >= 10) w.say(`${c.name}在${g.alive ? g.title + g.name + '的' : '军官的'}喝令下重整旗鼓`, c.faction, c.x, c.y, 1);
         }
         return;
@@ -281,9 +307,16 @@ export function updateCompany(w: SimWorld, c: Company) {
     // ---- 队形 ----
     if (c.kind === 'line_infantry' || c.kind === 'guard_grenadier') {
         const sheltered = inRect(layout.farm, c.x, c.y, 20) || inWoods(c.x, c.y);
-        const cav = sheltered ? undefined : nearestEnemy(w, c, o => o.kind === 'cuirassier' && o.status !== 'rout' && o.alive > 3 && (o.order === 'charge' || o.target === c.id));
-        if (cav && cav.c && cav.d < 600) setFormation(w, c, 'square');
-        else if (c.formation === 'square' && (!cav?.c || cav.d > 720)) setFormation(w, c, 'line');
+        let threat=false;
+        for(const horse of w.companies){
+            if(horse.faction===c.faction || horse.kind!=='cuirassier' || horse.line===5 || horse.alive<4 || horse.status==='rout' || horse.status==='gone')continue;
+            const distance=dist(c,horse),previous=c.cavalryDistances.get(horse.id)??distance;
+            c.cavalryDistances.set(horse.id,distance);
+            if(distance<700)c.lastHorse=w.tick;
+            if(distance<250 || (distance<450 && previous-distance>8 && w.tick-c.leftSquare>=60))threat=true;
+        }
+        if(threat && !sheltered)setFormation(w,c,'square');
+        else if(c.formation==='square' && w.tick-c.lastHorse>=240 && w.tick-c.formedSquareAt>=900)setFormation(w,c,'line');
         else if (c.formation !== 'square') setFormation(w, c, c.order === 'advance' && d > 600 && !sheltered ? 'column' : 'line');
     }
     // ---- 移动目标 ----
@@ -301,13 +334,20 @@ export function updateCompany(w: SimWorld, c: Company) {
         }
     }
     let gx = c.homeX, gy = c.homeY;
+    const contact=(c.kind==='cuirassier'?75:55)+(t?.formation==='square'?40:0);
     const range = c.kind === 'field_cannon' ? gunRange(w) * .8 : MUSKET * .78;
+    if(c.order==='rally' && c.kind==='cuirassier')c.blownUntil=Math.max(c.blownUntil,c.contactAt+450);
     if (t && c.order === 'advance') {
         if (d > range) { const k = (d - range) / d; gx = c.x + (t.x - c.x) * k; gy = c.y + (t.y - c.y) * k; }
         else { gx = c.x; gy = c.y; }
         if (c.formation === 'square') { gx = c.x; gy = c.y; }
     } else if (t && (c.order === 'assault' || c.order === 'charge')) {
-        gx = t.x + (t.x - c.x) / Math.max(1, d) * (c.order === 'charge' ? 50 : 0); gy = t.y + (t.y - c.y) / Math.max(1, d) * (c.order === 'charge' ? 50 : 0);
+        const separation=contact-2;
+        gx=t.x-(t.x-c.x)/Math.max(1,d)*separation;
+        gy=t.y-(t.y-c.y)/Math.max(1,d)*separation;
+        if(c.order==='charge' && c.chargeOpponent===t.id && t.formation==='square' && w.tick-c.chargeAt<90){
+            gx-=(t.y-c.y)/Math.max(1,d)*15;gy+=(t.x-c.x)/Math.max(1,d)*15;
+        }
         if (c.order === 'assault' && c.formation === 'square') { gx = c.x; gy = c.y; }
     } else if (!t && (c.order === 'advance' || c.order === 'assault' || c.order === 'charge')) {
         // 雾中看不见敌人：朝敌方阵地方向摸索前进。
@@ -338,9 +378,10 @@ export function updateCompany(w: SimWorld, c: Company) {
     let delta = want - cur; while (delta > Math.PI) delta -= 2 * Math.PI; while (delta < -Math.PI) delta += 2 * Math.PI;
     const turn = cur + Math.max(-.1, Math.min(.1, delta));
     c.hx = Math.cos(turn); c.hy = Math.sin(turn);
+    if(c.order!=='charge' && c.order!=='assault')c.chargeOpponent=-1;
     if (!t) return;
     // ---- 接敌 ----
-    const contact = (c.kind === 'cuirassier' ? 75 : 55) + (t.formation === 'square' ? 40 : 0);
+
     if (c.order === 'assault' && d < 200 && w.tick - c.checkedAt > 240 && t.status !== 'rout') {
         c.checkedAt = w.tick;
         // 刺刀冲锋前的意志较量：多数白刃战在接触前就分出了胜负。
@@ -353,8 +394,8 @@ export function updateCompany(w: SimWorld, c: Company) {
             shake(c, 7);
         }
     }
-    if ((c.order === 'assault' || c.order === 'charge') && d < contact && t.status !== 'rout' && !c.engaged) {
-        c.engaged = true; t.engaged = true; c.chargeAt = w.tick;
+    if ((c.order === 'assault' || c.order === 'charge') && d < contact && t.status !== 'rout' && c.chargeOpponent!==t.id) {
+        c.chargeOpponent=t.id;c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;c.chargeAt=w.tick;
         if(c.order==='assault')c.charges++;
         
         impact(w, c, t);
@@ -362,13 +403,14 @@ export function updateCompany(w: SimWorld, c: Company) {
             c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
         }
     }
-    if (c.engaged) {
-        if (d > contact + 90 || t.status === 'gone') c.engaged = false;
-        else if ((w.tick - c.chargeAt) % 18 < 6) meleePressure(w, c, t);
-        if (c.kind === 'cuirassier' && (w.tick - c.chargeAt > 200 || t.status === 'rout' || (t.formation === 'square' && w.tick - c.chargeAt > 90))) {
-            c.engaged = false; c.order = 'rally'; c.forced = -1;
-            for (const u of c.members) u.foe = -1;
-        }
+    const opponent=w.companies[c.chargeOpponent>=0?c.chargeOpponent:c.contactId];
+    if(c.engaged && opponent && (w.tick-c.chargeAt)%18<6)meleePressure(w,c,opponent);
+    if(c.kind==='cuirassier' && c.order==='charge' && c.chargeOpponent>=0 && (w.tick-c.chargeAt>200 || opponent?.status==='gone' || opponent?.status==='rout' || (opponent?.formation==='square' && w.tick-c.chargeAt>=72))){
+        const retreatX=opponent?c.x-opponent.x:-c.hx, retreatY=opponent?c.y-opponent.y:-c.hy;
+        const length=Math.hypot(retreatX,retreatY)||1;
+        c.homeX=Math.max(80,Math.min(WIDTH-80,c.x+retreatX/length*760));c.homeY=Math.max(80,Math.min(HEIGHT-80,c.y+retreatY/length*760));
+        c.blownUntil=w.tick+450;c.engaged=false;c.contactId=-1;c.lastMelee=-9999;c.order='rally';c.forced=-1;
+        for(const u of c.members)u.foe=-1;
     }
     if (!c.engaged && (c.order === 'assault' || c.order === 'charge') && t.status === 'rout' && d < 220 && c.kind !== 'cuirassier') {
         c.order = 'hold'; c.homeX = c.x; c.homeY = c.y;
