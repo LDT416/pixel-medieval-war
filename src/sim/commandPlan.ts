@@ -67,10 +67,10 @@ export class CommandPlan {
                 const b=w.battalions[c.battalion];
                 const ord: 'hold'|'advance' = contact ? 'advance' : 'hold';
                 b.order=ord;
-                if(point && !contact){b.homeX=point.x;b.homeY=point.y;}
+                if(point && !contact){b.homeX=point.x;b.homeY=point.y;b.stoppedAt=-1;b.aligned=false;}
                 for(const id of b.companies){
                     const m=w.companies[id];
-                    if(m&&active(m)){this.assign(w,m,'reserve',ord,contact?.id??-1);this.used.add(m.id);}
+                    if(m&&active(m)){this.assign(w,m,'reserve',ord,contact?.id??-1,contact?undefined:point);this.used.add(m.id);}
                 }
                 plan.reserveAt??=w.tick;
                 w.say(w.generals[f].name+'投入'+b.name+'，增援'+names[sector],f,b.x,b.y,3);

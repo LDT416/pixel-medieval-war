@@ -40,6 +40,7 @@ export class Crowd {
     private fixedAt:number[]=[];private fixedGoalX:number[]=[];private fixedGoalY:number[]=[];
     private fixedLimit:number[]=[];private bodyHeadingX:number[]=[];private bodyHeadingY:number[]=[];
     private occupiedByUnit:boolean[]=[];
+    private restCheckedAt:number[]=[];
     private nearWall:Uint8Array=new Uint8Array();
     reset(l:Layout){
         this.layout=l;this.columns=Math.ceil(l.width/CELL)+2;
@@ -47,7 +48,7 @@ export class Crowd {
         this.nearWall=new Uint8Array(this.changed.length);this.clock=0;
         this.fixedAt=[];this.fixedGoalX=[];this.fixedGoalY=[];this.fixedLimit=[];this.blockers=[];
         this.bodyVersion=[];this.solvedAt=[];this.witnessMask=[];
-        this.bodyHeadingX=[];this.bodyHeadingY=[];this.occupiedByUnit=[];
+        this.bodyHeadingX=[];this.bodyHeadingY=[];this.occupiedByUnit=[];this.restCheckedAt=[];
         this.slide=[];this.bins=new Array(this.changed.length);this.diagnostics=new Array(this.changed.length);
         this.occupied=[];this.lastX=[];this.lastY=[];this.scenery=new Array(this.changed.length);this.nearby.length=0;
         const add=(o:Obstacle)=>{
@@ -139,15 +140,9 @@ export class Crowd {
         if(Math.abs(x-this.nearX)>this.nearPad || Math.abs(y-this.nearY)>this.nearPad)
             return this.clearance(w,u,x,y);
         let best=1;
-        const radius=u.body.a+11.5;
         for(const v of this.nearby){
             const dx=x-this.lastX[v.id],dy=y-this.lastY[v.id],limit=u.body.a+v.body.a,d2=dx*dx+dy*dy;
             if(d2>=limit*limit)continue;
-            // The legacy search spans cells out to a+11.5. A 14px gun can straddle that cutoff.
-            if(v.body.a>11.5 && (Math.floor(this.lastX[v.id]/CELL)<Math.floor((x-radius)/CELL) ||
-                Math.floor(this.lastX[v.id]/CELL)>Math.floor((x+radius)/CELL) ||
-                Math.floor(this.lastY[v.id]/CELL)<Math.floor((y-radius)/CELL) ||
-                Math.floor(this.lastY[v.id]/CELL)>Math.floor((y+radius)/CELL)))continue;
             const d=Math.sqrt(d2);
             if(u.body.a===u.body.b && v.body.a===v.body.b){best=Math.min(best,d-limit);continue;}
             const nx=d?dx/d:1,ny=d?dy/d:0;
@@ -162,15 +157,10 @@ export class Crowd {
         if(v && v.hp>0){
             const dx=x-this.lastX[v.id],dy=y-this.lastY[v.id],d2=dx*dx+dy*dy,limit=u.body.a+v.body.a;
             if(d2<limit*limit){
-                const d=Math.sqrt(d2),radius=u.body.a+11.5;
-                if(v.body.a<=11.5 || (Math.floor(this.lastX[v.id]/CELL)>=Math.floor((x-radius)/CELL) &&
-                    Math.floor(this.lastX[v.id]/CELL)<=Math.floor((x+radius)/CELL) &&
-                    Math.floor(this.lastY[v.id]/CELL)>=Math.floor((y-radius)/CELL) &&
-                    Math.floor(this.lastY[v.id]/CELL)<=Math.floor((y+radius)/CELL))){
-                    if(u.body.a===u.body.b && v.body.a===v.body.b && d<limit)return true;
-                    const nx=d?dx/d:1,ny=d?dy/d:0;
-                    if(d-extent(u,w.companies[u.company],nx,ny)-extent(v,w.companies[v.company],nx,ny)<0)return true;
-                }
+                const d=Math.sqrt(d2);
+                if(u.body.a===u.body.b && v.body.a===v.body.b)return true;
+                const nx=d?dx/d:1,ny=d?dy/d:0;
+                if(d<extent(u,w.companies[u.company],nx,ny)+extent(v,w.companies[v.company],nx,ny))return true;
             }
         }
         if(this.clearance(w,u,x,y,true,key)<0)return true;
@@ -187,7 +177,7 @@ export class Crowd {
         return true;
     }
     private clearance(w:SimWorld,u:Soldier,x:number,y:number,blockedOnly=false,cacheKey=-1){
-        const ua=u.body.a,ub=u.body.b,radius=ua+11.5;
+        const ua=u.body.a,ub=u.body.b,radius=ua+shapes.gun.a;
         let clearance=1;
         const rows=Math.floor((y+radius)/CELL),cols=Math.floor((x+radius)/CELL);
         for(let j=Math.floor((y-radius)/CELL);j<=rows;j++)for(let i=Math.floor((x-radius)/CELL);i<=cols;i++){
@@ -210,6 +200,37 @@ export class Crowd {
             }
         }
         return clearance;
+    }
+    // Rotating footprints can overlap without either center moving. Split the
+    // correction by the pair's relative mobility, including fixed obstacles.
+    private separate(w:SimWorld,u:Soldier,c:Company,nearWall:boolean){
+        const x=u.x,y=u.y;
+        this.gather(u,x,y,MAX_PUSH);
+        let deepest=0,otherWeight=0,normalX=0,normalY=0;
+        for(const v of this.nearby){
+            const dx=x-this.lastX[v.id],dy=y-this.lastY[v.id],d=Math.hypot(dx,dy);
+            if(d>=u.body.a+v.body.a)continue;
+            const nx=d?dx/d:(u.id<v.id?-1:1),ny=d?dy/d:0,other=w.companies[v.company];
+            const depth=extent(u,c,nx,ny)+extent(v,other,nx,ny)-d;
+            if(depth<=deepest)continue;
+            deepest=depth;otherWeight=weight(v,other);normalX=nx;normalY=ny;
+        }
+        if(!deepest)return;
+        const own=weight(u,c),step=Math.min(MAX_PUSH,deepest*own/(own+otherWeight));
+        const kx=this.localClearance(w,u,x+.2,y)-this.localClearance(w,u,x-.2,y);
+        const ky=this.localClearance(w,u,x,y+.2)-this.localClearance(w,u,x,y-.2);
+        const length=Math.hypot(kx,ky);
+        let best=-deepest,bx=x,by=y;
+        // In a symmetric pocket the gradient can vanish. The two tangent
+        // directions give the center a way out from between its neighbours.
+        for(let i=0;i<4;i++){
+            const dx=i===0&&length?kx/length:i<2?normalX:i===2?-normalY:normalY;
+            const dy=i===0&&length?ky/length:i<2?normalY:i===2?normalX:-normalX;
+            u.x=x+step*dx;u.y=y+step*dy;if(nearWall)this.walls(u,c);
+            const clearance=this.localClearance(w,u,u.x,u.y);
+            if(clearance>best){best=clearance;bx=u.x;by=u.y;if(i===0 || best>=0)break;}
+        }
+        u.x=bx;u.y=by;
     }
     private anchor(w:SimWorld,u:Soldier){
         const x=u.x,y=u.y;
@@ -255,13 +276,17 @@ export class Crowd {
             u.x=x;u.y=y;
             // 部署路径是动画的理想位置；排队时也只能按本地步态追赶。
             const parked=w.tick>w.deployEnd && u.body===shapes.gun && !c.limbered && c.status!=='rout';
-            if(parked || (!dx && !dy && u.body.a===u.body.b)){
+            const stamp=this.changed[k];
+            // Turning an elongated neighbour can reach into a stationary walker's footprint.
+            // Recheck after local geometry changes, even when the walker has reached its slot.
+            const resting=!dx && !dy && u.body.a===u.body.b;
+            if(parked || (resting && (this.restCheckedAt[u.id]===stamp || this.clearance(w,u,x,y,true)>=0))){
+                if(resting)this.restCheckedAt[u.id]=stamp;
                 if(u.moving)u.stride-=Math.hypot(dx,dy);
                 if(parked)u.moving=false;
                 u.px=x;u.py=y;u.vx=0;u.vy=0;continue;
             }
             const maxStep=(c.sprintUntil>w.tick?235:Math.max(114,u.speed))*1.05/30;
-            const stamp=this.changed[k];
             if(this.fixedGoalX[u.id]===goalX && this.fixedGoalY[u.id]===goalY &&
                 this.fixedLimit[u.id]===maxStep && (this.fixedAt[u.id]===stamp ||
                 (this.witnessesUnchanged(u.id) && this.clearance(w,u,x,y,true)>=0))){
@@ -269,7 +294,7 @@ export class Crowd {
                 u.px=x;u.py=y;u.vx=0;u.vy=0;continue;
             }
             this.rejected=0;
-            let clearRest=false;
+            let clearRest=true;
             const oldSlide=this.slide[u.id];
             const distance=Math.hypot(dx,dy);
             const t=Math.min(1,maxStep/(distance||1));
@@ -302,13 +327,7 @@ export class Crowd {
                         u.x=bestX;u.y=bestY;
                     }
                 }
-                if(best<0 && weight(u,c)){
-                    // 转身会改变椭圆轮廓。只修复残余穿插，限制本帧修正距离。
-                    const kx=this.localClearance(w,u,u.x+.2,u.y)-this.localClearance(w,u,u.x-.2,u.y);
-                    const ky=this.localClearance(w,u,u.x,u.y+.2)-this.localClearance(w,u,u.x,u.y-.2);
-                    const length=Math.hypot(kx,ky)||1,step=Math.min(MAX_PUSH,-best*.5)*weight(u,c);
-                    u.x+=step*kx/length;u.y+=step*ky/length;if(nearWall)this.walls(u,c);
-                }
+                if(best<0 && weight(u,c))this.separate(w,u,c,nearWall);
             }
             u.x=Math.max(2,Math.min(this.layout.width-2,u.x));u.y=Math.max(2,Math.min(this.layout.height-2,u.y));
             if(this.key(u.x,u.y)!==k){const list=this.bins[k];list.splice(list.indexOf(u),1);this.insert(u);}
@@ -318,7 +337,7 @@ export class Crowd {
                 const dest=this.key(u.x,u.y);if(dest!==k)this.invalidate(dest);
                 this.bodyVersion[u.id]=this.clock;
                 this.fixedAt[u.id]=-1;this.witnessMask[u.id]=0;
-            }else if(!this.nearWall[k] && oldSlide===this.slide[u.id] && maxStep*1.1+2*shapes.gun.a+1<CELL && u.body!==shapes.gun){
+            }else if(clearRest && !this.nearWall[k] && oldSlide===this.slide[u.id] && maxStep*1.1+2*shapes.gun.a+1<CELL && u.body!==shapes.gun){
                 this.fixedAt[u.id]=stamp;
                 this.fixedGoalX[u.id]=goalX;this.fixedGoalY[u.id]=goalY;this.fixedLimit[u.id]=maxStep;
                 this.solvedAt[u.id]=this.clock;this.witnessMask[u.id]=clearRest?this.rejected:0;

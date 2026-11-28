@@ -464,7 +464,11 @@ export function updateBattalions(w: SimWorld) {
                 const c = comps[i];
                 c.battalionSlot = i;
                 const ex = b.x + tx * offsets[i], ey = b.y + ty * offsets[i];
-                const lag = Math.hypot(c.x - ex, c.y - ey);
+                // Companies with their own parking bay take a separate path on the final approach.
+                const parking = c.objectiveParking;
+                const separate = parking && (b.order==='hold'||b.order==='reserve') &&
+                    parking.battalionX===b.homeX && parking.battalionY===b.homeY && !w.logistics.isCommitted(c);
+                const lag = separate ? 0 : Math.hypot(c.x - ex, c.y - ey);
                 if (lag > maxLag) maxLag = lag;
                 let sp = c.assaultStage === 'rush' ? PACE.footRush : b.closing ? c.speed * 1.25 : c.speed;
                 if (c.formation === 'square') sp *= 0.55;
@@ -472,12 +476,19 @@ export function updateBattalions(w: SimWorld) {
                 if (c.formUntil > w.tick && c.formation !== 'column') sp *= 0.35;
                 if (sp < minSpeed) minSpeed = sp;
             }
-            const gd = Math.hypot(b.gx - b.x, b.gy - b.y);
-            if (gd > 2 && !anySquare && !anyEngaged && maxLag < 130) {
+            const waiting = w.marchCohesion.shouldWait(w,b,comps,offsets);
+            const transit = b.order === 'hold' || b.order === 'reserve' || b.order === 'rally' || (b.order === 'advance' && !tPos);
+            let stepX = b.gx, stepY = b.gy;
+            if (transit && !anySquare && !anyEngaged && !waiting && Math.hypot(stepX-b.x,stepY-b.y)>2) {
+                const next=w.marchRoutes.waypoint(b.id,b.x,b.y,stepX,stepY,w.tick,w.companies,b.faction);
+                if (next) { stepX=next.x; stepY=next.y; }
+            }
+            const gd = Math.hypot(stepX - b.x, stepY - b.y);
+            if (gd > 2 && !anySquare && !anyEngaged && !waiting && maxLag < 130) {
                 const damp = maxLag > 75 ? Math.max(0.45, (130 - maxLag) / 55) : 1;
                 const step = Math.min(gd, minSpeed * damp * 6 / 30);
-                b.x = Math.max(120, Math.min(WIDTH - 120, b.x + (b.gx - b.x) / gd * step));
-                b.y = Math.max(120, Math.min(HEIGHT - 120, b.y + (b.gy - b.y) / gd * step));
+                b.x = Math.max(120, Math.min(WIDTH - 120, b.x + (stepX - b.x) / gd * step));
+                b.y = Math.max(120, Math.min(HEIGHT - 120, b.y + (stepY - b.y) / gd * step));
             } else if (anyEngaged) {
                 // 白刃中营中心跟随存活连质心
                 b.x = comps.reduce((s, c) => s + c.x, 0) / comps.length;
@@ -492,6 +503,14 @@ export function updateBattalions(w: SimWorld) {
                 const c = comps[i];
                 if (w.logistics.isCommitted(c)) continue;
                 c.order = b.order;
+                const parking=c.objectiveParking;
+                if(parking){
+                    if((b.order==='hold'||b.order==='reserve') && b.homeX===parking.battalionX && b.homeY===parking.battalionY){
+                        c.homeX=parking.x;c.homeY=parking.y;
+                        continue;
+                    }
+                    c.objectiveParking=undefined;
+                }
                 if (b.order === 'assault') {
                     if (picked.company && c.forced < 0) c.forced = picked.company.id;
                 }
@@ -516,8 +535,9 @@ export function updateBattalions(w: SimWorld) {
             if (b.stoppedAt >= 0 && !b.aligned) {
                 const allLine = comps.every(c => c.formation === 'line' && c.formUntil <= w.tick);
                 const cont = measureBattalionContinuity(w, b);
+                const atBays=comps.every(c=>!c.objectiveParking || Math.hypot(c.x-c.homeX,c.y-c.homeY)<24);
                 const alignedNow = allLine && (cont.total === 0 || cont.ok === cont.total) && maxLag < 24;
-                if (alignedNow || w.tick - b.stoppedAt >= 60) {
+                if (atBays && (alignedNow || w.tick - b.stoppedAt >= 60)) {
                     b.aligned = true;
                 }
             }

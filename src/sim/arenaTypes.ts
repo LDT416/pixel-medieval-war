@@ -30,6 +30,7 @@ export interface Soldier {
     px:number; py:number; turnFrames:number; marchUntil:number; staff:boolean; officer:boolean; diedAt:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
+    objectiveParking?:import('./objectivePassage').ObjectiveParking;
     slotGeometry?:{formation:Formation;files:number;capacity:number;offsets:[number,number][]};
     variant:import("./units/roster").Variant|null;
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;

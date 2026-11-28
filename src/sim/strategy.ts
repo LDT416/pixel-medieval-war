@@ -8,6 +8,7 @@ import { diamondSlotOffset, stepCavalryCompany, cavalrySpeedMult } from './caval
 import {formationTicks,setupTicks} from './units/roster';
 import {unitTypes} from './units/unitTypes';
 import {PACE} from './scale';
+import {parkingAtHome} from './objectivePassage';
 
 const SPACING: Record<Formation, [number, number]> = {
     line: [13, 15], column: [13, 14], square: [13, 13], battery: [62, 0], wedge: [25, 32], staff: [22, 18], skirmish: [34, 34], diamond: [22, 26]
@@ -47,15 +48,16 @@ function courtyard(c:Company,slot:number){
         c.y+((slot%cols-3)*9+8)*facing];
 }
 /** 按当前队形把全连士兵直接摆到位（开局与援军入场时使用）。 */
-export function formUp(c: Company) {
+export function formUp(c: Company, parkingAllowed = true) {
     c.files = filesFor(c, c.members.length);
     c.capacity=c.members.length;
+    const parking=parkingAllowed ? parkingAtHome(c) : undefined;
     c.members.forEach((u, i) => {
         u.slot = i;
-        const [lat, dep] = slotOffset(c,i);
+        const [lat, dep] = parking?.offsets[i] ?? slotOffset(c,i);
         u.x = Math.min(WIDTH - 3, Math.max(3, c.x - lat * c.hy - dep * c.hx + u.jx));
         u.y = Math.min(HEIGHT - 3, Math.max(3, c.y + lat * c.hx - dep * c.hy + u.jy));
-        if(c.line===6 && layout.farm)[u.x,u.y]=courtyard(c,i);
+        if(!parking && c.line===6 && layout.farm)[u.x,u.y]=courtyard(c,i);
         u.px=u.x; u.py=u.y;
     });
 }
@@ -138,10 +140,11 @@ export function advance(w: SimWorld, u: Soldier) {
     if(!geometry || geometry.formation!==c.formation || geometry.files!==c.files || geometry.capacity!==c.capacity){
         geometry=c.slotGeometry={formation:c.formation,files:c.files,capacity:c.capacity,offsets:[]};
     }
-    const offset=geometry.offsets[u.slot] ?? (geometry.offsets[u.slot]=slotOffset(c,u.slot));
+    const parking=c.objectiveParking && parkingAtHome(c);
+    const offset=parking?.offsets[u.slot] ?? geometry.offsets[u.slot] ?? (geometry.offsets[u.slot]=slotOffset(c,u.slot));
     const lat=offset[0],dep=offset[1];
     let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
-    if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
+    if(!parking && c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
     
     const inBatLine = c.battalion >= 0 && c.battalionSlot >= 0 && !w.logistics.isCommitted(c);
     const batClosing = inBatLine && !!w.battalions[c.battalion]?.closing;
@@ -298,6 +301,8 @@ export function rout(w: SimWorld, c: Company, quiet = false) {
 /** 连队大脑，每 6 帧轮询一次：士气、目标、队形、移动、开火。 */
 export function updateCompany(w: SimWorld, c: Company) {
     if (c.status === 'gone') return;
+    const reserved=c.objectiveParking;
+    if(reserved && (c.order!=='hold' && c.order!=='reserve' || c.homeX!==reserved.x || c.homeY!==reserved.y))c.objectiveParking=undefined;
     c.smoke=Math.max(0,c.smoke-(w.weather==="fog"?.012:.024));
     c.vx=c.vy=0; compact(w,c);
     if (c.alive <= 0) { c.status = 'gone'; c.engaged = false; return; }
@@ -443,11 +448,17 @@ export function updateCompany(w: SimWorld, c: Company) {
         const e = nearestEnemy(w, c).c;
         gx = c.x + (e ? Math.sign(e.x - c.x) : c.faction ? -1 : 1) * 160; gy = e ? c.y + Math.sign(e.y - c.y) * 40 : c.y;
     } else if (c.order === 'rally' && dist(c, { x: c.homeX, y: c.homeY }) < 40 && c.morale > 55) c.order = 'hold';
+    const parking=c.objectiveParking && parkingAtHome(c);
+    if ((c.battalion < 0 || parking) && !c.engaged && !cavStep && !isArtillery(c) &&
+        (c.order === 'hold' || c.order === 'reserve' || c.order === 'rally') && Math.hypot(gx-c.x,gy-c.y)>2) {
+        const next=w.marchRoutes.waypoint(~c.id,c.x,c.y,gx,gy,w.tick,w.companies,c.faction);
+        if (next) { gx=next.x; gy=next.y; }
+    }
     if(c.order!=='charge' && c.assaultStage!=='rush' && c.formation!=='skirmish' && Math.hypot(gx-c.x,gy-c.y)>80){
         const len=Math.hypot(gx-c.x,gy-c.y),dx=(gx-c.x)/len,dy=(gy-c.y)/len;
         for(const other of w.companies){
             if(other===c || other.faction!==c.faction || !other.alive || other.status==='rout')continue;
-            if(c.battalion>=0 && other.battalion===c.battalion)continue;
+            if(!parking && c.battalion>=0 && other.battalion===c.battalion)continue;
             const rx=other.x-c.x,ry=other.y-c.y,ahead=rx*dx+ry*dy,side=rx*dy-ry*dx;
             const width=Math.min(110,(c.files+other.files)*4+16);
             if(ahead<4 || ahead>120 || Math.abs(side)>=width)continue;
@@ -463,7 +474,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     // The anchor is at the front rank. Compare the group with its expected centroid.
     let sx=0,sy=0;
     for(const u of c.members){
-        const [lat,depth]=slotOffset(c,u.slot);
+        const [lat,depth]=parking?.offsets[u.slot] ?? slotOffset(c,u.slot);
         sx-=lat*c.hy+depth*c.hx;sy+=lat*c.hx-depth*c.hy;
     }
     lag = Math.hypot(mx-c.x-sx/c.members.length,my-c.y-sy/c.members.length);

@@ -7,6 +7,8 @@ import {BoardSight} from './boardSight';
 import {Ballistics} from './projectiles';
 import {Earthworks} from './emplacements';
 import {Crowd} from './crowd';
+import {MarchCohesion} from './marchCohesion';
+import {MarchRoutes} from './marchRoutes';
 import { SpatialHash } from './spatialHash';
 import { Director } from './aiDirector';
 import { LegacyDirector } from './legacyDirector';
@@ -57,6 +59,8 @@ export class SimWorld {
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
     winner: Faction | null = null; endTick = -1; ended = false; reason = '';
     sight=new BoardSight();
+    readonly marchCohesion=new MarchCohesion();
+    marchRoutes!:MarchRoutes;
     ballistics=new Ballistics();
     /** 炮兵阵地的土胸墙。 */
     earthworks=new Earthworks();
@@ -88,6 +92,8 @@ export class SimWorld {
         if (this.posture[0] === 'defend' && this.posture[1] === 'defend') this.posture[this.rng.int(0, 1)] = 'attack';
         const defender: Faction | -1 = this.posture[0] === 'defend' ? 0 : this.posture[1] === 'defend' ? 1 : -1;
         this.layout = createCampaignLayout(this.rng, defender); setLayout(this.layout);this.crowd.reset(this.layout);
+        this.marchRoutes=new MarchRoutes(this.layout);
+        this.marchCohesion.reset();
         for (const f of [0, 1] as const) this.deploy(f, scale / 2);
         this.reinforcement = null;
         if (this.rng.next() < .42) {

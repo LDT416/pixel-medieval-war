@@ -1,6 +1,7 @@
 import {artillery as isArtillery} from './units/abilities';
 import type {Faction} from './arenaTypes';
 import type {SimWorld} from './world';
+import {objectiveClaimRadius} from './objectivePassage';
 
 const SECOND=30;
 export const CAPTURE_TICKS=45*SECOND, MAJORITY_TICKS=120*SECOND, MAJORITY_FROM=600*SECOND;
@@ -14,7 +15,7 @@ export class CampaignObjectives {
     update(w:SimWorld){
         const {objectives,farm}=w.layout;
         for(const p of objectives){
-            const radius=p.kind==='ridge'?230:p.kind==='bridge'?135:158;
+            const radius=objectiveClaimRadius[p.kind];
             const nearby=w.companies.filter(c=>c.line!==5&&!isArtillery(c)&&c.status!=='gone'&&c.status!=='rout'&&c.alive>0&&
                 (c.x-p.x)**2+(c.y-p.y)**2<radius*radius);
             const present=[nearby.some(c=>c.faction===0),nearby.some(c=>c.faction===1)];

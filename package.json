@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:movement": "node tests/march-routes.mjs && node tests/march-cohesion.mjs && node tests/objective-passage.mjs && node tests/march-replay.mjs",
     "test": "node tests/phase2.mjs && node tests/pace-probe.mjs && node tests/crowd-probe.mjs && node tests/scenarios/crowd.mjs && node tests/tracer-geometry.mjs && node tests/ballistics-probe.mjs && node tests/scenarios/roster-support.mjs && node tests/logistics.mjs && node tests/scenarios/visibility.mjs && node tests/scenarios/handover.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

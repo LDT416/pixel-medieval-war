@@ -1,4 +1,5 @@
 import {travelFatigue,restRecovery} from './units/roster';
+import {reserveObjectiveStop} from './objectivePassage';
 import {supportOptions} from './units/support';
 import {guard as isGuard, lineTroop as isLineTroop, mounted as isMounted, standard as isStandard} from './units/abilities';
 import type {Company,Faction,Order} from './arenaTypes';
@@ -149,7 +150,14 @@ export class CampaignLogistics{
             if(distance(c,w.companies[pending[0]])>105){pending[1].retireSent=-1;return;}
         }
         c.order=m.order;c.forced=m.target;
-        if(m.point){c.homeX=m.point.x;c.homeY=m.point.y;}
+        const point=m.point;
+        const site=point && m.order==='hold' && m.target<0 && !m.relief && !m.returning && rifle(c)
+            ? w.layout.objectives.find(p=>p.x===point.x && p.y===point.y) : undefined;
+        if(!site || c.objectiveParking?.site!==site.id)c.objectiveParking=undefined;
+        if(point){
+            const home=site ? reserveObjectiveStop(w,c,site,c)??c : point;
+            c.homeX=home.x;c.homeY=home.y;
+        }
         if(m.order==='assault'||m.order==='charge')c.chargeAt=w.tick;
         if(m.returning){
             c.line=1;this.resting.set(c.id,w.tick);

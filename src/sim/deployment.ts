@@ -6,6 +6,7 @@ import {Rng} from './rng';
 import {formUp} from './strategy';
 import {battalionOffsets, companyHalfWidth} from './battalion';
 import type {Point} from './types';
+import {blocksObjectivePassage,reserveObjectiveStop} from './objectivePassage';
 import type {SimWorld} from './world';
 
 type Role='front'|'reserve'|'battery'|'horse'|'staff'|'garrison'|'woods';
@@ -52,6 +53,15 @@ function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Object
     const frontX=(y:number)=>attacking?l.width/2-face*l.lineGap:l.ridgeX+Math.sin(y*.0016+l.seed)*80-face*112;
     function add(c:Company,x:number,y:number,role:Role,formation:Formation,objective?:Objective){
         x=clamp(x,150,l.width-150);y=clamp(y,160,l.height-160);
+        if (!legacy && foot(c) && formation==='line') {
+            const files=Math.ceil(c.members.length/c.ranks);
+            const clearance=Math.hypot((files-1)*6.5,(c.ranks-1)*15)+11;
+            const site=objective ?? l.objectives.find(p=>blocksObjectivePassage(l,p,{x,y},clearance));
+            if(site){
+                const stop=reserveObjectiveStop(w,c,site,{x:f?l.width:0,y});
+                x=stop?.x??c.x; y=stop?.y??c.y;
+            }
+        }
         plan.destinations.push({company:c.id,x,y,sector:sectorOf(y,l),role,formation,...(objective?{objectiveId:objective.id}:{})});
         if(role==='reserve')plan.reserve.push(c.id);
     }
@@ -201,8 +211,31 @@ function routePoints(f:Faction,index:number,d:Destination,l:Layout){
     }
     rounded.push(d);return rounded;
 }
-function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Route{
-    const c=w.companies[d.company],f=c.faction,face=f?-1:1,points=routePoints(f,i,d,w.layout);
+type MarchTraffic=Pick<Company,'id'|'faction'|'alive'|'status'|'x'|'y'>;
+function openingStart(w:DeploymentWorld,d:Destination,i:number):MarchTraffic {
+    const c=w.companies[d.company],f=c.faction;
+    const end=w.deployEnd??1350,delay=(i%8)*15,stop=end-(i%5)*11;
+    // The opening camera shows only the last few seconds of the trip. Plan that visible
+    // stretch from its original starting point, keeping the simulation clock and destination.
+    const approach=routePoints(f,i,d,w.layout);
+    const budget=(stop-delay)*(isMounted(c)?PACE.horseTrot:c.speed)/30;
+    let start=approach[0],remaining=budget;
+    for(let j=approach.length-1;j>0;j--){
+        const a=approach[j-1],b=approach[j],length=dist(a,b);
+        if(length>remaining){
+            start={x:b.x+(a.x-b.x)*remaining/length,y:b.y+(a.y-b.y)*remaining/length};
+            break;
+        }
+        remaining-=length;
+    }
+    return {...start,id:c.id,faction:f,alive:c.alive,status:c.status};
+}
+function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean,start:MarchTraffic,traffic:MarchTraffic[]):Route{
+    const c=w.companies[d.company],f=c.faction,face=f?-1:1;
+    const delay=(i%8)*15,stop=(w.deployEnd??1350)-(i%5)*11;
+    const path=w.marchRoutes.path(start.x,start.y,d.x,d.y,traffic,f,c.id);
+    // A disconnected destination is staged in place. Never interpolate across a blocked edge.
+    const points=path.length?[start,...path]:[d,d];
     const cumulative=[0];for(let j=1;j<points.length;j++)cumulative[j]=cumulative[j-1]+dist(points[j],points[j-1]);
     c.homeX=c.x=d.x;c.homeY=c.y=d.y;c.hx=face;c.hy=0;c.sector=d.sector;c.initialFront=c.homeX+face*170;
     if(!legacy){
@@ -221,10 +254,9 @@ function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Rou
     c.formation=d.formation;formUp(c);
     const station=new Float32Array(c.members.length*2),march=new Float32Array(station.length);
     for(const [k,u] of c.members.entries()){station[2*k]=u.x-d.x;station[2*k+1]=u.y-d.y;}
-    const finalLine=c.line;c.line=0;c.formation=isArtillery(c)?'battery':finalLine===5?'staff':'column';formUp(c);c.line=finalLine;
+    const finalLine=c.line;c.line=0;c.formation=isArtillery(c)?'battery':finalLine===5?'staff':'column';formUp(c,false);c.line=finalLine;
     for(const [k,u] of c.members.entries()){march[2*k]=(u.x-d.x)*face;march[2*k+1]=(u.y-d.y)*face;}
-    const end=w.deployEnd??1350;
-    return {c,d,points,cumulative,length:cumulative[cumulative.length-1],delay:(i%8)*15,stop:end-(i%5)*11,march,station,finished:false};
+    return {c,d,points,cumulative,length:cumulative[cumulative.length-1],delay,stop,march,station,finished:false};
 }
 /** 保持炮兵连 4～6 门炮编制完整，不拆成 1 门孤炮。 */
 function detachBridgeGuns(_w:DeploymentWorld){
@@ -233,7 +265,10 @@ function detachBridgeGuns(_w:DeploymentWorld){
 export function prepareDeployment(w:DeploymentWorld):[BattlePlan,BattlePlan]{
     const bridgeGuns=detachBridgeGuns(w);
     const plans=([0,1] as const).map(f=>planSide(w,f,new Rng(w.seed^(f?0x61726368:0x706c616e)),bridgeGuns)) as [BattlePlan,BattlePlan];
-    routes.set(w,plans.flatMap(p=>p.destinations.map((d,i)=>setupRoute(w,d,i,p.legacy))));
+    routes.set(w,plans.flatMap(p=>{
+        const traffic=p.destinations.map((d,i)=>openingStart(w,d,i));
+        return p.destinations.map((d,i)=>setupRoute(w,d,i,p.legacy,traffic[i],traffic));
+    }));
     marchDeployment(w);
     for(const p of plans){
         const guns=p.destinations.filter(d=>d.role==='battery'&&d.sector===p.mainEffort).reduce((s,d)=>s+w.companies[d.company].alive,0);
@@ -246,7 +281,8 @@ export function marchDeployment(w:DeploymentWorld){
     const active=routes.get(w);if(!active)return;
     for(const route of active){
         if(route.finished)continue;
-        const {c,d,points,march,station}=route,t=clamp((w.tick-route.delay)/(route.stop-route.delay),0,1);
+        const {c,d,points,march,station}=route;
+        const t=route.length===0?1:clamp((w.tick-route.delay)/(route.stop-route.delay),0,1);
         // 镜头从进场路线末段开始，按兵种步态走完部署路程。
         const speed=isMounted(c)?PACE.horseTrot:c.speed;
         const shown=Math.min(route.length,(route.stop-route.delay)*speed/30);

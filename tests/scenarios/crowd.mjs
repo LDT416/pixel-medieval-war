@@ -53,3 +53,49 @@ for(let n=1;n<=64;n++){
     }
 }
 console.log('Square layout: 1–64 members, minimum spacing 13px.');
+
+// The longer axis of a turning neighbour can enter an already parked walker's space.
+const turning=new SimWorld(1200,42);
+const walker=turning.units.find(u=>u.kind==='line_infantry');
+const mount=turning.units.find(u=>u.kind==='cuirassier' && !u.staff);
+const parked=turning.units.find(u=>u.kind==='field_cannon');
+const group=turning.companies[mount.company];
+turning.units=[walker,mount];
+turning.crowd.reset({...turning.layout,woods:[],farms:[]});
+Object.assign(group,{hx:0,hy:1});
+Object.assign(walker,{x:512,y:600});
+Object.assign(mount,{x:500,y:600});
+turning.crowd.step(turning);
+assert.equal(turning.crowd.overlaps(turning),0);
+Object.assign(group,{hx:1,hy:0});
+for(let n=0;n<5;n++){ turning.tick++;turning.crowd.step(turning); }
+assert.ok(walker.x>512,'parked walker makes room for the turning footprint');
+assert.equal(turning.crowd.overlaps(turning),0);
+
+// Two equal heavy footprints share the correction after turning from narrow to broad.
+const horses=turning.companies.filter(c=>c.kind==='cuirassier' && c.line!==5).slice(0,2);
+const mounts=horses.map(c=>c.members.find(u=>u.body.a!==u.body.b));
+turning.units=mounts;
+turning.crowd.reset({...turning.layout,woods:[],farms:[]});
+horses.forEach(c=>Object.assign(c,{hx:0,hy:1}));
+mounts.forEach((u,i)=>Object.assign(u,{x:640+12*i,y:700}));
+turning.crowd.step(turning);
+assert.equal(turning.crowd.overlaps(turning),0);
+horses.forEach(c=>Object.assign(c,{hx:1,hy:0}));
+assert.equal(turning.crowd.overlaps(turning),1);
+for(let n=0;n<4;n++){turning.tick++;turning.crowd.step(turning);}
+assert.equal(turning.crowd.overlaps(turning),0,'equal-mass mounts resolve a turn in four ticks');
+assert.ok(mounts[0].x<639 && mounts[1].x>653,'both movable bodies contribute');
+
+// A parked 14px footprint can reach across a bin boundary beyond the old 11.5px search radius.
+turning.units=[parked,walker];
+turning.crowd.reset({...turning.layout,woods:[],farms:[]});
+turning.companies[parked.company].limbered=false;
+turning.tick=turning.deployEnd+1;
+Object.assign(parked,{x:520.1,y:720});
+Object.assign(walker,{x:501,y:720});
+turning.crowd.step(turning);
+turning.tick++;walker.x=503.8;turning.crowd.step(turning);
+assert.ok(Math.hypot(walker.x-parked.x,walker.y-parked.y)>=walker.body.a+parked.body.a-1e-6,'the next bin is within the actual contact radius');
+assert.equal(parked.x,520.1);
+console.log('Turned and adjacent-bin footprints resolved.');
