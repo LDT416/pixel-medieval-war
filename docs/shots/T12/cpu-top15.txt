@@ -1,0 +1,17 @@
+Node --cpu-prof; sampled self time = sum(timeDeltas) for each leaf function and source location.
+rank | function | location | self ms | % of all sampled wall time
+1 | clearance | src/sim/crowd.ts (bundle line 905) | 42461.8 | 40.14
+2 | step | src/sim/crowd.ts (bundle line 940) | 23167.0 | 21.90
+3 | step | src/sim/world.ts (bundle line 3234) | 8931.8 | 8.44
+4 | advance | src/sim/strategy.ts (bundle line 1646) | 6148.5 | 5.81
+5 | walls | src/sim/crowd.ts (bundle line 837) | 5949.0 | 5.62
+6 | meleeStep | src/sim/strategy.ts (bundle line 1595) | 3900.0 | 3.69
+7 | rebuild | src/sim/spatialHash.ts (bundle line 1058) | 3784.8 | 3.58
+8 | updateCompany | src/sim/strategy.ts (bundle line 1832) | 2155.5 | 2.04
+9 | slotOffset | src/sim/strategy.ts (bundle line 1517) | 1516.2 | 1.43
+10 | moveToward | src/sim/strategy.ts (bundle line 1550) | 1267.9 | 1.20
+11 | dist | src/sim/combat.ts (bundle line 238) | 1060.3 | 1.00
+12 | (garbage collector) | V8 | 773.1 | 0.73
+13 | nearestEnemy | src/sim/strategy.ts (bundle line 1678) | 631.3 | 0.60
+14 | pickTarget | src/sim/strategy.ts (bundle line 1690) | 564.0 | 0.53
+15 | step | src/sim/campaignLogistics.ts (bundle line 2738) | 377.4 | 0.36

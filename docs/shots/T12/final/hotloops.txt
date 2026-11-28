@@ -1,0 +1,5 @@
+src/sim/combat.ts volley | rg -n \.(filter|map|sort)\s*\(|=>|\.\.\. | exit 1 | 0 matches
+src/sim/combat.ts shoot | rg -n \.(filter|map|sort)\s*\(|=>|\.\.\. | exit 1 | 0 matches
+src/sim/strategy.ts advance | rg -n \.(filter|map|sort)\s*\(|=>|\.\.\. | exit 1 | 0 matches
+src/sim/strategy.ts meleeStep | rg -n \.(filter|map|sort)\s*\(|=>|\.\.\. | exit 1 | 0 matches
+src/sim/crowd.ts step | rg -n \.(filter|map|sort)\s*\(|=>|\.\.\. | exit 1 | 0 matches

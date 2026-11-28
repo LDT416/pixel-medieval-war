@@ -1,0 +1,4 @@
+{"scale":2400,"seed":7919,"units":2400,"tick":36210,"winner":0,"sha256":"4ff933829b0b9aab770b8af446316f395f1c946d060989029b7576392aa90963"}
+{"scale":2400,"seed":7919,"units":2400,"tick":36210,"winner":0,"sha256":"4ff933829b0b9aab770b8af446316f395f1c946d060989029b7576392aa90963"}
+{"scale":10000,"seed":7919,"units":10800,"tick":12180,"winner":0,"sha256":"0d52e954d6f40c7c307796bfcf8bb68bcda36bfad300c9ba147594ae1f98c5c8"}
+{"scale":10000,"seed":7919,"units":10800,"tick":12180,"winner":0,"sha256":"0d52e954d6f40c7c307796bfcf8bb68bcda36bfad300c9ba147594ae1f98c5c8"}

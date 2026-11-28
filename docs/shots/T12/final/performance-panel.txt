@@ -1,0 +1,140 @@
+- navigation "Main toolbar":
+  - toolbar:
+    - button "Select an element in the page to inspect it - Ctrl + Shift + C"
+  - tablist "Panels":
+    - tab "Elements"
+    - tab "Console"
+    - tab "Sources"
+    - tab "Network"
+    - tab "Performance" [selected]
+    - tab "Memory"
+    - tab "Application"
+    - tab "Security"
+    - tab "Lighthouse"
+    - tab "Recorder"
+  - toolbar:
+    - button "Settings - F1 - Shift + ?"
+    - button "Customize and control DevTools":
+      - button "Customize and control DevTools"
+- tabpanel "Performance panel"
+- alert: DevTools is undocked
+- status
+[
+  'Record - Ctrl + E',
+  'Record and reload - Ctrl + Shift + E',
+  'Clear',
+  'Load trace…',
+  'Save',
+  'Save trace…',
+  'Go back to the live metrics page',
+  'Show recent timeline sessions',
+  'Collect garbage',
+  "Remove the regex: '/node_modules/|^node:'",
+  'Show ignore list setting dialog',
+  'Close',
+  'Capture settings',
+  'LCP reports the render time of the largest image, text block, or video visible in the viewport. Click here to learn more about LCP.',
+  'CLS measures the amount of unexpected shifted content. Click here to learn more about CLS.',
+  'INP measures the overall responsiveness to all click, tap, and keyboard interactions. Click here to learn more about INP.',
+  'Clear current log',
+  'Set up',
+  'New',
+  'Cancel',
+  'Ok',
+  'Disabling the network cache will simulate a network experience similar to a first time visitor',
+  'Record',
+  'Record and reload',
+  'Find and replace',
+  'Clear',
+  'Clear',
+  'Match case',
+  'Match whole word',
+  'Use regular expression',
+  'Show previous result',
+  'Show next result',
+  'Close search bar',
+  'Replace',
+  'Replace all',
+  'Select an element in the page to inspect it - Ctrl + Shift + C',
+  'Close Security',
+  'Close Recorder',
+  'Page: Main',
+  'Settings - F1 - Shift + ?',
+  'Customize and control DevTools',
+  'Customize and control DevTools',
+  'Close'
+]
+- navigation "Main toolbar":
+  - toolbar:
+    - button "Select an element in the page to inspect it - Ctrl + Shift + C"
+  - tablist "Panels":
+    - tab "Elements"
+    - tab "Console"
+    - tab "Sources"
+    - tab "Network"
+    - tab "Performance" [selected]
+    - tab "Memory"
+    - tab "Application"
+    - tab "Security"
+    - tab "Lighthouse"
+    - tab "Recorder"
+  - toolbar:
+    - button "Settings - F1 - Shift + ?"
+    - button "Customize and control DevTools":
+      - button "Customize and control DevTools"
+- tabpanel "Performance panel":
+  - toolbar:
+    - button "Hide sidebar"
+    - button "Record - Ctrl + E"
+    - button "Record and reload - Ctrl + Shift + E"
+    - button "Clear"
+    - button "Load trace…"
+    - button "Save trace…"
+    - button "Go back to the live metrics page"
+    - 'button "Current session: #1. Show recent timeline sessions"': "#1"
+    - checkbox "Screenshots" [checked]
+    - text: Screenshots
+    - checkbox "Memory"
+    - text: Memory
+    - button "Collect garbage"
+    - button "Show ignore list setting dialog"
+    - checkbox "Dim 3rd parties"
+    - text: Dim 3rd parties
+    - button "Capture settings"
+    - button "Show shortcuts"
+    - dialog:
+      - text: Keyboard shortcuts for flame chart
+      - button "Close"
+      - list:
+        - radiogroup:
+          - radio "Modern - normal scrolling"
+          - text: Modern - normal scrolling
+          - radio "Classic - scroll to zoom" [checked]
+          - text: Classic - scroll to zoom
+        - listitem: Zoom Scroll ↕ W S or + - hold shift for fast zoom
+        - listitem: Scroll & pan Shift + Scroll ↕ Scroll ↔ or A D Drag or Shift + ↑ ↓ ← →
+  - tablist:
+    - tab "Insights"
+    - tab "Annotations" [selected]
+  - text: Annotate a trace for yourself and others
+  - img
+  - text: Label an item Double-click or press Enter on an item and type to add an item label
+  - img
+  - text: Connect two items Double-click on an item, click on the adjacent rightward arrow, then select the destination item
+  - img
+  - text: Define a time range Shift-drag in the flame chart, then type to add a time range annotation
+  - img
+  - text: Delete an annotation Hover over the list in the sidebar Annotations tab to delete an annotation
+  - group "Overview grid window":
+    - text: 0 ms 5,000 ms 10,000 ms 15,000 ms 20,000 ms 25,000 ms 30,000 ms 35,000 ms 40,000 ms 45,000 ms 50,000 ms 55,000 ms 60,000 ms
+    - slider "Left resizer"
+    - slider "Right resizer"
+    - text: CPU NET
+  - tree "Flame chart"
+  - tablist:
+    - tab "Summary" [selected]
+    - tab "Bottom-up"
+    - tab "Call tree"
+    - tab "Event log"
+- alert: DevTools is undocked
+- status

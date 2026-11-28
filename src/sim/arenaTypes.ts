@@ -1,8 +1,9 @@
 import type { Faction, Kind } from './types';
 export type { Faction, Kind };
 export const kinds: Kind[] = ['line_infantry','guard_grenadier','cuirassier','bannerman','field_cannon'];
-export type Scale = 1200 | 2400 | 3600;
-export const scales: Scale[] = [1200,2400,3600];
+export const scales = [1200, 2400, 3600] as const;
+export const simulationScales = [...scales, 6000, 10000, 20000] as const;
+export type Scale = typeof simulationScales[number];
 export const TICKS = 30;
 export type Action = 'stand'|'march'|'run'|'aim'|'load'|'thrust'|'recoil'|'kneel'|'kneelLoad';
 /** 连队队形：线列火力最强，纵队行军快，方阵克骑兵但怕炮，散兵适合轻步兵掩护，菱形用于骑兵冲锋。 */
@@ -29,6 +30,7 @@ export interface Soldier {
     px:number; py:number; turnFrames:number; marchUntil:number; staff:boolean; officer:boolean; diedAt:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
+    slotGeometry?:{formation:Formation;files:number;capacity:number;offsets:[number,number][]};
     variant:import("./units/roster").Variant|null;
     id: number; faction: Faction; kind: Kind; name: string; members: Soldier[]; alive: number; peak: number;
     x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;

@@ -1,0 +1,66 @@
+
+> napoleon-1815@6.0.0 test
+> node tests/phase2.mjs && node tests/pace-probe.mjs && node tests/crowd-probe.mjs && node tests/scenarios/crowd.mjs && node tests/tracer-geometry.mjs && node tests/ballistics-probe.mjs && node tests/scenarios/roster-support.mjs && node tests/logistics.mjs && node tests/scenarios/visibility.mjs && node tests/scenarios/handover.mjs
+
+1200 232.5s 法兰西帝国失守两个战区，有序撤退 avg 1.18ms p99 3.39ms
+2400 765.0s 反法同盟持续控制多数战略要点 avg 1.88ms p99 3.53ms
+3600 600.0s 反法同盟持续控制多数战略要点 avg 1.59ms p99 2.69ms
+seed 15838 158s winner 0 loss 0.420 cannon 0.296 反法同盟失守两个战区，有序撤退
+seed 23757 160s winner 0 loss 0.360 cannon 0.226 反法同盟失守两个战区，有序撤退
+seed 39595 131s winner 1 loss 0.273 cannon 0.402 法兰西帝国失守两个战区，有序撤退
+seed 63352 166s winner 1 loss 0.587 cannon 0.558 法兰西帝国失守两个战区，有序撤退
+seed 7919 1200s winner 0 loss 0.225 cannon 0.548 夜幕降临，反法同盟趁夜撤离战场
+seed 31676 145s winner 1 loss 0.403 cannon 0.535 法兰西帝国失守两个战区，有序撤退
+seed 47514 1200s winner 1 loss 0.348 cannon 0.168 夜幕降临，法兰西帝国趁夜撤离战场
+seed 71271 186s winner 1 loss 0.292 cannon 0.258 法兰西帝国失守两个战区，有序撤退
+seed 95028 134s winner 0 loss 0.418 cannon 0.132 反法同盟失守两个战区，有序撤退
+seed 118785 179s winner 0 loss 0.405 cannon 0.171 反法同盟失守两个战区，有序撤退
+seed 87109 1200s winner 1 loss 0.175 cannon 0.549 夜幕降临，法兰西帝国趁夜撤离战场
+seed 110866 126s winner 1 loss 0.465 cannon 0.432 法兰西帝国失守两个战区，有序撤退
+seed 142542 176s winner 1 loss 0.378 cannon 0.559 法兰西帝国失守两个战区，有序撤退
+seed 55433 1200s winner 1 loss 0.360 cannon 0.014 夜幕降临，法兰西帝国趁夜撤离战场
+seed 166299 90s winner 0 loss 0.395 cannon 0.543 反法同盟失守两个战区，有序撤退
+seed 134623 156s winner 1 loss 0.513 cannon 0.403 法兰西帝国失守两个战区，有序撤退
+seed 79190 106s winner 1 loss 0.507 cannon 0.508 法兰西帝国失守两个战区，有序撤退
+seed 102947 182s winner 0 loss 0.357 cannon 0.406 反法同盟失守两个战区，有序撤退
+seed 126704 169s winner 0 loss 0.283 cannon 0.344 反法同盟失守两个战区，有序撤退
+seed 150461 160s winner 0 loss 0.472 cannon 0.370 反法同盟失守两个战区，有序撤退
+seed 190056 562s winner 1 loss 0.435 cannon 0.296 法兰西帝国失守两个战区，有序撤退
+seed 158380 1200s winner 0 loss 0.142 cannon 0.010 夜幕降临，反法同盟趁夜撤离战场
+seed 174218 1200s winner 0 loss 0.377 cannon 0.081 夜幕降临，反法同盟趁夜撤离战场
+seed 182137 1200s winner 1 loss 0.320 cannon 0.180 夜幕降临，法兰西帝国趁夜撤离战场
+{
+  seeds: 24,
+  medianSeconds: 172.5,
+  minSeconds: 90,
+  maxSeconds: 1200,
+  loserLossFraction: 0.37125,
+  generalDeathFraction: 0.16666666666666666,
+  wins: [ 11, 13 ],
+  cannonShare: 0.33280138141676546,
+  pooledCannonShare: 0.33428465070107954
+}
+Battle assertions passed.
+{"seed":23757,"frames":4785,"firstGun":14.133333333333333,"firstCasualty":27.866666666666667,"idleFraction":0.08171368861024034,"movement":{"line_infantry":{"count":865318,"mean":61.71706059336328,"max":121.74864620688356},"cuirassier":{"count":212092,"mean":109.08192126528505,"max":230.77000000001883},"field_cannon":{"count":14372,"mean":58.8597103642901,"max":119.70000000002723},"bannerman":{"count":57533,"mean":63.206153359336625,"max":121.1267236310212},"guard_grenadier":{"count":236042,"mean":61.51675234844883,"max":119.70000000001974},"footRush":{"count":10776,"mean":97.22939062482246,"max":114.0000000000256},"horseSprint":{"count":7181,"mean":132.5856600891633,"max":230.77000000001883}}}
+{"samples":147,"mean":0,"peak":0,"steadySamples":135,"steadyMean":0,"jitter":{"flipsPerSec":0.004483506311790005,"poseTogglesPerSec":0.02200065905557676,"slotSwapsPerDeath":1.087719298245614}}
+S9 controlled passage {"crossed":3,"peak":0,"final":[[760,555],[760,565],[760,575],[760,625],[760,635],[760,645],[885,588],[885,600],[885,612]]}
+{"gate":867.9999999999984,"wall":800.6,"limberedX":503.99}
+Square layout: 1–64 members, minimum spacing 13px.
+{"maxMusketLength":0.5000000000000014,"impactCount":1,"finalSegments":0}
+seed 7919: 1200s winner=0 dead=221,135 fled=0,0 parapet={"musket":1,"scatter":0,"round":7}
+seed 15838: 157s winner=0 dead=143,225 fled=7,0 parapet={"musket":2,"scatter":0,"round":46}
+{"musketHitRate":"5.3%","musketFriendly":"2.2%","roundShots":525,"roundKills":304,"killsPerBall":"0.58","roundFriendly":"1.7%","canisterHits":87,"canisterFriendly":"0.0%","why":"{\"sameCompany\":2,\"otherCompany\":0,\"nearSum\":42.47467636613556,\"victimKneeling\":0,\"shooterInMelee\":0}","avgShotRange":"246","cannonShare":"50.3%","heldFire":12394,"ignored":5,"laneChecks":3740,"generalsDead":3,"parapetAbsorbed":{"musket":3,"scatter":0,"round":53},"avgSec":678,"p99":["0.90","1.22"]}
+{"variants":["voltigeur","hussar","lancer","horse_battery","howitzer","rifles"],"actions":[{"action":"continue","label":"维持当前命令","score":0.55},{"action":"rotate","label":"申请换班","score":0},{"action":"recover","label":"原地恢复","score":0}]}
+{
+  maps: 80,
+  deployed: 45,
+  deliveryTicks: 45,
+  deliveryPixels: 300,
+  intercepted: 1,
+  supplyRound: 4,
+  wagonsRaided: 1,
+  rotation: { front: 0, reserve: 3, deliveries: 2, distance: 34 }
+}
+Visibility passed: local sight, hidden forced order cleared, frozen grid report, expiry at tick 300, routed observer and replay reset.
+{"initialDistance":320.1562118716424,"handoverDistance":72.03392875927929,"elapsedTicks":200}
+exit=0

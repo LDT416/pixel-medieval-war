@@ -1,5 +1,5 @@
 import {guard as isGuard,lineTroop as isLineTroop,artillery as isArtillery,standard as isStandard} from './units/abilities';
-import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type Battalion, type General,
+import { simulationScales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type Battalion, type General,
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
@@ -29,6 +29,12 @@ import {footprints,unitTypes} from './units/unitTypes';
 import {selectVariant,variants} from './units/roster';
 export const TIMEOUT = 36000, PURSUIT = 210;
 
+function recordPhase(profile: Record<string,number>, phase: string, start: number) {
+    const end=performance.now();
+    profile[phase]=(profile[phase] ?? 0)+(end-start);
+    return end;
+}
+
 export class SimWorld {
     readonly deployEnd=PACE.deploymentTicks;
     rearGuard:[number|null,number|null]=[null,null];
@@ -45,6 +51,7 @@ export class SimWorld {
     recentRouts:{tick:number;c:Company;x:number;y:number}[]=[];
     timeline:Sample[]=[];turningPoints:TurningPoint[]=[];
     units: Soldier[] = []; companies: Company[] = []; battalions: Battalion[] = []; generals: General[] = []; news: News[] = [];
+    readonly volleyShooters:Soldier[]=[];
     events: BattleEvent[] = []; rounds: Round[] = [];
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
@@ -65,7 +72,7 @@ export class SimWorld {
     constructor(scale: Scale = 1200, seed = 1815, readonly legacySide:Faction|null=null) { this.reset(scale, seed); }
 
     reset(scale: Scale = this.scale, seed = this.seed) {
-        if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
+        if (!simulationScales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.sight=new BoardSight();this.ballistics=new Ballistics();this.earthworks.reset();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
         this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.assaultOrders=[];this.cavalryImpacts=[];this.cavalryChargeEvents=[];this.cavalryTaskCounts={};this.artilleryStats={reaims:0,limberTurns:0,slowedReloads:0,silencedGuns:0,shellExplosions:0};this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.battalions = []; this.news = []; this.rounds = []; this.events = [];
@@ -326,14 +333,22 @@ export class SimWorld {
         }
     }
 
+    profile: Record<string, number> | null = null;
+
     step() {
         this.events.length = 0;
         if (this.ended) return;
+        const profile=this.profile;
+        let phaseStart=profile ? performance.now() : 0;
         if(activeLayout!==this.layout)setLayout(this.layout);
         this.tick++;
         if(this.tick<=this.deployEnd){
-            marchDeployment(this);this.crowd.step(this);
+            marchDeployment(this);
+            if(profile)phaseStart=recordPhase(profile,'companies',phaseStart);
+            this.crowd.step(this);
+            if(profile)phaseStart=recordPhase(profile,'crowd',phaseStart);
             if(this.tick%30===0)this.sampleTimeline();
+            if(profile)recordPhase(profile,'director',phaseStart);
             return;
         }
         this.hash.rebuild(this.units);
@@ -341,15 +356,19 @@ export class SimWorld {
         const rf = this.reinforcement;
         if (rf && !rf.arrived && this.tick >= rf.tick && this.winner === null && !this.broken[rf.faction]) this.arrive(rf);
         this.logistics.step(this);
+        if(profile)phaseStart=recordPhase(profile,'hash+logistics',phaseStart);
         if (this.tick % 30 === 1 && this.winner === null){
             this.sight.scan(this);
             this.director.update(this);
             if(this.legacy && this.legacySide!==null && !this.broken[this.legacySide])this.legacy.army(this,this.legacySide);
         }
+        if(profile)phaseStart=recordPhase(profile,'director',phaseStart);
         updateBattalions(this);
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
+        if(profile)phaseStart=recordPhase(profile,'companies',phaseStart);
         resolveRounds(this);
+        if(profile)phaseStart=recordPhase(profile,'rounds',phaseStart);
         const n = this.units.length, start = this.tick % 2 * (n >> 1);
         for (let i = 0; i < n; i++) {
             const u = this.units[(i + start) % n];
@@ -363,7 +382,9 @@ export class SimWorld {
                 if((pose==='march' && u.pose==='stand')||(pose==='stand' && u.pose==='march'))this.toggles++;
             }
         }
+        if(profile)phaseStart=recordPhase(profile,'soldiers',phaseStart);
         this.crowd.step(this);
+        if(profile)phaseStart=recordPhase(profile,'crowd',phaseStart);
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
         if (this.tick % 12 === 0 && this.cavalryImpacts.length) {
             for (const imp of this.cavalryImpacts) {
@@ -380,6 +401,7 @@ export class SimWorld {
             this.ended = true; this.summarize(); this.rounds.length = 0;
             for (const u of this.units) if (u.hp > 0) { u.moving = false; u.vx = u.vy = 0; u.pose = 'stand'; }
         }
+        if(profile)recordPhase(profile,'director',phaseStart);
     }
     private sampleTimeline(){this.timeline.push({tick:this.tick,odds:this.odds(),eff:[this.effective(0),this.effective(1)],morale:[this.armyMorale(0),this.armyMorale(1)]});}
     private summarize(){

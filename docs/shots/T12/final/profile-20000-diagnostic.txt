@@ -1,0 +1,2 @@
+{"seed":7919,"scale":20000,"units":20000,"ticks":960,"mean":25.96,"p50":25.88,"p99":40.81,"max":166.5,"winner":0,"dead":[52,808],"phases":{"companies":3.573,"crowd":18.536,"director":0.071,"hash+logistics":0.997,"rounds":0.053,"soldiers":2.718}}
+{"scale":20000,"worstP99":40.81,"meanMs":25.96}

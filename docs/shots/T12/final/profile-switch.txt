@@ -1,0 +1,2 @@
+{"profiled":false,"tick":600,"calls":0,"phases":null,"signature":"fd4a096bf435362504ccbf6c0dd2327f2eca8182ce10afb0cf62d83dcc80e760"}
+{"profiled":true,"tick":600,"calls":3360,"phases":["companies","crowd","director","hash+logistics","rounds","soldiers"],"signature":"fd4a096bf435362504ccbf6c0dd2327f2eca8182ce10afb0cf62d83dcc80e760"}

@@ -1,0 +1,6 @@
+{"browser":"158.0.8127.88","site":"http://127.0.0.1:4183/?seed=15838","viewport":[1280,800]}
+{"webglRenderer":"ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Laptop GPU (0x000027E0) Direct3D11 vs_5_0 ps_5_0, D3D11)"}
+{"speed":[0.25,1,2,4],"scale":[1200,2400,3600],"active":4}
+{"smoke":{"tick":9195,"ended":true,"winner":0},"errors":[]}
+{"rafFrames":314,"elapsedMs":60083.2,"maxMs":367,"maxSteps":8,"above250ms":78,"errors":[]}
+Screencast frames 1534
