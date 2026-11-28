@@ -1,5 +1,5 @@
 import {guard as isGuard,lineTroop as isLineTroop,artillery as isArtillery,standard as isStandard} from './units/abilities';
-import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type General,
+import { scales, type Scale, type Faction, type Kind, type Soldier, type BattleEvent, type Round, type Company, type Battalion, type General,
     type Sample, type TurningPoint, type News, type Trait, type Weather, type Posture, type Formation, type Order, type Reinforcement } from './arenaTypes';
 import { WIDTH, HEIGHT, CX, CY, LINE_GAP, layout as activeLayout, createCampaignLayout, setLayout, ridgeLine, type Layout } from './maps';
 import { Rng } from './rng';
@@ -14,6 +14,7 @@ import { prepareDeployment, marchDeployment, type BattlePlan } from './deploymen
 import { CampaignLogistics } from './campaignLogistics';
 import { CampaignObjectives } from './campaignObjectives';
 import { advance, updateCompany, formUp, rout } from './strategy';
+import { alignBattalionCompanies, updateBattalions, isSkirmisherCompany } from './battalion';
 import { resolveRounds, shake } from './combat';
 
 export const ARMY = ['法兰西帝国', '反法同盟'] as const;
@@ -36,9 +37,14 @@ export class SimWorld {
     lostSectors:boolean[][]=[[],[]];
     readonly noAssault:[boolean,boolean]=[false,false];
     charges:{tick:number;company:number;target:number;fresh:boolean;outcome:'break'|'repulsed'|'melee'}[]=[];
+    assaultOrders:{tick:number;battalion:number;company:number;dist:number;sinceFirstFire:number}[]=[];
+    cavalryImpacts:{tick:number;company:number;target:number;formation:Formation;speed:number;arc:'front'|'flank'|'rear';vsSquare:boolean;targetMoraleAfter:number;targetRoutedWithin300:boolean}[]=[];
+    cavalryChargeEvents:{tick:number;company:number;task:string;target:number}[]=[];
+    cavalryTaskCounts:Record<string,number>={};
+    artilleryStats={reaims:0,limberTurns:0,slowedReloads:0,silencedGuns:0,shellExplosions:0};
     recentRouts:{tick:number;c:Company;x:number;y:number}[]=[];
     timeline:Sample[]=[];turningPoints:TurningPoint[]=[];
-    units: Soldier[] = []; companies: Company[] = []; generals: General[] = []; news: News[] = [];
+    units: Soldier[] = []; companies: Company[] = []; battalions: Battalion[] = []; generals: General[] = []; news: News[] = [];
     events: BattleEvent[] = []; rounds: Round[] = [];
     alive: [number, number] = [0, 0]; dead: [number, number] = [0, 0]; fled: [number, number] = [0, 0];
     start: [number, number] = [0, 0]; reinforced: [number, number] = [0, 0]; broken: [boolean, boolean] = [false, false];
@@ -62,7 +68,7 @@ export class SimWorld {
         if (!scales.includes(scale)) throw new RangeError('Unsupported army scale');
         this.sight=new BoardSight();this.ballistics=new Ballistics();this.earthworks.reset();this.scale = scale; this.seed = seed >>> 0; this.rng.state = this.seed;
         this.stationaryFrames=this.flips=this.toggles=this.slotMoves=0; this.tick = 0; this.winner = null; this.ended = false; this.endTick = -1; this.reason = '';
-        this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.news = []; this.rounds = []; this.events = [];
+        this.rearGuard=[null,null];this.lostSectors=[[false,false,false],[false,false,false]];this.charges=[];this.assaultOrders=[];this.cavalryImpacts=[];this.cavalryChargeEvents=[];this.cavalryTaskCounts={};this.artilleryStats={reaims:0,limberTurns:0,slowedReloads:0,silencedGuns:0,shellExplosions:0};this.recentRouts=[];this.timeline=[];this.turningPoints=[];this.units = []; this.companies = []; this.battalions = []; this.news = []; this.rounds = []; this.events = [];
         this.alive = [0, 0]; this.dead = [0, 0]; this.fled = [0, 0]; this.start = [0, 0]; this.reinforced = [0, 0]; this.broken = [false, false];
         const r = this.rng.next();
         this.weather = r < .55 ? 'clear' : r < .8 ? 'rain' : 'fog';
@@ -111,7 +117,13 @@ export class SimWorld {
         const c: Company = { id: this.companies.length, faction: f, kind, variant, name, members: [], alive: 0, peak: 0,
             x,y,sector:Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))) as 0|1|2,brigade:Math.floor(this.companies.length/4),corps:f*3+Math.max(0,Math.min(2,Math.floor(y*3/HEIGHT))),ammo:0,fatigue:0,smoke:0,fireMode:'first',firingSince:-1,nextGroup:0,firstVolleyAt:-999,sprintUntil:0,sprintReady:0,assaultStage:'idle',assaultUntil:0,assaultReady:0,freshAtStart:false,cavalryDistances:new Map(),lastHorse:-9999,leftSquare:-9999,formedSquareAt:-9999,chargeOpponent:-1,lastMelee:-9999,contactId:-1,contactAt:-9999,blownUntil:0,relocated:false, limbered:false, deployUntil:0, initialFront:x+face*170, vx:0, vy:0, capacity:n, lastShrink:-90, margin:0, hx: face, hy: 0, gx: x, gy: y, homeX: x, homeY: y, formation, formUntil: 0, files: 1, ranks,
             order, status: 'steady', morale: base, base, target: -1, forced: -1, reloadAt: 0,
-            engaged: false, checkedAt: -999, chargeAt: -999, line,losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: type.speed * pace * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
+            engaged: false, checkedAt: -999, chargeAt: -999, line,
+            battalion: -1, battalionSlot: -1, refuseAngle: 0, refuseUntil: 0, recentLosses: [],
+            chargePhase: 'idle', cavTask: 'none', cavSpeed: 0, impactSpeed: 0,
+            chargeCount: 0, restUntil: 0, rallyStartAt: 0,
+            pursueStartX: 0, pursueStartY: 0, pursueStartTick: 0,
+            threatenUntil: 0, threatenTarget: -1, flankWaypoint: null,
+            losses:0,volleys:0,routs:0,charges:0,captures:0,rallies:0,wooded:false, kills: 0, underFire: 0, speed: type.speed * pace * (line === 5 ? .8 : 1), colors: 0, rallied: 0 };
         this.companies.push(c);
         for (let i = 0; i < n; i++) this.soldier(c, kind);
         return c;
@@ -120,7 +132,9 @@ export class SimWorld {
         const u: Soldier = { body:footprints[unitTypes[kind].frame], id: this.units.length, faction: c.faction, kind, company: c.id, slot: c.members.length, x: c.x, y: c.y, vx: 0, vy: 0,
             ammo:isLineTroop({kind})||isGuard({kind})?40:0,shotsFired:0,loadedAt:0,shotTarget:-1,kneelUntil:0,hp: unitTypes[kind].hp, face: c.hx, moving: false, pose: 'stand', hitAt: -999, firedAt: -999, fireAt: -1,
             stride: this.rng.int(0, 15), speed: unitTypes[kind].speed * (c.variant && c.kind===kind?variants[c.variant].pace:1) * (.97 + this.rng.next() * .06), cooldown: this.rng.int(0, 90), foe: -1,
-            aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0, px:c.x, py:c.y, turnFrames:0, marchUntil:0, staff:c.line===5, officer:c.members.length===0 && c.line!==5, diedAt:-999, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
+            aimTarget:-1, aimX:0, aimY:0, rangeError:0, shotsOnTarget:0,
+            aim: Math.atan2(c.hy, c.hx), crew: isArtillery({kind}) ? 6 : 0, reaimUntil: 0, reaimTargetAim: Math.atan2(c.hy, c.hx), reaimKind: 'none', captured: false,
+            px:c.x, py:c.y, turnFrames:0, marchUntil:0, staff:c.line===5, officer:c.members.length===0 && c.line!==5, diedAt:-999, escaped:false, general: false, jx: this.rng.next() * 4 - 2, jy: this.rng.next() * 4 - 2 };
         if (isStandard(u)) c.colors++;
         c.ammo+=u.ammo;c.members.push(u); c.alive++; c.peak++;
         this.units.push(u); this.alive[c.faction]++;
@@ -129,7 +143,9 @@ export class SimWorld {
     private deploy(f: Faction, total: number) {
         const g = this.generals[f], trait = g.trait, face = f ? -1 : 1, defending = this.layout.ridgeOwner === f;
         const r = () => this.rng.next();
-        const guns = Math.max(4, Math.round(total * (.017 + r() * .01 + (trait === 'cautious' ? .008 : 0))));
+        // F1：每方火炮数 = 每千人 4～6 门（按该方兵力四舍五入，至少 2 门；2400 人局每方 5～6 门）
+        const gunsPerK = 4.2 + r() * 1.2 + (trait === 'cautious' ? 0.35 : 0);
+        const guns = Math.max(2, Math.round((total / 1000) * Math.min(5.9, gunsPerK)));
         const cav = Math.round(total * (.12 + r() * .08 + (trait === 'aggressive' ? .03 : 0)));
         const guard = Math.round(total * (.09 + r() * .08));
         const banner = Math.round(total * .035), staff = 3;
@@ -141,39 +157,112 @@ export class SimWorld {
         const lineName = () => f ? `第${nextNum()}步兵团` : `第${nextNum()}战列步兵团`;
         const split = (count: number, size: number) => { const k = Math.max(1, Math.round(count / size)); return Array.from({ length: k }, (_, i) => Math.floor(count * (i + 1) / k) - Math.floor(count * i / k)); };
         const infantry: Company[] = [];
-        // 战列步兵：六成上一线，其余作二线。
-        const lineSizes = split(line, unitTypes.line_infantry.capacity), firstN = Math.ceil(lineSizes.length * .6), secondN = lineSizes.length - firstN;
-        const band = HEIGHT*.78;
+        // 战列步兵：按营编组（每营 4～6 连），轻步兵/来复枪作为营前散兵连。
+        const lineSizes = split(line, unitTypes.line_infantry.capacity);
+        const band = HEIGHT * .78;
+        const lineCompanies: Company[] = [];
+        const skirmishCompanies: Company[] = [];
         lineSizes.forEach((n, i) => {
-            const first = i < firstN, k = first ? i : i - firstN, m = first ? firstN : secondN;
-            const y = CY + (k - (m - 1) / 2) * band / Math.max(1,m) + (first ? 0 : 110);
-            const x = frontX(y) - face * (first ? 0 : 330);
-            infantry.push(this.company(f, 'line_infantry', lineName(), first ? 0 : 1, n, x, y, 'line', 'hold', ranks));
-        });
-        // 据点守军
-        const farm = this.layout.farm;
-        if (farm && this.layout.farmOwner === f && infantry.length > 2) {
-            let best = infantry[0];
-            for (const c of infantry) if (Math.abs(c.y - farm.y) + (c.line ? 0 : 400) < Math.abs(best.y - farm.y) + (best.line ? 0 : 400)) best = c;
-            best.line = 6; best.x = best.homeX = farm.x; best.y = best.homeY = farm.y; best.name += '（农庄守军）'; best.base += 8; best.morale += 8;
-        }
-        // 近卫预备队
-        split(guard, unitTypes.guard_grenadier.capacity).forEach((n, i, all) => {
-            const y = CY + (i - (all.length - 1) / 2) * 200;
-            const c = this.company(f, 'guard_grenadier', f ? `第${i + 1}近卫步兵团` : `老近卫军第${i + 1}掷弹兵团`, 2, n, frontX(y) - face * 700, y, 'column', 'reserve', ranks);
+            const c = this.company(f, 'line_infantry', lineName(), 0, n, frontX(CY), CY, 'line', 'hold', ranks);
             infantry.push(c);
+            if (isSkirmisherCompany(c)) {
+                c.formation = 'skirmish';
+                skirmishCompanies.push(c);
+            } else {
+                lineCompanies.push(c);
+            }
         });
-        // 骑兵分列两翼
+        // 据点守军：从普通战列连中抽一个独立守军连
+        const farm = this.layout.farm;
+        if (farm && this.layout.farmOwner === f && lineCompanies.length > 5) {
+            const garrison = lineCompanies.pop()!;
+            garrison.line = 6; garrison.x = garrison.homeX = farm.x; garrison.y = garrison.homeY = farm.y;
+            garrison.name += '（农庄守军）'; garrison.base += 8; garrison.morale += 8;
+        }
+        // 把普通战列连划为若干个 4～6 连的营
+        const groupIntoBattalions = (list: Company[], minSize: number, maxSize: number): Company[][] => {
+            if (!list.length) return [];
+            const targetSize = Math.min(maxSize, Math.max(minSize, 5));
+            let k = Math.max(1, Math.round(list.length / targetSize));
+            while (k > 1 && Math.floor(list.length / k) < minSize) k--;
+            while (Math.ceil(list.length / k) > maxSize && list.length >= (k + 1) * minSize) k++;
+            const groups: Company[][] = [];
+            for (let i = 0; i < k; i++) {
+                const start = Math.floor(i * list.length / k), end = Math.floor((i + 1) * list.length / k);
+                if (end > start) groups.push(list.slice(start, end));
+            }
+            return groups;
+        };
+        const lineBatGroups = groupIntoBattalions(lineCompanies, 4, 6);
+        const firstBatN = Math.max(1, Math.ceil(lineBatGroups.length * 0.65));
+        const secondBatN = lineBatGroups.length - firstBatN;
+        const lineBattalions: Battalion[] = [];
+        const createBat = (kind: Kind, name: string, lineNo: number, comps: Company[], bx: number, by: number, order: Order): Battalion => {
+            const bid = this.battalions.length;
+            const sec = Math.max(0, Math.min(2, Math.floor(by * 3 / HEIGHT))) as 0 | 1 | 2;
+            const b: Battalion = {
+                id: bid, faction: f, kind, name, sector: sec, line: lineNo,
+                companies: comps.map(c => c.id), skirmishers: [],
+                x: bx, y: by, hx: face, hy: 0, gx: bx, gy: by, homeX: bx, homeY: by,
+                order, fireMode: f === 1 ? 'platoon' : 'rank',
+                target: -1, targetCompany: -1,
+                fireSeq: 0, nextFireAt: 0, firingSince: -1, firstVolleyCount: 0,
+                stoppedAt: -1, aligned: false, closing: false,
+                smoke: 0, initialAmmo: comps.reduce((s, c) => s + c.ammo, 0),
+                refusedLeft: false, refusedRight: false, firstChargeAt: -1
+            };
+            this.battalions.push(b);
+            comps.forEach((c, idx) => {
+                c.battalion = bid; c.battalionSlot = idx; c.line = lineNo; c.order = order; c.sector = sec;
+            });
+            return b;
+        };
+        lineBatGroups.forEach((group, bi) => {
+            const first = bi < firstBatN, k = first ? bi : bi - firstBatN, m = first ? firstBatN : secondBatN;
+            const y = CY + (k - (m - 1) / 2) * (band / Math.max(1, m));
+            const x = frontX(y) - face * (first ? 0 : 500);
+            const b = createBat('line_infantry', f ? `第${bi + 1}步兵营` : `第${bi + 1}战列步兵营`, first ? 0 : 1, group, x, y, 'hold');
+            lineBattalions.push(b);
+        });
+        // 将轻步兵/来复枪连配属给一线战列步兵营（若无一线营则配给第一个营）
+        const frontBats = lineBattalions.filter(b => b.line === 0);
+        const hostBats = frontBats.length ? frontBats : lineBattalions;
+        skirmishCompanies.forEach((sc, i) => {
+            const host = hostBats[i % Math.max(1, hostBats.length)];
+            if (host) {
+                host.skirmishers.push(sc.id);
+                sc.battalion = host.id;
+                sc.battalionSlot = -1;
+                sc.line = 0;
+                sc.sector = host.sector;
+            }
+        });
+        // 近卫预备队：编成近卫营（3～5 连）
+        const guardComps: Company[] = [];
+        split(guard, unitTypes.guard_grenadier.capacity).forEach((n, i) => {
+            const c = this.company(f, 'guard_grenadier', f ? `第${i + 1}近卫步兵连` : `老近卫军第${i + 1}掷弹兵连`, 2, n, frontX(CY) - face * 720, CY, 'line', 'reserve', ranks);
+            infantry.push(c);
+            guardComps.push(c);
+        });
+        const guardBatGroups = groupIntoBattalions(guardComps, 3, 5);
+        guardBatGroups.forEach((group, bi) => {
+            const y = CY + (bi - (guardBatGroups.length - 1) / 2) * 900;
+            const x = frontX(y) - face * 720;
+            createBat('guard_grenadier', f ? `第${bi + 1}近卫步兵营` : `老近卫军第${bi + 1}掷弹兵营`, 2, group, x, y, 'reserve');
+        });
+        // 骑兵分列两翼（默认菱形队形准备冲锋）
         let cavNum = this.rng.int(1, 9);
         split(cav, unitTypes.cuirassier.capacity).forEach((n, i) => {
             const wing = i % 2 ? 1 : -1, row = Math.floor(i / 2);
             const y = CY + wing * (band / 2 + 160 + (row % 2) * 120);
             const x = frontX(CY) - face * (560 + row * 140);
-            this.company(f, 'cuirassier', f ? `第${cavNum += this.rng.int(1, 4)}龙骑兵团` : `第${cavNum += this.rng.int(1, 3)}胸甲骑兵团`, 3, n, x, y, 'wedge', 'hold', 2);
+            this.company(f, 'cuirassier', f ? `第${cavNum += this.rng.int(1, 4)}龙骑兵团` : `第${cavNum += this.rng.int(1, 3)}胸甲骑兵团`, 3, n, x, y, 'diamond', 'hold', 2);
         });
-        // 炮兵部署在阵前或山脊顶
+        // 炮兵部署在阵前或山脊顶（F2：每连 4～6 门炮）
         const letters = 'ABCDEFGHIJKLMN';
-        split(guns, unitTypes.field_cannon.capacity).forEach((n, i, all) => {
+        const batCount = guns <= 6 ? 1 : Math.max(1, Math.round(guns / 5));
+        const gunSplits = Array.from({ length: batCount }, (_, i) => Math.floor(guns * (i + 1) / batCount) - Math.floor(guns * i / batCount));
+        gunSplits.forEach((n, i, all) => {
             const y = CY + (i - (all.length - 1) / 2) * Math.min(520, band / all.length);
             const x = frontX(y) - face * 170;
             this.company(f, 'field_cannon', f ? `皇家炮兵${letters[i]}连` : `第${i + 1}近卫炮兵连`, 4, n, x, y, 'battery', 'hold', 1);
@@ -188,23 +277,48 @@ export class SimWorld {
             c.members.sort((a, b) => Number(isStandard(a)) - Number(isStandard(b)));
             formUp(c);
         }
+        for (const b of this.battalions) if (b.faction === f) {
+            b.initialAmmo = b.companies.reduce((s, id) => s + (this.companies[id]?.ammo ?? 0), 0);
+            alignBattalionCompanies(this, b, true);
+            for (const id of [...b.companies, ...b.skirmishers]) formUp(this.companies[id]);
+        }
         this.start[f] = total;
     }
     private arrive(r: Reinforcement) {
         r.arrived = true;
         const f = r.faction, face = f ? -1 : 1, top = this.rng.next() < .5, ranks = f ? 2 : 3;
         const y0 = top ? 90 : HEIGHT - 90, ys = top ? 1 : -1;
-        const cav = r.count > 80 ? 22 : 0, guns = r.count >= 100 ? 4 : 0, inf = r.count - cav - guns;
+        const cav = r.count > 80 ? 22 : 0, guns = Math.round((r.count / 1000) * 5), inf = r.count - cav - guns;
         const k = Math.max(1, Math.round(inf / 32));
         let num = this.rng.int(10, 30);
         const born: Company[] = [];
+        const infBorn: Company[] = [];
         for (let i = 0; i < k; i++) {
             const n = Math.floor(inf * (i + 1) / k) - Math.floor(inf * i / k);
-            born.push(this.company(f, 'line_infantry', f ? `普鲁士第${num += 3}团` : `格鲁希军第${num += 3}团`, 7, n, CX - face * (250 + i * 170), y0 + ys * (i % 2) * 60, 'column', 'advance', ranks));
+            const c = this.company(f, 'line_infantry', f ? `普鲁士第${num += 3}连` : `格鲁希军第${num += 3}连`, 7, n, CX - face * (250 + i * 170), y0 + ys * (i % 2) * 60, 'line', 'advance', ranks);
+            born.push(c); infBorn.push(c);
         }
-        if (cav) born.push(this.company(f, 'cuirassier', f ? '普鲁士枪骑兵团' : '格鲁希军龙骑兵团', 3, cav, CX - face * (250 + k * 170), y0, 'wedge', 'hold', 2));
+        if (infBorn.length >= 2) {
+            const bid = this.battalions.length;
+            const bx = CX - face * 450, by = y0 + ys * 60;
+            const b: Battalion = {
+                id: bid, faction: f, kind: 'line_infantry', name: f ? '普鲁士援军营' : '格鲁希军援军营',
+                sector: Math.max(0, Math.min(2, Math.floor(by * 3 / HEIGHT))) as 0 | 1 | 2, line: 7,
+                companies: infBorn.map(c => c.id), skirmishers: [],
+                x: bx, y: by, hx: face, hy: 0, gx: bx, gy: by, homeX: bx, homeY: by,
+                order: 'advance', fireMode: f === 1 ? 'platoon' : 'rank',
+                target: -1, targetCompany: -1, fireSeq: 0, nextFireAt: 0, firingSince: -1, firstVolleyCount: 0,
+                stoppedAt: -1, aligned: false, closing: false, smoke: 0,
+                initialAmmo: infBorn.reduce((s, c) => s + c.ammo, 0),
+                refusedLeft: false, refusedRight: false, firstChargeAt: -1
+            };
+            this.battalions.push(b);
+            infBorn.forEach((c, idx) => { c.battalion = bid; c.battalionSlot = idx; });
+            alignBattalionCompanies(this, b, true);
+        }
+        if (cav) born.push(this.company(f, 'cuirassier', f ? '普鲁士枪骑兵团' : '格鲁希军龙骑兵团', 3, cav, CX - face * (250 + k * 170), y0, 'diamond', 'hold', 2));
         if (guns) born.push(this.company(f, 'field_cannon', f ? '普鲁士炮兵连' : '格鲁希军炮兵连', 4, guns, CX - face * 650, y0 + ys * 80, 'battery', 'hold', 1));
-        for (const c of born) { c.hx = 0; c.hy = ys; formUp(c); c.hx = face; c.hy = 0; this.reinforced[f] += c.alive; }
+        for (const c of born) { c.hx = 0; c.hy = ys; formUp(c); c.hx = face; c.hy = 0; for (const u of c.members) if (isArtillery(u)) { u.aim = Math.atan2(c.hy, c.hx); u.reaimTargetAim = u.aim; } this.reinforced[f] += c.alive; }
         this.logistics.sync(this);
         this.say(f ? `${r.name}从侧翼杀到！布吕歇尔兑现了诺言` : `${r.name}终于赶到战场！`, f, CX - face * 400, y0, 3);
         for (const c of this.companies) if (c.status !== 'gone') {
@@ -232,6 +346,7 @@ export class SimWorld {
             this.director.update(this);
             if(this.legacy && this.legacySide!==null && !this.broken[this.legacySide])this.legacy.army(this,this.legacySide);
         }
+        updateBattalions(this);
         for (let i = this.tick % 6; i < this.companies.length; i += 6) updateCompany(this, this.companies[i]);
         for(const c of this.companies) if(c.status!=='gone' && c.status!=='rout'){c.x+=c.vx/30;c.y+=c.vy/30;}
         resolveRounds(this);
@@ -250,6 +365,13 @@ export class SimWorld {
         }
         this.crowd.step(this);
         if (this.tick % 15 === 0 && this.winner === null) this.checkVictory();
+        if (this.tick % 12 === 0 && this.cavalryImpacts.length) {
+            for (const imp of this.cavalryImpacts) {
+                if (imp.targetRoutedWithin300 || this.tick - imp.tick > 300) continue;
+                const tc = this.companies[imp.target];
+                if (tc && (tc.status === 'rout' || tc.status === 'gone')) imp.targetRoutedWithin300 = true;
+            }
+        }
         if(this.tick%30===0){
             if(this.winner===null)this.objectives.update(this);
             this.sampleTimeline();

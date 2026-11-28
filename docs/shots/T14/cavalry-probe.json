@@ -1,0 +1,398 @@
+{
+  "summary": {
+    "seeds": 24,
+    "scale": 2400,
+    "J1_idlePct": 11.46,
+    "J2_avgChargesPerCavCompany": 4.37,
+    "J3_diamondImpactPct": 100,
+    "J4_impactSpeedMedian": 223.3,
+    "J5_rechargedPct": 98.68,
+    "J6_flankRearRoutPct": 78.23,
+    "J7_frontSquareRoutPct": 2.17,
+    "J8_totalDistinctTasks": 6,
+    "J8_distinctTaskList": [
+      "counter",
+      "flank",
+      "pursue",
+      "threaten",
+      "battery",
+      "screen"
+    ],
+    "J8_avgTasksPerGame": 6,
+    "counts": {
+      "idleSamples": 13554,
+      "totalSamples": 118311,
+      "cavCount": 457,
+      "chargeCount": 1996,
+      "totalImpacts": 2322,
+      "chargedComps": 456,
+      "rechargedComps": 450,
+      "flankRearTotal": 928,
+      "flankRearRouted": 726,
+      "frontSquareTotal": 138,
+      "frontSquareRouted": 3
+    }
+  },
+  "perSeed": [
+    {
+      "seed": 7919,
+      "idlePct": 10.1,
+      "chargeCount": 122,
+      "cavCount": 24,
+      "impacts": 152,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 15838,
+      "idlePct": 13.3,
+      "chargeCount": 89,
+      "cavCount": 20,
+      "impacts": 96,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 23757,
+      "idlePct": 8.8,
+      "chargeCount": 115,
+      "cavCount": 19,
+      "impacts": 127,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 31676,
+      "idlePct": 7.8,
+      "chargeCount": 70,
+      "cavCount": 15,
+      "impacts": 83,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 39595,
+      "idlePct": 20.1,
+      "chargeCount": 81,
+      "cavCount": 22,
+      "impacts": 95,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 47514,
+      "idlePct": 14.6,
+      "chargeCount": 79,
+      "cavCount": 19,
+      "impacts": 85,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 55433,
+      "idlePct": 7.8,
+      "chargeCount": 83,
+      "cavCount": 19,
+      "impacts": 92,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 63352,
+      "idlePct": 14.9,
+      "chargeCount": 85,
+      "cavCount": 20,
+      "impacts": 103,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 71271,
+      "idlePct": 17.8,
+      "chargeCount": 80,
+      "cavCount": 17,
+      "impacts": 96,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 79190,
+      "idlePct": 10.5,
+      "chargeCount": 75,
+      "cavCount": 20,
+      "impacts": 89,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 87109,
+      "idlePct": 8.1,
+      "chargeCount": 81,
+      "cavCount": 18,
+      "impacts": 95,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 95028,
+      "idlePct": 7.1,
+      "chargeCount": 119,
+      "cavCount": 24,
+      "impacts": 147,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 102947,
+      "idlePct": 21.3,
+      "chargeCount": 56,
+      "cavCount": 16,
+      "impacts": 70,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 110866,
+      "idlePct": 9.4,
+      "chargeCount": 78,
+      "cavCount": 16,
+      "impacts": 87,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 118785,
+      "idlePct": 5.5,
+      "chargeCount": 90,
+      "cavCount": 20,
+      "impacts": 105,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 126704,
+      "idlePct": 6.4,
+      "chargeCount": 58,
+      "cavCount": 21,
+      "impacts": 83,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 134623,
+      "idlePct": 6.2,
+      "chargeCount": 53,
+      "cavCount": 18,
+      "impacts": 72,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 142542,
+      "idlePct": 4.8,
+      "chargeCount": 59,
+      "cavCount": 17,
+      "impacts": 73,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 150461,
+      "idlePct": 6.8,
+      "chargeCount": 105,
+      "cavCount": 21,
+      "impacts": 111,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 158380,
+      "idlePct": 9.8,
+      "chargeCount": 88,
+      "cavCount": 18,
+      "impacts": 98,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 166299,
+      "idlePct": 26,
+      "chargeCount": 66,
+      "cavCount": 19,
+      "impacts": 83,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 174218,
+      "idlePct": 8.7,
+      "chargeCount": 94,
+      "cavCount": 20,
+      "impacts": 102,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 182137,
+      "idlePct": 7,
+      "chargeCount": 58,
+      "cavCount": 16,
+      "impacts": 59,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    },
+    {
+      "seed": 190056,
+      "idlePct": 12.3,
+      "chargeCount": 112,
+      "cavCount": 18,
+      "impacts": 119,
+      "tasks": [
+        "counter",
+        "flank",
+        "pursue",
+        "threaten",
+        "battery",
+        "screen"
+      ]
+    }
+  ]
+}

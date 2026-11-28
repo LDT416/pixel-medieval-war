@@ -4,6 +4,7 @@ import {sectorOf,type Layout,type Objective,type Sector} from './maps';
 import {PACE} from './scale';
 import {Rng} from './rng';
 import {formUp} from './strategy';
+import {battalionOffsets, companyHalfWidth} from './battalion';
 import type {Point} from './types';
 import type {SimWorld} from './world';
 
@@ -59,65 +60,108 @@ function planSide(w:DeploymentWorld,f:Faction,r:Rng,bridgeGuns:Map<number,Object
         return plan;
     }
     const companies=own.filter(foot),guns=own.filter(c=>isArtillery(c)),horses=own.filter(c=>isMounted(c)&&c.line!==5);
-    // 所有选位读取部署前的样本。分派完成后再改变实体坐标。
-    if(attacking){
-        const soldiers=companies.reduce((s,c)=>s+c.alive,0);
-        const ordered=[...companies.filter(c=>c.line!==2),...companies.filter(c=>c.line===2)];
-        let used=0,head=0;
-        for(const c of ordered){
-            if(used>=soldiers*.50 && Math.abs(used-soldiers*.55)<Math.abs(used+c.alive-soldiers*.55))break;
-            used+=c.alive;head++;
-        }
-        const feintCount=Math.max(1,Math.round((ordered.length-head)*.47));
-        ordered.forEach((c,i)=>{
-            const sector=i<head?mainEffort:i<head+feintCount?feint:other;
-            const position=i<head?i:i<head+feintCount?i-head:i-head-feintCount;
-            const count=i<head?head:i<head+feintCount?feintCount:ordered.length-head-feintCount;
-            const rank=i<head&&position%4===3||sector===other;
-            const y=center(sector,l)+(position-(count-1)/2)*Math.min(178,l.height/(4*Math.max(1,count)));
-            add(c,frontX(y)-face*(rank?470:0),y,rank?'reserve':'front',rank?'column':'line');
+    const ownBats=w.battalions.filter(b=>b.faction===f);
+    // 按营整体布阵：确保营内各连紧挨（间隙 ≤ 30px、错位 0），营与营留 60～120px 间隔，二线在后方 400～600px。
+    const placeBattalion=(b:typeof ownBats[number],bx:number,by:number,role:Role)=>{
+        const comps=b.companies.map(id=>w.companies[id]).filter(Boolean);
+        const batWidth=comps.reduce((s,c)=>s+companyHalfWidth(c)*2,0)+16*Math.max(0,comps.length-1);
+        const safeY=clamp(by, 180 + batWidth*0.5, l.height - 180 - batWidth*0.5);
+        const safeX=clamp(bx, 220, l.width - 220);
+        b.x=b.homeX=b.gx=safeX; b.y=b.homeY=b.gy=safeY;
+        b.hx=face; b.hy=0; b.sector=sectorOf(safeY,l);
+        const offsets=battalionOffsets(comps);
+        const tx=0, ty=face; // tx=-hy=0, ty=hx=face
+        comps.forEach((c,i)=>{
+            const cx=safeX+tx*offsets[i], cy=safeY+ty*offsets[i];
+            add(c, cx, cy, role, 'line');
         });
+        const skirms=b.skirmishers.map(id=>w.companies[id]).filter(Boolean);
+        skirms.forEach((sc,i)=>{
+            const lat=(i-(skirms.length-1)*0.5)*240;
+            add(sc, safeX+face*400, safeY+ty*lat, 'front', 'skirmish');
+        });
+        return batWidth;
+    };
+    const batHalfWidth=(b:typeof ownBats[number])=>{
+        const comps=b.companies.map(id=>w.companies[id]).filter(Boolean);
+        return (comps.reduce((s,c)=>s+companyHalfWidth(c)*2,0)+16*Math.max(0,comps.length-1))*0.5;
+    };
+    const layoutLine=(bats:typeof ownBats, baseX:(y:number)=>number, depthOffset:number, role:Role, spreadSectors=false, sectorOffset=0)=>{
+        if(!bats.length)return;
+        const widths=bats.map(b=>batHalfWidth(b)*2);
+        const gap=90;
+        if(spreadSectors && bats.length>=2){
+            // 多营跨战区覆盖左翼、中央、右翼，杜绝空战区被骑兵速推；同战区内营间留 90px（60～120px）间隔
+            const perSector:[typeof ownBats,typeof ownBats,typeof ownBats]=[[],[],[]];
+            const order:[Sector,Sector,Sector]=[mainEffort,feint,other];
+            bats.forEach((b,i)=>perSector[order[(i+sectorOffset)%3]].push(b));
+            for(const sec of [0,1,2] as const){
+                const group=perSector[sec];
+                if(!group.length)continue;
+                const gw=group.map(b=>batHalfWidth(b)*2);
+                const tw=gw.reduce((s,v)=>s+v,0)+gap*Math.max(0,group.length-1);
+                let curY=clamp(center(sec,l)-tw*0.5, 220, Math.max(220, l.height-220-tw));
+                for(let i=0;i<group.length;i++){
+                    const by=curY+gw[i]*0.5;
+                    placeBattalion(group[i], baseX(by)-face*depthOffset, by, role);
+                    curY+=gw[i]+gap;
+                }
+            }
+            return;
+        }
+        const totalW=widths.reduce((s,v)=>s+v,0)+gap*Math.max(0,bats.length-1);
+        const centerY=spreadSectors?center([mainEffort,feint,other][sectorOffset%3],l):l.height*0.5;
+        let curY=clamp(centerY-totalW*0.5, 220, Math.max(220, l.height-220-totalW));
+        for(let i=0;i<bats.length;i++){
+            const by=curY+widths[i]*0.5;
+            const bx=baseX(by)-face*depthOffset;
+            placeBattalion(bats[i], bx, by, role);
+            curY+=widths[i]+gap;
+        }
+    };
+    const lineBats=ownBats.filter(b=>b.kind==='line_infantry');
+    const guardBats=ownBats.filter(b=>b.kind==='guard_grenadier');
+    const frontBats=lineBats.filter(b=>b.line===0);
+    const secondBats=lineBats.filter(b=>b.line!==0);
+    const batCompIds=new Set(ownBats.flatMap(b=>[...b.companies,...b.skirmishers]));
+    const looseFoot=companies.filter(c=>!batCompIds.has(c.id));
+
+    layoutLine(frontBats, frontX, 0, 'front', true, 0);
+    layoutLine(secondBats, frontX, 500, 'reserve', true, frontBats.length);
+    layoutLine(guardBats, frontX, attacking ? 720 : (trait==='steadfast'||trait==='cautious'?780:560), 'reserve', false, 0);
+
+    // 未编入营的独立步兵连（例如农庄守军）
+    if(looseFoot.length){
+        const farmObj=l.objectives.find(p=>p.kind==='farm');
+        looseFoot.forEach((c,i)=>{
+            if(!attacking && c.line===6 && farmObj){
+                add(c, farmObj.x, farmObj.y, 'garrison', 'line', farmObj);
+            }else{
+                const y=center(feint,l)+(i-(looseFoot.length-1)*0.5)*180;
+                add(c, frontX(y)-face*200, y, 'front', c.variant==='voltigeur'||c.variant==='rifles'?'skirmish':'line');
+            }
+        });
+    }
+    if(attacking){
         let assigned=0;
         const totalGuns=guns.reduce((s,c)=>s+c.alive,0);
         guns.forEach((c,i)=>{
             const sector=assigned<totalGuns*.60?mainEffort:feint;assigned+=c.alive;
-            const y=center(sector,l)+(i-(guns.length-1)/2)*105;add(c,frontX(y)-face*160,y,'battery','battery');
+            const y=center(sector,l)+(i-(guns.length-1)/2)*160;add(c,frontX(y)-face*180,y,'battery','battery');
         });
     }else{
-        const line=companies.filter(c=>isLineTroop(c)),guards=companies.filter(c=>isGuard(c));
-        const positions=l.objectives.filter(p=>p.kind==='farm'||p.kind==='bridge');
-        const unused=[...line,...guards];
-        for(const p of positions){
-            const index=unused.findIndex(c=>c.line===6&&p.kind==='farm'&&p.x===l.farm?.x);
-            const c=unused.splice(index>=0?index:0,1)[0];if(!c)break;
-            add(c,p.x-face*(p.kind==='bridge'?46:0),p.y,'garrison','line',p);
-        }
-        const cover=l.woods.filter(p=>sectorOf(p.y,l)!==1).sort((a,b)=>Math.abs(a.x-l.ridgeX)-Math.abs(b.x-l.ridgeX))[0];
-        if(cover&&unused.length>4){
-            const c=unused.shift()!;add(c,cover.x,cover.y,'woods','line');
-        }
-        const front=unused.filter(c=>!isGuard(c)),reserve=unused.filter(c=>isGuard(c));
-        front.forEach((c,i)=>{
-            const y=center(mainEffort,l)+(i-(front.length-1)/2)*Math.min(226,l.height/(3*Math.max(front.length,1)));
-            const depth=front.length>=3&&i%4===1;
-            add(c,frontX(y)-face*(depth?260:0),y,depth?'reserve':'front',depth?'column':'line');
-        });
-        reserve.forEach((c,i)=>{
-            const y=l.height*.5+(i-(reserve.length-1)/2)*158;
-            add(c,frontX(y)-face*(trait==='steadfast'||trait==='cautious'?680:440),y,'reserve','column');
-        });
         const ridgeGuns=guns.filter(c=>!bridgeGuns.has(c.id));
         guns.forEach(c=>{
             const bridge=bridgeGuns.get(c.id);
-            const y=bridge?.y??center(mainEffort,l)+(ridgeGuns.indexOf(c)-(ridgeGuns.length-1)/2)*136;
+            const y=bridge?.y??center(mainEffort,l)+(ridgeGuns.indexOf(c)-(ridgeGuns.length-1)/2)*160;
             add(c,bridge?bridge.x-face*130:l.ridgeX+Math.sin(y*.0016+l.seed)*80,y,'battery','battery',bridge);
         });
     }
     const wing=[...intel].filter(p=>p.sector!==1).sort((a,b)=>b.openness-a.openness)[0].sector;
     horses.forEach((c,i)=>{
         const sector=attacking?wing:i%2?2:0;
-        const y=center(sector,l)+(i-(horses.length-1)/2)*118;
-        add(c,frontX(y)-face*(attacking?470:660),y,'horse','wedge');
+        const y=center(sector,l)+(i-(horses.length-1)/2)*140;
+        add(c,frontX(y)-face*(attacking?470:660),y,'horse','diamond');
     });
     const staff=own.find(c=>c.line===5);
     if(staff){const y=center(1,l);add(staff,frontX(y)-face*1290,y,'staff','staff');}
@@ -168,6 +212,10 @@ function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Rou
         }else if(foot(c)){
             c.line=d.role==='reserve'?(isGuard(c)?2:1):0;c.order=d.role==='reserve'?'reserve':'hold';
             c.name=c.name.replace('（农庄守军）','');
+            if(c.battalion>=0 && c.battalionSlot>=0 && w.battalions[c.battalion]){
+                w.battalions[c.battalion].line=c.line;
+                w.battalions[c.battalion].order=c.order;
+            }
         }
     }
     c.formation=d.formation;formUp(c);
@@ -178,22 +226,9 @@ function setupRoute(w:DeploymentWorld,d:Destination,i:number,legacy:boolean):Rou
     const end=w.deployEnd??1350;
     return {c,d,points,cumulative,length:cumulative[cumulative.length-1],delay:(i%8)*15,stop:end-(i%5)*11,march,station,finished:false};
 }
-/** 桥头抽调单炮：保留原有炮手实体、总兵力与炮数，炮群余部仍可驻守山脊。 */
-function detachBridgeGuns(w:DeploymentWorld){
-    const posts=new Map<number,Objective>(),f=w.layout.ridgeOwner;
-    if(f<0||w.legacySide===f)return posts;
-    const batteries=w.companies.filter(c=>c.faction===f&&isArtillery(c));
-    for(const p of w.layout.objectives.filter(o=>o.kind==='bridge')){
-        const source=[...batteries].sort((a,b)=>b.members.length-a.members.length)[0];
-        if(!source||source.members.length<2)break;
-        const gun=source.members.pop()!;source.alive--;source.peak--;source.capacity--;
-        const id=w.companies.length;
-        const detachment:Company={...source,id,name:source.name+' · '+p.name+'炮组',members:[gun],alive:1,peak:1,capacity:1,
-            files:1,cavalryDistances:new Map(),colors:0,ammo:0};
-        gun.company=id;gun.slot=0;gun.officer=true;
-        w.companies.push(detachment);posts.set(id,p);
-    }
-    return posts;
+/** 保持炮兵连 4～6 门炮编制完整，不拆成 1 门孤炮。 */
+function detachBridgeGuns(_w:DeploymentWorld){
+    return new Map<number,Objective>();
 }
 export function prepareDeployment(w:DeploymentWorld):[BattlePlan,BattlePlan]{
     const bridgeGuns=detachBridgeGuns(w);
@@ -222,7 +257,7 @@ export function marchDeployment(w:DeploymentWorld){
         const x=a.x+(b.x-a.x)*u,y=a.y+(b.y-a.y)*u,unfold=clamp((t-.82)/.18,0,1);
         const blend=unfold*unfold*(3-2*unfold),face=c.faction?-1:1;
         c.vx=w.tick?(x-c.x)*30:0;c.vy=w.tick?(y-c.y)*30:0;c.x=x;c.y=y;c.hx=dx;c.hy=dy;
-        if(t===1){c.formation=d.formation;c.hx=face;c.hy=0;formUp(c);c.vx=c.vy=0;route.finished=true;}
+        if(t===1){c.formation=d.formation;c.hx=face;c.hy=0;formUp(c);c.vx=c.vy=0;route.finished=true;if(isArtillery(c)){const a=Math.atan2(c.hy,c.hx);for(const g of c.members){g.aim=a;g.reaimTargetAim=a;g.reaimKind='none';}}}
         for(let k=0;k<c.members.length;k++){
             const unit=c.members[k],front=march[2*k],lateral=march[2*k+1];
             const offX=front*face*(1-blend)+station[2*k]*blend;

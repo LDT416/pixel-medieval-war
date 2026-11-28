@@ -12,9 +12,9 @@ interface FormationProfile {
     changeTicks: number;
     squareTicks: number;
 }
-const infantry:FormationProfile={allowed:['line','column','square'],changeTicks:55,squareTicks:58};
+const infantry:FormationProfile={allowed:['line','column','square','skirmish'],changeTicks:55,squareTicks:58};
 const guard:FormationProfile={...infantry,squareTicks:36};
-const cavalry:FormationProfile={allowed:['wedge','column','staff'],changeTicks:55,squareTicks:0};
+const cavalry:FormationProfile={allowed:['diamond','wedge','column','staff'],changeTicks:55,squareTicks:0};
 const battery:FormationProfile={allowed:['battery','column'],changeTicks:55,squareTicks:0};
 interface UnitType {formation:FormationProfile;group:Group;frame:Frame;hp:number;morale:number;speed:number;value:number;capacity:number}
 export const unitTypes:Record<Kind,UnitType>={

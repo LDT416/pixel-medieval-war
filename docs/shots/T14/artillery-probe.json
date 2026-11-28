@@ -1,0 +1,940 @@
+{
+  "summary": {
+    "seeds": 24,
+    "scale": 2400,
+    "J9_gunsPerThousandMin": 4.17,
+    "J9_gunsPerThousandMax": 5.83,
+    "J10_outsideArcFires": 0,
+    "J11_artilleryKillSharePct": 23.91,
+    "J12_gamesWithReaim": "24/24",
+    "J12_gamesWithLimberTurn": "22/24",
+    "J12_avgReaimsPerGame": 47.17,
+    "J12_avgLimberTurnsPerGame": 16.38,
+    "J13_slowedReloadGamesPct": 70.8,
+    "J13_silencedGunGamesPct": 41.7,
+    "J14_shellKills": 1260,
+    "J14_shellHits": 7046,
+    "J14_shellFriendlyPct": 0.7,
+    "J14_shellExplosions": 2921,
+    "counts": {
+      "deaths": 17264,
+      "roundKills": 1430,
+      "scatterKills": 1437,
+      "shellKills": 1260
+    }
+  },
+  "perSeed": [
+    {
+      "seed": 7919,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 970,
+      "round": {
+        "sent": 92,
+        "hits": 138,
+        "friendly": 3,
+        "kills": 128
+      },
+      "scatter": {
+        "sent": 1488,
+        "hits": 520,
+        "friendly": 17,
+        "kills": 291
+      },
+      "shell": {
+        "sent": 197,
+        "hits": 341,
+        "friendly": 1,
+        "kills": 82
+      },
+      "artilleryStats": {
+        "reaims": 29,
+        "limberTurns": 13,
+        "slowedReloads": 11,
+        "silencedGuns": 0,
+        "shellExplosions": 195
+      }
+    },
+    {
+      "seed": 15838,
+      "initialGuns": [
+        7,
+        6
+      ],
+      "perK": [
+        5.833333333333334,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 750,
+      "round": {
+        "sent": 52,
+        "hits": 82,
+        "friendly": 2,
+        "kills": 74
+      },
+      "scatter": {
+        "sent": 432,
+        "hits": 166,
+        "friendly": 17,
+        "kills": 90
+      },
+      "shell": {
+        "sent": 22,
+        "hits": 7,
+        "friendly": 0,
+        "kills": 2
+      },
+      "artilleryStats": {
+        "reaims": 87,
+        "limberTurns": 29,
+        "slowedReloads": 4,
+        "silencedGuns": 1,
+        "shellExplosions": 22
+      }
+    },
+    {
+      "seed": 23757,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 550,
+      "round": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "scatter": {
+        "sent": 272,
+        "hits": 69,
+        "friendly": 9,
+        "kills": 36
+      },
+      "shell": {
+        "sent": 29,
+        "hits": 24,
+        "friendly": 0,
+        "kills": 1
+      },
+      "artilleryStats": {
+        "reaims": 82,
+        "limberTurns": 35,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 29
+      }
+    },
+    {
+      "seed": 31676,
+      "initialGuns": [
+        5,
+        5
+      ],
+      "perK": [
+        4.166666666666667,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 778,
+      "round": {
+        "sent": 25,
+        "hits": 27,
+        "friendly": 0,
+        "kills": 25
+      },
+      "scatter": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "shell": {
+        "sent": 156,
+        "hits": 258,
+        "friendly": 7,
+        "kills": 46
+      },
+      "artilleryStats": {
+        "reaims": 4,
+        "limberTurns": 0,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 154
+      }
+    },
+    {
+      "seed": 39595,
+      "initialGuns": [
+        5,
+        6
+      ],
+      "perK": [
+        4.166666666666667,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 775,
+      "round": {
+        "sent": 13,
+        "hits": 20,
+        "friendly": 0,
+        "kills": 19
+      },
+      "scatter": {
+        "sent": 240,
+        "hits": 128,
+        "friendly": 9,
+        "kills": 70
+      },
+      "shell": {
+        "sent": 156,
+        "hits": 334,
+        "friendly": 9,
+        "kills": 70
+      },
+      "artilleryStats": {
+        "reaims": 10,
+        "limberTurns": 4,
+        "slowedReloads": 0,
+        "silencedGuns": 1,
+        "shellExplosions": 156
+      }
+    },
+    {
+      "seed": 47514,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 824,
+      "round": {
+        "sent": 56,
+        "hits": 59,
+        "friendly": 5,
+        "kills": 51
+      },
+      "scatter": {
+        "sent": 432,
+        "hits": 232,
+        "friendly": 2,
+        "kills": 115
+      },
+      "shell": {
+        "sent": 144,
+        "hits": 314,
+        "friendly": 0,
+        "kills": 35
+      },
+      "artilleryStats": {
+        "reaims": 23,
+        "limberTurns": 36,
+        "slowedReloads": 157,
+        "silencedGuns": 1,
+        "shellExplosions": 144
+      }
+    },
+    {
+      "seed": 55433,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 456,
+      "round": {
+        "sent": 34,
+        "hits": 27,
+        "friendly": 9,
+        "kills": 26
+      },
+      "scatter": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "shell": {
+        "sent": 103,
+        "hits": 386,
+        "friendly": 0,
+        "kills": 85
+      },
+      "artilleryStats": {
+        "reaims": 48,
+        "limberTurns": 16,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 99
+      }
+    },
+    {
+      "seed": 63352,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 758,
+      "round": {
+        "sent": 51,
+        "hits": 61,
+        "friendly": 7,
+        "kills": 55
+      },
+      "scatter": {
+        "sent": 128,
+        "hits": 90,
+        "friendly": 69,
+        "kills": 40
+      },
+      "shell": {
+        "sent": 127,
+        "hits": 490,
+        "friendly": 0,
+        "kills": 91
+      },
+      "artilleryStats": {
+        "reaims": 31,
+        "limberTurns": 6,
+        "slowedReloads": 4,
+        "silencedGuns": 0,
+        "shellExplosions": 127
+      }
+    },
+    {
+      "seed": 71271,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 639,
+      "round": {
+        "sent": 89,
+        "hits": 149,
+        "friendly": 0,
+        "kills": 136
+      },
+      "scatter": {
+        "sent": 16,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "shell": {
+        "sent": 217,
+        "hits": 258,
+        "friendly": 10,
+        "kills": 38
+      },
+      "artilleryStats": {
+        "reaims": 91,
+        "limberTurns": 22,
+        "slowedReloads": 22,
+        "silencedGuns": 0,
+        "shellExplosions": 217
+      }
+    },
+    {
+      "seed": 79190,
+      "initialGuns": [
+        5,
+        6
+      ],
+      "perK": [
+        4.166666666666667,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 991,
+      "round": {
+        "sent": 91,
+        "hits": 251,
+        "friendly": 8,
+        "kills": 209
+      },
+      "scatter": {
+        "sent": 176,
+        "hits": 88,
+        "friendly": 40,
+        "kills": 39
+      },
+      "shell": {
+        "sent": 168,
+        "hits": 432,
+        "friendly": 0,
+        "kills": 75
+      },
+      "artilleryStats": {
+        "reaims": 76,
+        "limberTurns": 30,
+        "slowedReloads": 98,
+        "silencedGuns": 2,
+        "shellExplosions": 168
+      }
+    },
+    {
+      "seed": 87109,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 755,
+      "round": {
+        "sent": 33,
+        "hits": 53,
+        "friendly": 0,
+        "kills": 51
+      },
+      "scatter": {
+        "sent": 112,
+        "hits": 64,
+        "friendly": 48,
+        "kills": 35
+      },
+      "shell": {
+        "sent": 139,
+        "hits": 319,
+        "friendly": 0,
+        "kills": 52
+      },
+      "artilleryStats": {
+        "reaims": 24,
+        "limberTurns": 2,
+        "slowedReloads": 3,
+        "silencedGuns": 1,
+        "shellExplosions": 139
+      }
+    },
+    {
+      "seed": 95028,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 489,
+      "round": {
+        "sent": 12,
+        "hits": 16,
+        "friendly": 0,
+        "kills": 12
+      },
+      "scatter": {
+        "sent": 304,
+        "hits": 199,
+        "friendly": 78,
+        "kills": 62
+      },
+      "shell": {
+        "sent": 12,
+        "hits": 14,
+        "friendly": 0,
+        "kills": 0
+      },
+      "artilleryStats": {
+        "reaims": 97,
+        "limberTurns": 44,
+        "slowedReloads": 16,
+        "silencedGuns": 5,
+        "shellExplosions": 12
+      }
+    },
+    {
+      "seed": 102947,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 907,
+      "round": {
+        "sent": 46,
+        "hits": 56,
+        "friendly": 5,
+        "kills": 50
+      },
+      "scatter": {
+        "sent": 416,
+        "hits": 224,
+        "friendly": 0,
+        "kills": 128
+      },
+      "shell": {
+        "sent": 214,
+        "hits": 630,
+        "friendly": 5,
+        "kills": 140
+      },
+      "artilleryStats": {
+        "reaims": 44,
+        "limberTurns": 0,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 211
+      }
+    },
+    {
+      "seed": 110866,
+      "initialGuns": [
+        5,
+        6
+      ],
+      "perK": [
+        4.166666666666667,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 930,
+      "round": {
+        "sent": 21,
+        "hits": 38,
+        "friendly": 0,
+        "kills": 33
+      },
+      "scatter": {
+        "sent": 32,
+        "hits": 12,
+        "friendly": 2,
+        "kills": 5
+      },
+      "shell": {
+        "sent": 155,
+        "hits": 607,
+        "friendly": 1,
+        "kills": 113
+      },
+      "artilleryStats": {
+        "reaims": 36,
+        "limberTurns": 20,
+        "slowedReloads": 77,
+        "silencedGuns": 1,
+        "shellExplosions": 155
+      }
+    },
+    {
+      "seed": 118785,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 429,
+      "round": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "scatter": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "shell": {
+        "sent": 1,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "artilleryStats": {
+        "reaims": 19,
+        "limberTurns": 13,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 1
+      }
+    },
+    {
+      "seed": 126704,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 497,
+      "round": {
+        "sent": 12,
+        "hits": 14,
+        "friendly": 0,
+        "kills": 14
+      },
+      "scatter": {
+        "sent": 208,
+        "hits": 148,
+        "friendly": 32,
+        "kills": 79
+      },
+      "shell": {
+        "sent": 51,
+        "hits": 102,
+        "friendly": 0,
+        "kills": 12
+      },
+      "artilleryStats": {
+        "reaims": 68,
+        "limberTurns": 11,
+        "slowedReloads": 132,
+        "silencedGuns": 1,
+        "shellExplosions": 50
+      }
+    },
+    {
+      "seed": 134623,
+      "initialGuns": [
+        6,
+        7
+      ],
+      "perK": [
+        5,
+        5.833333333333334
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 663,
+      "round": {
+        "sent": 57,
+        "hits": 100,
+        "friendly": 2,
+        "kills": 95
+      },
+      "scatter": {
+        "sent": 272,
+        "hits": 146,
+        "friendly": 5,
+        "kills": 84
+      },
+      "shell": {
+        "sent": 112,
+        "hits": 272,
+        "friendly": 6,
+        "kills": 22
+      },
+      "artilleryStats": {
+        "reaims": 59,
+        "limberTurns": 18,
+        "slowedReloads": 88,
+        "silencedGuns": 0,
+        "shellExplosions": 112
+      }
+    },
+    {
+      "seed": 142542,
+      "initialGuns": [
+        7,
+        6
+      ],
+      "perK": [
+        5.833333333333334,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 560,
+      "round": {
+        "sent": 53,
+        "hits": 71,
+        "friendly": 0,
+        "kills": 65
+      },
+      "scatter": {
+        "sent": 528,
+        "hits": 194,
+        "friendly": 17,
+        "kills": 102
+      },
+      "shell": {
+        "sent": 119,
+        "hits": 382,
+        "friendly": 0,
+        "kills": 92
+      },
+      "artilleryStats": {
+        "reaims": 28,
+        "limberTurns": 22,
+        "slowedReloads": 1,
+        "silencedGuns": 1,
+        "shellExplosions": 119
+      }
+    },
+    {
+      "seed": 150461,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 726,
+      "round": {
+        "sent": 33,
+        "hits": 91,
+        "friendly": 4,
+        "kills": 83
+      },
+      "scatter": {
+        "sent": 176,
+        "hits": 129,
+        "friendly": 0,
+        "kills": 71
+      },
+      "shell": {
+        "sent": 73,
+        "hits": 283,
+        "friendly": 2,
+        "kills": 36
+      },
+      "artilleryStats": {
+        "reaims": 71,
+        "limberTurns": 9,
+        "slowedReloads": 629,
+        "silencedGuns": 0,
+        "shellExplosions": 73
+      }
+    },
+    {
+      "seed": 158380,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 796,
+      "round": {
+        "sent": 29,
+        "hits": 54,
+        "friendly": 0,
+        "kills": 50
+      },
+      "scatter": {
+        "sent": 688,
+        "hits": 204,
+        "friendly": 1,
+        "kills": 112
+      },
+      "shell": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "artilleryStats": {
+        "reaims": 19,
+        "limberTurns": 13,
+        "slowedReloads": 219,
+        "silencedGuns": 0,
+        "shellExplosions": 0
+      }
+    },
+    {
+      "seed": 166299,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 918,
+      "round": {
+        "sent": 34,
+        "hits": 65,
+        "friendly": 2,
+        "kills": 56
+      },
+      "scatter": {
+        "sent": 0,
+        "hits": 0,
+        "friendly": 0,
+        "kills": 0
+      },
+      "shell": {
+        "sent": 260,
+        "hits": 538,
+        "friendly": 0,
+        "kills": 110
+      },
+      "artilleryStats": {
+        "reaims": 49,
+        "limberTurns": 16,
+        "slowedReloads": 75,
+        "silencedGuns": 2,
+        "shellExplosions": 259
+      }
+    },
+    {
+      "seed": 174218,
+      "initialGuns": [
+        6,
+        5
+      ],
+      "perK": [
+        5,
+        4.166666666666667
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 920,
+      "round": {
+        "sent": 13,
+        "hits": 14,
+        "friendly": 0,
+        "kills": 13
+      },
+      "scatter": {
+        "sent": 144,
+        "hits": 26,
+        "friendly": 14,
+        "kills": 9
+      },
+      "shell": {
+        "sent": 157,
+        "hits": 403,
+        "friendly": 2,
+        "kills": 84
+      },
+      "artilleryStats": {
+        "reaims": 62,
+        "limberTurns": 10,
+        "slowedReloads": 9,
+        "silencedGuns": 0,
+        "shellExplosions": 156
+      }
+    },
+    {
+      "seed": 182137,
+      "initialGuns": [
+        6,
+        6
+      ],
+      "perK": [
+        5,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 385,
+      "round": {
+        "sent": 31,
+        "hits": 22,
+        "friendly": 0,
+        "kills": 22
+      },
+      "scatter": {
+        "sent": 32,
+        "hits": 25,
+        "friendly": 20,
+        "kills": 8
+      },
+      "shell": {
+        "sent": 96,
+        "hits": 255,
+        "friendly": 0,
+        "kills": 26
+      },
+      "artilleryStats": {
+        "reaims": 17,
+        "limberTurns": 6,
+        "slowedReloads": 10,
+        "silencedGuns": 0,
+        "shellExplosions": 96
+      }
+    },
+    {
+      "seed": 190056,
+      "initialGuns": [
+        5,
+        6
+      ],
+      "perK": [
+        4.166666666666667,
+        5
+      ],
+      "outsideArcErrors": 0,
+      "deaths": 798,
+      "round": {
+        "sent": 176,
+        "hits": 169,
+        "friendly": 9,
+        "kills": 163
+      },
+      "scatter": {
+        "sent": 336,
+        "hits": 111,
+        "friendly": 15,
+        "kills": 61
+      },
+      "shell": {
+        "sent": 227,
+        "hits": 397,
+        "friendly": 6,
+        "kills": 48
+      },
+      "artilleryStats": {
+        "reaims": 58,
+        "limberTurns": 18,
+        "slowedReloads": 0,
+        "silencedGuns": 0,
+        "shellExplosions": 227
+      }
+    }
+  ]
+}

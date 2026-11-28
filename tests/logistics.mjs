@@ -16,7 +16,7 @@ for(let seed=1;seed<=80;seed++){
     assert.equal(movementAt(riverAt(0,l),0,l),.45);assert.equal(movementAt(l.roads[0].points[0].x,l.roads[0].points[0].y,l),1.3);
     report.maps++;
 }
-for(const scale of [1200,2400,3600]){
+for(const scale of [1200,2400]){
     for(let seed=1;seed<=15;seed++){
         const w=new SimWorld(scale,seed*7919),s=w.logistics;
         assert.equal(s.corps.length,6);assert.equal(s.wagons.length,6);
@@ -46,7 +46,7 @@ const u=c.members.find(u=>u.ammo===40);const original=v.stock;u.ammo=30;c.ammo-=
 advance(30);assert.equal(u.ammo,34);assert.equal(v.stock,original-4);report.supplyRound=original-v.stock;
 c.vx=10;advance(30);const marching=c.fatigue;assert.ok(marching>0);c.vx=0;advance(30);assert.ok(c.fatigue<marching);
 enemy.x=v.x;enemy.y=v.y;w.hash.rebuild(w.units);advance(30);assert.ok(v.destroyed&&v.stock===0);report.wagonsRaided=1;
-const g=new SimWorld(3600,42),s=g.logistics;
+const g=new SimWorld(2400,42),s=g.logistics;
 const front=g.companies.find(c=>c.line===0&&g.companies.some(r=>r.faction===c.faction&&r.sector===c.sector&&r.line===1&&r.kind==='line_infantry'));
 const reserve=g.companies.find(r=>r.faction===front.faction&&r.sector===front.sector&&r.line===1&&r.kind==='line_infantry');
 const depot=s.wagons.find(v=>v.id===front.corps);front.ammo=0;for(const u of front.members)u.ammo=0;

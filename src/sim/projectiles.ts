@@ -8,12 +8,12 @@ import {RANGE} from './scale';
  * 实体弹道。所有远程杀伤都沿真实路径判定：弹丸飞过谁、在谁的身高范围内，就打中谁，不分敌我。
  * 高度单位：1.0 ≈ 站立步兵身高。跪姿 0.6，骑兵 1.7，火炮 0.8。
  */
-export type ShotKind = 'musket' | 'round' | 'scatter';
+export type ShotKind = 'musket' | 'round' | 'scatter' | 'shell';
 type Tally = {sent: number; hits: number; friendly: number; kills: number};
 
 export function bodyHeight(w: SimWorld, u: Soldier) {
     if (mounted(u)) return 1.7;
-    if (artillery(u)) return .8;
+    if (artillery(u)) return u.crew > 0 ? .98 : .8;
     return u.kneelUntil > w.tick || u.pose === 'kneel' || u.pose === 'kneelLoad' ? .55 : 1;
 }
 /** 命中判定用的横截面半径（像素）。骑兵按朝向近似取均值。 */
@@ -29,11 +29,15 @@ export interface RayHit { unit: Soldier; s: number }
 export function traceRay(w: SimWorld, x: number, y: number, dx: number, dy: number, range: number,
     height: (s: number) => number, skip: number, filter?: (u: Soldier) => boolean): RayHit | null {
     const found: {best: RayHit | null} = {best: null};
-    const step = 40;
+    const step = 56;
     for (let s0 = 0; s0 < range + step; s0 += step) {
-        if (found.best && found.best.s < s0 - 20) break;
-        const cx = x + dx * Math.min(range, s0), cy = y + dy * Math.min(range, s0);
-        w.hash.visit(cx, cy, 34, u => {
+        if (found.best && found.best.s < s0 - 28) break;
+        const sClamped = Math.min(range, s0);
+        // 高度超过所有单位最大身高（骑兵 1.7）且相邻步也在高空时，无需查询空间哈希
+        const hMid = height(sClamped);
+        if (hMid > 1.85 && height(Math.max(0, sClamped - step * .5)) > 1.85 && height(Math.min(range, sClamped + step * .5)) > 1.85) continue;
+        const cx = x + dx * sClamped, cy = y + dy * sClamped;
+        w.hash.visit(cx, cy, 36, u => {
             if (u.id === skip || (filter && !filter(u))) return;
             const ox = u.x - x, oy = u.y - y, s = ox * dx + oy * dy;
             if (s <= 2 || s > range || (found.best && s >= found.best.s)) return;
@@ -51,12 +55,15 @@ export class Ballistics {
     stats: Record<ShotKind, Tally> = {
         musket: {sent: 0, hits: 0, friendly: 0, kills: 0},
         round: {sent: 0, hits: 0, friendly: 0, kills: 0},
-        scatter: {sent: 0, hits: 0, friendly: 0, kills: 0}
+        scatter: {sent: 0, hits: 0, friendly: 0, kills: 0},
+        shell: {sent: 0, hits: 0, friendly: 0, kills: 0}
     };
     /** 射击纪律检查次数与因火线上有友军而放弃的次数。 */
     discipline = {checks: 0, heldFire: 0, ignored: 0};
     /** 累计瞄准距离，用于统计平均交火距离。 */
     shotRange = 0;
+    /** 白刃战阵亡计数。 */
+    meleeKills = 0;
     /** 友军误伤诊断：同连 / 他连；命中距离；被击中者是否跪姿；射手连是否在白刃中。 */
     friendlyWhy = {sameCompany: 0, otherCompany: 0, nearSum: 0, victimKneeling: 0, shooterInMelee: 0};
 
@@ -78,16 +85,19 @@ export class Ballistics {
         const ux = dx / d, uy = dy / d, c = w.companies[u.company];
         const own = c.formation === 'column' ? 36 : c.ranks * 15 + 8;
         let blocked = false;
-        // 火线是一个随距离张开的扇面（与实际散布一致）：扇面里有站立的友军，或者远处有任何友军，就不开火。
-        for (let s0 = 20; s0 < d + 140 && !blocked; s0 += 30) {
-            w.hash.visit(u.x + ux * s0, u.y + uy * s0, 26 + s0 * Math.min(.22, .075 * spread), o => {
+        const cone = Math.min(.15, .088 * spread);
+        // 火线是一个随距离张开的扇面：步长与局部查询半径成正比，几何无缝覆盖且大幅减少远距哈希次数。
+        for (let s0 = 10; s0 < d + 120 && !blocked; ) {
+            const rad = 26 + s0 * cone;
+            w.hash.visit(u.x + ux * s0, u.y + uy * s0, rad, o => {
                 if (blocked || o.faction !== u.faction || o.id === u.id) return;
                 const ox = o.x - u.x, oy = o.y - u.y, s = ox * ux + oy * uy;
-                if (s <= 2 || s > d + 130) return;
-                if (Math.abs(ox * uy - oy * ux) > bodyRadius(o) + 2 + s * Math.min(.22, .075 * spread)) return;
+                if (s <= 1 || s > d + 110) return;
+                if (Math.abs(ox * uy - oy * ux) > bodyRadius(o) + 6 + s * cone) return;
                 if (o.company === u.company && s < own && bodyHeight(w, o) < muzzle - .1) return;
                 blocked = true;
             });
+            s0 += Math.max(30, Math.round(rad * 1.45));
         }
         return blocked;
     }
@@ -97,31 +107,31 @@ export class Ballistics {
      */
     musket(w: SimWorld, u: Soldier, c: Company, aim: Soldier, spread: number) {
         this.stats.musket.sent++;
-        this.shotRange += Math.hypot(aim.x - u.x, aim.y - u.y);
+        const ax = aim.x - u.x, ay = aim.y - u.y, d = Math.max(1, Math.hypot(ax, ay));
+        this.shotRange += d;
         const kneeling = u.kneelUntil > w.tick || u.pose === 'kneel' || u.pose === 'kneelLoad';
         const muzzle = kneeling ? .72 : 1;
-        const ax = aim.x - u.x, ay = aim.y - u.y, d = Math.max(1, Math.hypot(ax, ay));
-        // 横向散布（弧度）与纵向散布（到达目标距离处的高度偏差）。
-        const yaw = Math.max(-.1, Math.min(.1, gauss(w) * .034 * spread));
+        // 横向散布（弧度）与纵向散布（到达目标距离处的高度偏差），精度随距离自然衰减。
+        const yaw = Math.max(-.075, Math.min(.075, gauss(w) * .020 * spread));
         const cos = Math.cos(yaw), sin = Math.sin(yaw);
         const dx = (ax * cos - ay * sin) / d, dy = (ax * sin + ay * cos) / d;
-        // 纵向偏差在弹道后段才显现（游戏距离是压缩的，不能让低弹出膛几步就落到前排跪姿士兵头上）。
-        const heightAtTarget = .62 + gauss(w) * (.9 + d * .026) * spread;
+        const heightAtTarget = .62 + gauss(w) * (.55 + d * .0092) * spread;
         const dev = heightAtTarget - muzzle;
+        const maxRange = c.variant === 'rifles' ? Math.round(RANGE.musket * 1.25) : RANGE.musket;
         // 本连纵深之内弹道保持枪口高度：后排是从前排的列间空隙射出去的（队列操典）。
         const s0 = Math.min(d * .6, c.formation === 'column' ? 36 : c.formation === 'square' ? 12 : c.ranks * 15 + 8);
         const k = (s: number) => s <= s0 ? 0 : (s - s0) / (d - s0);
         const height = (s: number) => muzzle + dev * k(s) * k(s);
-        const ground = dev < 0 ? Math.min(RANGE.musket, s0 + (d - s0) * Math.sqrt(muzzle / -dev)) : RANGE.musket;
+        const ground = dev < 0 ? Math.min(maxRange, s0 + (d - s0) * Math.sqrt(muzzle / -dev)) : maxRange;
         // 炮兵阵地的土胸墙挡住低飞的弹丸。
         const wall = w.earthworks.block(u.x, u.y, dx, dy, ground, height);
         const reach = Math.min(ground, wall);
-        const hit = traceRay(w, u.x, u.y, dx, dy, reach, height, u.id);
+        const hit = traceRay(w, u.x, u.y, dx, dy, reach, height, u.id, o => !(o.company === u.company && Math.hypot(o.x - u.x, o.y - u.y) <= s0 && bodyHeight(w, o) < muzzle - .1));
         if (!hit && wall < ground) w.earthworks.absorbed.musket++;
         const end = hit ? hit.s : reach;
         if (hit) {
             if (hit.unit.faction === u.faction) { const f = this.friendlyWhy; if (hit.unit.company === u.company) { f.sameCompany++; if (f.sameCompany <= 12) (globalThis as any).__ffLog?.push({sr: Math.floor(u.slot / Math.max(1, c.files)), vr: Math.floor(hit.unit.slot / Math.max(1, c.files)), sk: kneeling, vh: bodyHeight(w, hit.unit), s: Math.round(hit.s), h: +height(hit.s).toFixed(2), d: Math.round(d), form: c.formation, pose: u.pose, mode: c.fireMode, files: c.files}); } else f.otherCompany++; f.nearSum += hit.s; if (bodyHeight(w, hit.unit) < .8) f.victimKneeling++; if (c.engaged) f.shooterInMelee++; }
-            const killed = damage(w, hit.unit, w.rng.int(55, 130), dx, dy, false, c);
+            const killed = damage(w, hit.unit, w.rng.int(85, 145), dx, dy, false, c);
             this.record('musket', u, hit.unit, killed);
         }
         return {x: u.x + dx * end, y: u.y + dy * end, struck: !!hit, dx, dy};
@@ -180,13 +190,33 @@ export class Ballistics {
             if (r.energy <= 0) break;
             const killed = damage(w, u, r.energy > .35 ? 190 : 90, ux, uy, true, source);
             this.record('round', gun, u, killed);
-            r.energy -= mounted(u) ? .3 : artillery(u) ? .6 : .12;
+            r.energy -= mounted(u) ? .35 : artillery(u) ? .6 : .16;
             const hc = w.companies[u.company];
             if (!r.touched.includes(hc.id)) { r.touched.push(hc.id); hc.morale = Math.max(0, hc.morale - 3.5); }
         }
     }
-    /** 统计口径：实心弹“发射数”按炮弹计。 */
+    /** 统计口径：实心弹/榴弹“发射数”按炮弹计。 */
     countRound() { this.stats.round.sent++; }
+    countShell() { this.stats.shell.sent++; }
+    /** 榴弹爆炸：在半径 80px 内用 16～24 条实体射线判定破片，不分敌我。 */
+    shellBurst(w: SimWorld, r: RoundLike, bx: number, by: number) {
+        const fragments = w.rng.int(16, 24);
+        const source = w.companies[r.company], gun = r.gun;
+        const touched = new Set<number>();
+        for (let i = 0; i < fragments; i++) {
+            const ang = (i / fragments) * Math.PI * 2 + (w.rng.next() - 0.5) * 0.25;
+            const dx = Math.cos(ang), dy = Math.sin(ang);
+            const reach = 80 * (0.65 + w.rng.next() * 0.35);
+            const hf = (s: number) => 0.35 + (s / Math.max(1, reach)) * 0.45;
+            const hit = traceRay(w, bx, by, dx, dy, reach, hf, -1);
+            if (hit) {
+                const killed = damage(w, hit.unit, w.rng.int(22, 48), dx, dy, true, source);
+                this.record('shell', gun, hit.unit, killed);
+                const hc = w.companies[hit.unit.company];
+                if (hc && !touched.has(hc.id)) { touched.add(hc.id); hc.morale = Math.max(0, hc.morale - 2.2); }
+            }
+        }
+    }
 }
 export interface RoundLike { gun: Soldier; company: number; energy: number; hit: Set<number>; touched: number[] }
 export function emitImpact(w: SimWorld, g: Soldier, x: number, y: number, struck: boolean) {

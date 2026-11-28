@@ -45,7 +45,7 @@ export function riverAt(y:number,l=layout){
 /** 新地图只在开局取随机数，通行地表随后由同一份几何数据派生。 */
 export function createCampaignLayout(rng:Rng,defender:Faction|-1,size:Size=CAMPAIGN_SIZE):Layout{
     const l=empty(size),{width,height}=l,cx=width/2,cy=height/2,orientation=defender===0?-1:1;
-    l.seed=rng.next()*100;l.lineGap=rng.int(860,1090);
+    l.seed=rng.next()*100;l.lineGap=rng.int(2250,2950);
     l.ridgeOwner=defender;l.ridgeWidth=rng.int(330,460);
     l.ridgeX=cx+orientation*l.lineGap;
     l.ridges.push({x:l.ridgeX,y:cy,width:l.ridgeWidth,length:height*.48});

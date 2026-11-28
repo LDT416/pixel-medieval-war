@@ -46,15 +46,14 @@ export class CommandPlan {
             const phase=plan.phases[stage++];
             w.say(w.generals[f].name+'开始'+phase.name+'，主攻方向为'+names[plan.mainEffort],f,target?.x??w.layout.width/2,(plan.mainEffort+.5)*w.layout.height/3,2);
             if(phase.orders==='charge'){
-                const vulnerable=enemy.filter(c=>isArtillery(c)||c.status==='shaken');
-                for(const horse of available.filter(c=>isMounted(c) && w.tick>=c.blownUntil && c.order==='hold')){
-                    const mark=vulnerable.filter(c=>c.sector===horse.sector && dist(horse,c)<1650)
-                        .sort((a,b)=>dist(horse,a)-dist(horse,b))[0];
-                    if(mark)this.assign(w,horse,'screen','charge',mark.id);
-                }
+                // 骑兵由 evaluateCavalryAI 统一按 6 种战术任务决策，不再由 phase 强行覆写
             }
             if(target && phase.orders==='advance'){
-                for(const c of available.filter(c=>c.sector===plan.mainEffort && c.line===0 && c.order==='hold'))w.logistics.dispatch(w,c,'advance',target.id);
+                for(const b of w.battalions)if(b.faction===f && b.sector===plan.mainEffort && b.line===0 && b.order==='hold'){
+                    b.order='advance';
+                    for(const id of b.companies){const c=w.companies[id];if(c&&active(c))w.logistics.dispatch(w,c,'advance',target.id);}
+                }
+                for(const c of available.filter(c=>c.battalion<0 && c.sector===plan.mainEffort && c.line===0 && c.order==='hold'))w.logistics.dispatch(w,c,'advance',target.id);
             }
         }
         this.nextPhase[f]=stage;
@@ -64,7 +63,18 @@ export class CommandPlan {
             const point=missing[0]??points.find(p=>p.sector===sector);
             const contact=enemy.filter(c=>c.sector===sector).sort((a,b)=>dist(a,point??ready[0])-dist(b,point??ready[0]))[0];
             const c=ready.sort((a,b)=>dist(a,point??target??a)-dist(b,point??target??b))[0];
-            if(this.assign(w,c,'reserve',point && danger!==null?'hold':'advance',point && danger!==null?-1:contact?.id??-1,point)){
+            if(c.battalion>=0 && w.battalions[c.battalion]){
+                const b=w.battalions[c.battalion];
+                const ord: 'hold'|'advance' = contact ? 'advance' : 'hold';
+                b.order=ord;
+                if(point && !contact){b.homeX=point.x;b.homeY=point.y;}
+                for(const id of b.companies){
+                    const m=w.companies[id];
+                    if(m&&active(m)){this.assign(w,m,'reserve',ord,contact?.id??-1);this.used.add(m.id);}
+                }
+                plan.reserveAt??=w.tick;
+                w.say(w.generals[f].name+'投入'+b.name+'，增援'+names[sector],f,b.x,b.y,3);
+            }else if(this.assign(w,c,'reserve',point && danger!==null?'hold':'advance',point && danger!==null?-1:contact?.id??-1,point)){
                 this.used.add(c.id);plan.reserveAt??=w.tick;
                 w.say(w.generals[f].name+'投入'+c.name+'，增援'+names[sector],f,c.x,c.y,3);
             }
@@ -73,16 +83,10 @@ export class CommandPlan {
             const batteries=troops.filter(c=>isArtillery(c));
             for(const c of available.filter(c=>isArtillery(c)&&c.sector===plan.mainEffort)){
                 const aim=batteries.length>1?batteries.reduce((a,b)=>dist(c,a)<dist(c,b)?a:b):target;
-                if(c.forced!==aim.id && dist(c,aim)<2450)w.logistics.dispatch(w,c,'hold',aim.id);
+                if(c.forced!==aim.id && dist(c,aim)<5800)w.logistics.dispatch(w,c,'hold',aim.id);
             }
         }
-        for(const horse of available.filter(c=>isMounted(c) && c.order==='hold' && w.tick>=c.blownUntil)){
-            const escort=friendly.filter(c=>foot(c) && c.sector===horse.sector && (c.order==='advance'||c.order==='assault'))
-                .sort((a,b)=>dist(horse,a)-dist(horse,b))[0];
-            if(!escort || dist(horse,escort)<600 || enemy.some(e=>dist(e,horse)<450))continue;
-            const point={x:escort.x+(f?1:-1)*240,y:escort.y+(horse.id%2?165:-165)};
-            this.assign(w,horse,'screen','hold',-1,point);
-        }
+        // 骑兵侧翼掩护与巡逻由 evaluateCavalryAI 统一执行（D6），避免重复下发旧式静止点
         for(const sector of sectors){
             const horse=enemy.filter(c=>isMounted(c) && c.sector===sector && c.order==='charge');
             if(horse.length)for(const c of friendly.filter(c=>c.line===1 && c.sector===sector && c.id%2===0)){
@@ -90,7 +94,7 @@ export class CommandPlan {
             }
             const point=points.find(p=>p.sector===sector && p.owner!==f && (plan.role==='attack'||missing.includes(p)));
             if(!point || w.lostSectors[f][sector] || !opening || friendly.some(c=>foot(c)&&dist(c,point)<135))continue;
-            const c=available.filter(c=>c.sector===sector && foot(c) && c.line!==6 && (!plan.reserve.includes(c.id)||this.used.has(c.id)) && c.status==='steady' && !this.assigned(c,w.tick))
+            const c=available.filter(c=>c.battalion<0 && c.sector===sector && foot(c) && c.line!==6 && (!plan.reserve.includes(c.id)||this.used.has(c.id)) && c.status==='steady' && !this.assigned(c,w.tick))
                 .sort((a,b)=>dist(a,point)-dist(b,point))[0];
             if(c && dist(c,point)<1950 && !enemy.some(e=>dist(e,c)<250) && this.assign(w,c,'point','hold',-1,point)){
                 w.say(c.name+'受令前往'+point.name,f,c.x,c.y,1);

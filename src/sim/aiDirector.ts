@@ -4,6 +4,8 @@ import type { SimWorld } from './world';
 import { inRect, inWoods, layout, WIDTH } from './maps';
 import { MUSKET, dist } from './combat';
 import { CommandPlan } from './commandPlan';
+import { activeCompanies, meetsAssaultConditions, recentLossFraction, isFlankOrRear } from './battalion';
+import { evaluateCavalryAI } from './cavalry';
 
 const CANNONADE = { aggressive: 330, cunning: 560, steadfast: 650, cautious: 900 };
 const ASSAULT = { aggressive: 58, cunning: 50, steadfast: 44, cautious: 36 };
@@ -37,86 +39,122 @@ export class Director {
         const plan=w.plans[f];
         const free=(c:Company)=>!this.plan.assigned(c,w.tick) && !plan.reserve.includes(c.id);
         const leader = g.alive ? g.title + g.name : '代理指挥官';
-        // ---- 全线推进 ----
+        // ---- 全线推进（按营下发，保持横队整体性） ----
+        const issueBattalionOrder = (b: typeof w.battalions[number], order: 'advance' | 'hold' | 'assault', target = -1) => {
+            b.order = order;
+            if (order === 'advance') b.closing = false;
+            for (const id of b.companies) {
+                const c = w.companies[id];
+                if (c && c.alive > 0 && c.status !== 'rout' && c.status !== 'gone') w.logistics.dispatch(w, c, order, target);
+            }
+        };
         if (attack && !this.advanced[f] && w.tick >= this.cannonadeEnd[f]) {
-            this.advanced[f] = true; this.secondWave[f] = w.tick + 330;
+            this.advanced[f] = true; this.secondWave[f] = w.tick + 1800;
             let x = 0, y = 0, n = 0;
-            for (const c of own) if (c.line === 0 && free(c)) { w.logistics.dispatch(w,c,'advance'); x += c.x; y += c.y; n++; }
+            for (const b of w.battalions) if (b.faction === f && b.line === 0 && !w.lostSectors[f][b.sector]) {
+                issueBattalionOrder(b, 'advance'); x += b.x; y += b.y; n++;
+            }
+            for (const c of own) if (c.battalion < 0 && c.line === 0 && free(c)) { w.logistics.dispatch(w,c,'advance'); x += c.x; y += c.y; n++; }
             w.say(`${leader}下令：全线推进！`, f, n ? x / n : WIDTH / 2, n ? y / n : 1600, 2);
         }
         if (this.secondWave[f] && w.tick >= this.secondWave[f]) {
             this.secondWave[f] = 0;
-            for (const c of own) if (c.line === 1 && c.order === 'hold' && free(c)) w.logistics.dispatch(w,c,'advance');
+            for (const b of w.battalions) if (b.faction === f && b.line === 1 && (b.order === 'hold' || b.order === 'reserve') && !w.lostSectors[f][b.sector]) {
+                issueBattalionOrder(b, 'advance');
+            }
+            for (const c of own) if (c.battalion < 0 && c.line === 1 && (c.order === 'hold' || c.order === 'reserve') && free(c)) w.logistics.dispatch(w,c,'advance');
         }
-        // 攻方：重整好的连队再次投入进攻。
-        if (attack && this.advanced[f] && !this.secondWave[f] && w.tick % 150 === 1)
-            for (const c of own) if (free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && !isMounted(c)) w.logistics.dispatch(w,c,'advance');
-        // 守方：敌军疲态尽显时转入全线反击。
+        // 梯次投入：二线营在中盘投入，近卫营与翼侧未交火营在深盘投入总攻
+        if (w.tick > w.deployEnd + 2700 && w.tick % 240 === 1) {
+            const anyFrontEngaged = w.battalions.some(b => b.faction === f && b.firingSince >= 0);
+            if (anyFrontEngaged || w.tick > w.deployEnd + 4500) {
+                for (const b of w.battalions) if (b.faction === f && !w.lostSectors[f][b.sector]) {
+                    const dueLine1 = b.line === 1 && (b.order === 'reserve' || b.order === 'hold');
+                    const dueGuard = b.line === 2 && w.tick > w.deployEnd + 4800 && (b.order === 'reserve' || b.order === 'hold');
+                    const dueIdleFront = b.line === 0 && b.order === 'hold' && b.firstVolleyCount === 0 && w.tick > w.deployEnd + 3600;
+                    if (!dueLine1 && !dueGuard && !dueIdleFront) continue;
+                    const comps = activeCompanies(w, b);
+                    if (comps.length && comps.reduce((s, c) => s + c.morale, 0) / comps.length > 46) {
+                        issueBattalionOrder(b, 'advance');
+                        if (b.line === 2) w.say(`${leader}投入${b.name}参加总攻！`, f, b.x, b.y, 2);
+                    }
+                }
+            }
+        }
+        // 攻方：重整好或待命的营再次投入进攻。
+        if (attack && this.advanced[f] && !this.secondWave[f] && w.tick % 150 === 1) {
+            for (const b of w.battalions) if (b.faction === f && (b.line <= 2 || b.line === 7) && (b.order === 'hold' || b.order === 'reserve') && !w.lostSectors[f][b.sector]) {
+                const comps = activeCompanies(w, b);
+                if (comps.length && comps.reduce((s, c) => s + c.morale, 0) / comps.length > 50) issueBattalionOrder(b, 'advance');
+            }
+            for (const c of own) if (c.battalion < 0 && free(c) && (c.line <= 1 || c.line === 7) && c.order === 'hold' && c.status === 'steady' && c.morale > 50 && !isMounted(c)) w.logistics.dispatch(w,c,'advance');
+        }
+        // 守方：敌军疲态尽显或久战后转入全线反击。
         if (!attack && w.tick > 3600 && w.tick % 90 === 1) {
             const visiblyWorn=seen.length>0 && seen.every(c=>c.status==='rout' || c.morale<38);
             if (visiblyWorn || w.tick > 16500) {
                 w.posture[f] = 'attack'; this.advanced[f] = true;
-                for (const c of own) if (free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && !isMounted(c) && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
+                for (const b of w.battalions) if (b.faction === f && !w.lostSectors[f][b.sector] && activeCompanies(w, b).length) issueBattalionOrder(b, 'advance');
+                for (const c of own) if (c.battalion < 0 && free(c) && c.line !== 6 && c.line !== 5 && c.line !== 4 && !isMounted(c) && c.status !== 'rout') w.logistics.dispatch(w,c,'advance');
                 w.say(f ? `${leader}挥舞帽子：全线前进！` : `${leader}下令：全线反击！`, f, w.frontline().x, w.frontline().y, 3);
             }
         }
-        // ---- 刺刀冲锋 ----
-        for (const c of own) {
-            if (c.status !== 'steady' || (!isLineTroop(c) && !isGuard(c)) || c.line === 6) continue;
-            if((!free(c) && c.order!=='advance' && (c.order==='reserve' || (!seen.includes(w.companies[c.target]) || dist(c,w.companies[c.target])>260))) || w.noAssault[f] || w.tick<c.assaultReady || c.engaged || c.formation==='square')continue;
-            if (c.order !== 'advance' && c.order !== 'hold') continue;
-            const current=w.companies[c.target];
-            const viable=(o:Company)=>o.faction!==f && o.alive>0 && o.line!==5 && !isMounted(o) && o.status!=='rout' && o.status!=='gone';
-            const reach=w.weather==='fog'?1300:2250;
-            const t=current && seen.includes(current) && viable(current)?current:seen.filter(o=>viable(o)&&dist(o,c)<reach)
-                .sort((a,b)=>dist(a,c)-dist(b,c))[0];
-            if(!t)continue;
-            let limit = ASSAULT[trait] - (attack ? 0 : 10) + (isGuard(c) && plan.reserveAt!==null ? 22 : 0);
-            if (inRect(layout.farm, t.x, t.y, 20)) limit -= 14;
-            const d = dist(c, t);
-            const support=own.some(o=>o!==c && o.line!==5 && o.status==='steady' && dist(o,c)<480);
-            const fresh=t.alive===t.peak && t.morale>60 && c.morale>50;
-            const worn=c.firingSince>=0 && w.tick-c.firingSince>1200;
-            const window=w.tick-t.firstVolleyAt<80 && d<150;
-            const lowAmmo=c.ammo<8*c.alive;
-            if(worn && !support && c.losses>Math.max(1,c.kills)*1.3 && w.logistics.requestRelief(w,c))continue;
-            const isolated=!seen.some(o=>o!==t && o.faction===t.faction && o.line!==5 && o.alive>3 && o.status==='steady' && dist(o,t)<250);
-            const designated=c.order==='advance' && (c.sector===plan.mainEffort || isolated) && (support || c.morale>65);
-            if ((d<reach && (fresh || designated) && (c.id%3!==2 || attack)) || (d<MUSKET+40 && (t.morale<limit || t.alive<c.alive*.45 || window || lowAmmo || (worn && (support || c.kills>=1.2*Math.max(1,c.losses)))))) {
-                c.order = 'assault'; c.forced = t.id;
-                c.freshAtStart=fresh;c.charges++;
-                if (isGuard(c) || w.rng.next() < .22) w.say(`${c.name}上刺刀，冲锋！`, f, c.x, c.y, isGuard(c) ? 2 : 1);
-            }
-        }
-        // ---- 骑兵寻找战机 ----
-        if (w.tick > (attack ? this.cannonadeEnd[f] + 150 : 800)) {
-            for (const c of own) {
-                if (!isMounted(c) || c.line === 5 || c.status !== 'steady' || c.order !== 'hold' || c.morale < 52 || w.tick<c.blownUntil) continue;
-                if (w.rng.next() > .4) continue;
-                let best: Company | undefined, bs = 0;
-                for (const o of seen) {
-                    if (o.faction === f || o.status === 'gone' || o.status === 'rout' || (o.alive < 4 && o.line!==5)) continue;
-                    const d = dist(c, o);
-                    if (d > 1600 || inWoods(o.x, o.y, 30) || inRect(layout.farm, o.x, o.y, 40)) continue;
-                    if (o.formation === 'square' && o.formUntil <= w.tick) continue;
-                    let s = o.status === 'shaken' ? 2 : o.formUntil > w.tick && o.formation!=='square' && w.tick-o.leftSquare>300 ? 2.4 : 0;
-                    if (isArtillery(o) && !seen.some(p => p.faction === o.faction && !isArtillery(p) && p.line !== 5 && p.status !== 'rout' && p.status !== 'gone' && dist(p, o) < 260)) s = Math.max(s, trait === 'cunning' ? 2.6 : 2);
-                    if(o.line===5){
-                        const cover=own.length && seen.some(p=>p.faction===o.faction && p.line!==5 && p.status==='steady' && p.alive>=6 && dist(p,o)<580);
-                        if(cover || d>1150 || !w.generals[o.faction].alive)continue;
-                        s=2.8;
+        // ---- 刺刀冲锋（严格执行任务书 13 D4：必须 <= 400px 且满足 5 条件之一） ----
+        if (!w.noAssault[f]) {
+            for (const b of w.battalions) {
+                if (b.faction !== f || w.lostSectors[f][b.sector]) continue;
+                const comps = activeCompanies(w, b);
+                if (!comps.length) continue;
+                if (b.order === 'assault' || b.order === 'rally' || b.order === 'reserve') continue;
+                if (comps.some(c => c.engaged || c.formation === 'square' || w.tick < c.assaultReady)) { b.closing = false; continue; }
+                const avgMorale = comps.reduce((s, c) => s + c.morale, 0) / comps.length;
+                if (avgMorale < 42) { b.closing = false; continue; }
+                const tComp = b.targetCompany >= 0 ? w.companies[b.targetCompany] : undefined;
+                const tBat = b.target >= 0 ? w.battalions[b.target] : null;
+                if (!tComp || tComp.faction === f || tComp.alive <= 0 || tComp.status === 'gone' || tComp.status === 'rout' || tComp.line === 5 || isMounted(tComp)) { b.closing = false; continue; }
+                const tPos = (tBat && activeCompanies(w, tBat).length > 0) ? tBat : tComp;
+                const d = dist(b, tPos);
+                const cond = meetsAssaultConditions(w, b, tBat, tComp);
+                // 正常交战要求至少打过首轮齐射后再压近或冲锋（除非已被迫贴脸 <= 220px 或侧后突袭）
+                const readyToCharge = b.firstVolleyCount >= 1 || d <= 220 || isFlankOrRear(b, tBat ?? tComp);
+                if (cond && readyToCharge && d <= 400) {
+                    b.order = 'assault'; b.closing = false;
+                    const firstTime = b.firstChargeAt < 0;
+                    if (firstTime) b.firstChargeAt = w.tick;
+                    w.assaultOrders.push({tick: w.tick, battalion: b.id, company: comps[0].id, dist: d, sinceFirstFire: b.firingSince >= 0 ? w.tick - b.firingSince : 0});
+                    for (const c of comps) {
+                        c.order = 'assault'; c.forced = tComp.id; c.charges++;
+                        c.freshAtStart = tComp.alive === tComp.peak && tComp.morale > 60;
                     }
-                    if (isLineTroop(o) && o.formation === 'line' && w.tick - o.reloadAt > -40 && w.tick < o.reloadAt) s = Math.max(s, 1.15);
-                    if (isMounted(o) && o.order === 'charge' && d < 700) s = Math.max(s, 1.8);
-                    s *= 1 - d / 2200;
-                    if (s > bs) { bs = s; best = o; }
+                    if (b.kind === 'guard_grenadier' || w.rng.next() < 0.35) w.say(`${b.name}上刺刀，全营冲锋！`, f, b.x, b.y, b.kind === 'guard_grenadier' ? 2 : 1);
+                } else if (cond && readyToCharge && d > 400 && d <= 1250 && (b.firingSince >= 0 || b.order === 'advance')) {
+                    // 满足优势条件但尚未进入 400px：以横队压近至 340px，进入 400px 内再发起刺刀冲锋
+                    b.closing = true;
+                    if (b.order === 'hold') { b.order = 'advance'; for (const c of comps) c.order = 'advance'; }
+                } else {
+                    b.closing = false;
                 }
-                if (best && bs >= EAGER[trait] * (1 - Math.min(.35, w.tick / 30000))) {
-                    c.charges++;c.order = 'charge'; c.forced = best.id;
-                    w.say(`${c.name}拔出马刀，向${best.name}发起冲锋！`, f, c.x, c.y, 2);
+            }
+            // 未编入营的独立步兵连（不含农庄守军与散兵连）
+            for (const c of own) {
+                if (c.battalion >= 0 || c.status !== 'steady' || (!isLineTroop(c) && !isGuard(c)) || c.line === 6 || c.formation === 'skirmish') continue;
+                if (w.tick < c.assaultReady || c.engaged || c.formation === 'square') continue;
+                if (c.order !== 'advance' && c.order !== 'hold') continue;
+                const t = c.target >= 0 ? w.companies[c.target] : undefined;
+                if (!t || t.faction === f || t.alive <= 0 || t.status === 'gone' || t.status === 'rout' || t.line === 5 || isMounted(t)) continue;
+                const d = dist(c, t);
+                if (d > 400) continue;
+                const cond = t.morale < 40 || t.status === 'shaken' || recentLossFraction(w, t) > 0.15 || t.ammo <= 0 || isFlankOrRear(c, t) || (c.firingSince >= 0 && w.tick - c.firingSince >= 900 && c.morale >= t.morale + 15);
+                if (cond) {
+                    c.order = 'assault'; c.forced = t.id; c.charges++;
+                    w.assaultOrders.push({tick: w.tick, battalion: -1, company: c.id, dist: d, sinceFirstFire: c.firingSince >= 0 ? w.tick - c.firingSince : 0});
+                    c.freshAtStart = t.alive === t.peak && t.morale > 60;
+                    if (isGuard(c) || w.rng.next() < .22) w.say(`${c.name}上刺刀，冲锋！`, f, c.x, c.y, isGuard(c) ? 2 : 1);
                 }
             }
         }
+        // ---- 骑兵战术任务评估（任务书 14 D 节：去掉 60% 跳过，6 种任务择优执行） ----
+        evaluateCavalryAI(w, f, own, seen);
         // ---- 参谋部跟随主力 ----
         const staff = w.companies[g.company];
         if (staff && staff.status !== 'gone' && staff.status !== 'rout') {

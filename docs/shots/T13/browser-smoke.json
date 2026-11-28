@@ -1,0 +1,56 @@
+{
+  "seed": "31676",
+  "scale": 2400,
+  "endTick": 10995,
+  "ended": true,
+  "winner": 0,
+  "alive": [
+    919,
+    894
+  ],
+  "dead": [
+    248,
+    292
+  ],
+  "fled": [
+    33,
+    14
+  ],
+  "shotsMeta": {
+    "duel1": {
+      "tick": 2648,
+      "mx": 7714.724034356526,
+      "my": 1301.5717350193327,
+      "dist": 906.8113050568248,
+      "bName": "第1战列步兵营",
+      "tName": "第2步兵营"
+    },
+    "cavalry": {
+      "tick": 4028,
+      "name": "第8胸甲骑兵团 · 骠骑兵连",
+      "phase": "gallop",
+      "speed": 211,
+      "formation": "diamond"
+    },
+    "artillery": {
+      "tick": 4028,
+      "name": "第1近卫炮兵连 · 骑炮兵连",
+      "variant": "horse_battery",
+      "crews": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "aimsDeg": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "problems": []
+}

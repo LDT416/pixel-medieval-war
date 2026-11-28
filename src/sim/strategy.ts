@@ -2,26 +2,30 @@ import {artillery as isArtillery, guard as isGuard, lineTroop as isLineTroop, mo
 import type { Soldier, Company, Formation } from './arenaTypes';
 import type { SimWorld } from './world';
 import { WIDTH, HEIGHT, movementAt, behindCrest, inWoods, inRect, layout } from './maps';
-import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, gunFire } from './combat';
+import { MUSKET, CANISTER, gunRange, dist, shake, emit, volley, shoot, strike, gunFire, angleDiffRad } from './combat';
+import { diamondSlotOffset, stepCavalryCompany, cavalrySpeedMult } from './cavalry';
 
 import {formationTicks,setupTicks} from './units/roster';
 import {unitTypes} from './units/unitTypes';
 import {PACE} from './scale';
 
 const SPACING: Record<Formation, [number, number]> = {
-    line: [13, 15], column: [13, 14], square: [13, 13], battery: [62, 0], wedge: [25, 32], staff: [22, 18]
+    line: [13, 15], column: [13, 14], square: [13, 13], battery: [62, 0], wedge: [25, 32], staff: [22, 18], skirmish: [34, 34], diamond: [22, 26]
 };
 export function filesFor(c: Company, n: number) {
     switch (c.formation) {
         case 'line': return Math.max(1, Math.ceil(n / c.ranks));
         case 'column': return Math.min(n, 9);
         case 'wedge': return Math.max(1, Math.ceil(n / 2));
+        case 'diamond': return Math.max(1, Math.min(7, Math.ceil(n / 3)));
+        case 'skirmish': return Math.max(1, Math.ceil(n / 2));
         case 'battery': return n;
         default: return Math.max(1, Math.ceil(n / 2));
     }
 }
 /** 连内第 i 个士兵相对连中心的（横向, 纵深）偏移。 */
 function slotOffset(c: Company, i: number): [number, number] {
+    if (c.formation === 'diamond') return diamondSlotOffset(c.capacity, i);
     const [sp, dp] = SPACING[c.formation];
     if (c.formation === 'square') {
         if(c.capacity<4)return [(i-(c.capacity-1)/2)*sp,0];
@@ -84,6 +88,11 @@ function flee(w: SimWorld, u: Soldier, c: Company) {
 }
 function meleeStep(w: SimWorld, u: Soldier, c: Company) {
     if (isArtillery(u) || c.order==='rally') return false;
+    // B4：骑兵面对已成型方阵时在 60px 外绕行承受射击，不钻进方阵中心肉搏
+    if (isMounted(u) && c.chargeOpponent >= 0) {
+        const opp = w.companies[c.chargeOpponent];
+        if (opp && opp.formation === 'square' && opp.formUntil <= w.tick && opp.status !== 'rout') return false;
+    }
     const fixed=c.formation==='square' && c.formUntil<=w.tick;
     const closing=c.contactId>=0 && w.tick-c.contactAt<=45;
     let foe = u.foe >= 0 ? w.units[u.foe] : undefined;
@@ -129,8 +138,12 @@ export function advance(w: SimWorld, u: Soldier) {
     let tx=c.x-lat*c.hy-dep*c.hx+u.jx, ty=c.y+lat*c.hx-dep*c.hy+u.jy;
     if(c.line===6 && layout.farm)[tx,ty]=courtyard(c,u.slot);
     
+    const inBatLine = c.battalion >= 0 && c.battalionSlot >= 0 && !w.logistics.isCommitted(c);
+    const batClosing = inBatLine && !!w.battalions[c.battalion]?.closing;
     const charging = c.order === 'charge' || (c.order === 'assault' && c.target>=0 && w.sight.canSee(w,c,w.companies[c.target]) && dist(c,w.companies[c.target]) < 320);
-    const gait=c.sprintUntil>w.tick?PACE.horseSprint:c.assaultStage==='rush'?PACE.footRush:u.speed;
+    const horseGait = isMounted(u) && c.line !== 5 ? Math.max(PACE.horseWalk * cavalrySpeedMult(c), c.cavSpeed * 1.06) : u.speed;
+    const isSkirm = c.formation === 'skirmish' && c.battalion >= 0;
+    const gait = isMounted(u) && c.line !== 5 ? horseGait : c.assaultStage === 'rush' ? PACE.footRush : isSkirm ? PACE.footRush * 1.12 : batClosing ? u.speed * 1.25 : u.speed;
     const moved=moveToward(w,u,tx,ty,gait*(1-PACE.maxFatiguePenalty*c.fatigue));
     faceToward(u,c.hx);
     if (moved) {
@@ -174,7 +187,7 @@ function pickTarget(w: SimWorld, c: Company) {
     const forced = w.companies[c.forced];
     if (forced && forced.status !== 'gone' && forced.alive > 0 && (forced.line!==5 || isMounted(c) && c.order==='charge') && visible(forced)) return forced;
     c.forced = -1;
-    const reach = isArtillery(c) ? gunRange(w) : w.weather === 'fog' ? 1000 : 2600;
+    const reach = isArtillery(c) ? gunRange(w) : w.weather === 'fog' ? 1400 : 7500;
     let best: Company | undefined, score = Infinity;
     for (const o of w.companies) {
         if (o.faction === c.faction || o.status === 'gone' || o.alive <= 0 || o.line === 5) continue;
@@ -192,7 +205,7 @@ function pickTarget(w: SimWorld, c: Company) {
     }
     return best;
 }
-function setFormation(w: SimWorld, c: Company, f: Formation) {
+export function setFormation(w: SimWorld, c: Company, f: Formation) {
     if (c.formation === f || !unitTypes[c.kind].formation.allowed.includes(f)) return;
     if(f==='square' && w.tick-c.leftSquare<120)return;
     c.capacity=c.members.length; c.margin=0; c.lastShrink=w.tick;
@@ -219,7 +232,7 @@ function setFormation(w: SimWorld, c: Company, f: Formation) {
 function compact(w:SimWorld,c:Company){
     const lost=c.members.length!==c.alive;
     if(lost)c.members=c.members.filter(u=>u.hp>0);
-    if(!c.alive || c.status==='rout')return;
+    if(!c.alive || c.status==='rout' || isArtillery(c))return;
     const width=c.files, rows=Math.ceil(c.capacity/width);
     const shrink=c.formation!=='square' && width-2*c.margin>2 && w.tick-c.lastShrink>=90
         && (c.alive<=(width-2*c.margin)*rows*.7 || (lost && rows>1 && !c.members.some(u=>u.slot>=width*(rows-1))));
@@ -274,7 +287,7 @@ export function rout(w: SimWorld, c: Company, quiet = false) {
     } else if (c.peak >= 8 && w.rng.next() < (isMounted(c) ? .5 : .7)) {
         w.say(`${c.name}${isMounted(c) ? '掉转马头逃离战场' : '丢下火枪，四散溃逃！'}`, c.faction, c.x, c.y, 1);
     }
-    for (const o of w.companies) if (o !== c && o.faction === c.faction && o.status !== 'gone' && dist(o, c) < 380) shake(o, 5);
+    for (const o of w.companies) if (o !== c && o.faction === c.faction && o.status !== 'gone' && dist(o, c) < 380) shake(o, 3);
 }
 
 /** 连队大脑，每 6 帧轮询一次：士气、目标、队形、移动、开火。 */
@@ -296,7 +309,7 @@ export function updateCompany(w: SimWorld, c: Company) {
     const g = w.generals[c.faction];
     const near = nearestEnemy(w, c);
     // ---- 士气 ----
-    const calm = w.tick > c.underFire && !c.engaged;
+    const calm = w.tick > c.underFire && !c.engaged && near.d > 950;
     let regen = calm ? .55 : .08;
     if (g.alive && g.unit && dist(g.unit, c) < 750) regen += .35;
     if (c.colors > 0) regen += .12;
@@ -310,7 +323,7 @@ export function updateCompany(w: SimWorld, c: Company) {
             c.status = 'shaken'; c.rallied++;c.rallies++; c.order = isMounted(c) ? 'rally' : 'hold';
             let mx = 0, my = 0; for (const u of c.members) { mx += u.x; my += u.y; }
             c.x = c.homeX = mx / c.members.length; c.y = c.homeY = my / c.members.length;
-            c.hx = c.faction ? -1 : 1; c.hy = 0; if(isMounted(c))c.blownUntil=w.tick+450; if(c.formation!=='square')setFormation(w,c,isMounted(c)?'wedge':'line');
+            c.hx = c.faction ? -1 : 1; c.hy = 0; if(isMounted(c)){c.chargePhase='idle';c.cavTask='none';} if(c.formation!=='square')setFormation(w,c,isMounted(c)?'diamond':'line');
             if (c.peak >= 10) w.say(`${c.name}在${g.alive ? g.title + g.name + '的' : '军官的'}喝令下重整旗鼓`, c.faction, c.x, c.y, 1);
         }
         return;
@@ -332,13 +345,16 @@ export function updateCompany(w: SimWorld, c: Company) {
             const distance=dist(c,horse),previous=c.cavalryDistances.get(horse.id)??distance;
             c.cavalryDistances.set(horse.id,distance);
             const moving=Math.hypot(horse.vx,horse.vy)>3;
-            if(moving && (distance<250 || (distance<450 && previous-distance>8 && w.tick-c.leftSquare>=60))){
+            if(moving && (distance<320 || (distance<560 && (previous-distance>5 || horse.cavTask==='threaten' || horse.order==='charge') && w.tick-c.leftSquare>=60))){
                 c.lastHorse=w.tick;threat=true;
             }
         }
         if((threat || (w.director.plan.wantsSquare(c,w.tick) && w.tick-c.leftSquare>=60)) && !sheltered)setFormation(w,c,'square');
-        else if(c.formation==='square' && w.tick-c.lastHorse>=240 && w.tick-c.formedSquareAt>=900)setFormation(w,c,'line');
-        else if (c.formation !== 'square') setFormation(w, c, !sheltered && ((c.order==='advance' && d>600) || (c.order==='assault' && (c.formation==='column' || (d>350 && c.id%3===0)))) ? 'column' : 'line');
+        else if(c.formation==='square' && w.tick-c.lastHorse>=240 && w.tick-c.formedSquareAt>=900)setFormation(w,c,c.variant==='voltigeur'||c.variant==='rifles'?'skirmish':'line');
+        else if (c.formation !== 'square' && c.battalion < 0) {
+            const want: Formation = (c.variant==='voltigeur'||c.variant==='rifles') ? 'skirmish' : (!sheltered && c.order==='advance' && d>2100 ? 'column' : 'line');
+            setFormation(w, c, want);
+        }
     }
     // ---- 移动目标 ----
     if(c.order==='assault' && w.noAssault[c.faction]){c.order='hold';c.assaultStage='idle';}
@@ -357,42 +373,76 @@ export function updateCompany(w: SimWorld, c: Company) {
     }else c.assaultStage='idle';
     if(isArtillery(c)){
         c.order='hold';
-        if(!c.relocated){
-            let sum=0,count=0;
-            for(const p of w.companies)if(p.faction===c.faction && p.line===0 && p.alive && p.status!=='rout'){sum+=p.x;count++;}
-            const front=sum/count, face=c.faction?-1:1;
-            if(count && (front-c.initialFront)*face>600){
-                c.homeX=front-face*170; c.limbered=true; c.relocated=true;c.deployUntil=w.tick+setupTicks(c);
+        // H3：哑火炮（crew === 0）被敌军接触后视为缴获
+        for (const gun of c.members) {
+            if (gun.hp > 0 && gun.crew === 0 && !gun.captured) {
+                let capturedBy: Company | null = null;
+                w.hash.visit(gun.x, gun.y, 75, o => {
+                    if (!capturedBy && o.faction !== c.faction && o.hp > 0 && !isArtillery(o)) capturedBy = w.companies[o.company];
+                });
+                if (capturedBy) {
+                    gun.captured = true;
+                    (capturedBy as Company).captures++;
+                    w.say(`${(capturedBy as Company).name}缴获了一门哑火的敌炮`, (capturedBy as Company).faction, gun.x, gun.y, 1);
+                }
             }
-        }else if(c.limbered && Math.hypot(c.x-c.homeX,c.y-c.homeY)<2){
-            c.limbered=false;c.deployUntil=w.tick+setupTicks(c);w.earthworks.dig(w,c.id);
+        }
+        // I2：骑炮兵在炮火准备结束后可跟随友方骑兵机动部署；普通炮兵随一线推进前移
+        if (!c.limbered && w.tick >= c.deployUntil) {
+            const face = c.faction ? -1 : 1;
+            const readyMove = w.tick > Math.max(w.deployEnd + 900, w.director.cannonadeEnd[c.faction] + 900);
+            if (c.variant === 'horse_battery' && readyMove && c.members.some(g => g.hp > 0 && g.crew > 2)) {
+                const friendCav = w.companies.find(p => p.faction === c.faction && isMounted(p) && p.line !== 5 && p.alive >= 6 && p.status !== 'rout' && p.status !== 'gone');
+                if (friendCav && Math.hypot(friendCav.x - c.x, friendCav.y - c.y) > 1800) {
+                    const tx = Math.max(220, Math.min(WIDTH - 220, friendCav.x - face * 720));
+                    const ty = Math.max(220, Math.min(HEIGHT - 220, friendCav.y));
+                    if (Math.hypot(tx - c.x, ty - c.y) > 550) {
+                        c.homeX = tx; c.homeY = ty; c.limbered = true; c.deployUntil = w.tick + setupTicks(c);
+                    }
+                }
+            } else if (!c.relocated && readyMove && c.members.some(g => g.hp > 0 && g.crew > 2)) {
+                let sum = 0, count = 0;
+                for (const p of w.companies) if (p.faction === c.faction && p.line === 0 && p.alive && p.status !== 'rout') { sum += p.x; count++; }
+                const front = sum / count;
+                if (count && (front - c.initialFront) * face > 900) {
+                    c.homeX = front - face * 260; c.limbered = true; c.relocated = true; c.deployUntil = w.tick + setupTicks(c);
+                }
+            }
+        } else if (c.limbered && Math.hypot(c.x - c.homeX, c.y - c.homeY) < 12) {
+            c.limbered = false; c.deployUntil = w.tick + setupTicks(c);
+            const face = c.faction ? -1 : 1;
+            c.hx = face; c.hy = 0;
+            for (const g of c.members) if (g.hp > 0) { g.aim = Math.atan2(c.hy, c.hx); g.reaimTargetAim = g.aim; g.reaimKind = 'none'; g.shotsOnTarget = 0; }
+            w.earthworks.dig(w, c.id);
         }
     }
     let gx = c.homeX, gy = c.homeY;
     const contact=(isMounted(c)?75:55)+(t?.formation==='square'?40:0);
     const range = isArtillery(c) ? gunRange(w) * .8 : MUSKET * .78;
-    if(c.order==='rally' && isMounted(c))c.blownUntil=Math.max(c.blownUntil,c.contactAt+450);
-    if (t && c.order === 'advance') {
+    const cavStep = stepCavalryCompany(w, c, t, d);
+    const inBatLine = c.battalion >= 0 && c.battalionSlot >= 0 && !w.logistics.isCommitted(c);
+    if (cavStep) {
+        gx = cavStep.gx; gy = cavStep.gy;
+    } else if (inBatLine && c.order !== 'assault' && c.order !== 'rally') {
+        gx = c.homeX; gy = c.homeY;
+    } else if (t && c.order === 'advance') {
         if (d > range) { const k = (d - range) / d; gx = c.x + (t.x - c.x) * k; gy = c.y + (t.y - c.y) * k; }
         else { gx = c.x; gy = c.y; }
 
-    } else if (t && (c.order === 'assault' || c.order === 'charge')) {
-        const separation=c.order==='assault'?c.assaultStage==='approach'?130:c.assaultStage==='signal'?d:24:contact-2;
+    } else if (t && c.order === 'assault') {
+        const separation=c.assaultStage==='approach'?130:c.assaultStage==='signal'?d:24;
         gx=t.x-(t.x-c.x)/Math.max(1,d)*separation;
         gy=t.y-(t.y-c.y)/Math.max(1,d)*separation;
-        if(c.order==='charge' && c.chargeOpponent===t.id && t.formation==='square' && w.tick-c.chargeAt<90){
-            gx-=(t.y-c.y)/Math.max(1,d)*15;gy+=(t.x-c.x)/Math.max(1,d)*15;
-        }
-
-    } else if (!t && (c.order === 'advance' || c.order === 'assault' || c.order === 'charge')) {
+    } else if (!t && (c.order === 'advance' || c.order === 'assault')) {
         // 雾中看不见敌人：朝敌方阵地方向摸索前进。
         const e = nearestEnemy(w, c).c;
         gx = c.x + (e ? Math.sign(e.x - c.x) : c.faction ? -1 : 1) * 160; gy = e ? c.y + Math.sign(e.y - c.y) * 40 : c.y;
     } else if (c.order === 'rally' && dist(c, { x: c.homeX, y: c.homeY }) < 40 && c.morale > 55) c.order = 'hold';
-    if(c.order!=='charge' && c.assaultStage!=='rush' && Math.hypot(gx-c.x,gy-c.y)>80){
+    if(c.order!=='charge' && c.assaultStage!=='rush' && c.formation!=='skirmish' && Math.hypot(gx-c.x,gy-c.y)>80){
         const len=Math.hypot(gx-c.x,gy-c.y),dx=(gx-c.x)/len,dy=(gy-c.y)/len;
         for(const other of w.companies){
             if(other===c || other.faction!==c.faction || !other.alive || other.status==='rout')continue;
+            if(c.battalion>=0 && other.battalion===c.battalion)continue;
             const rx=other.x-c.x,ry=other.y-c.y,ahead=rx*dx+ry*dy,side=rx*dy-ry*dx;
             const width=Math.min(110,(c.files+other.files)*4+16);
             if(ahead<4 || ahead>120 || Math.abs(side)>=width)continue;
@@ -412,78 +462,131 @@ export function updateCompany(w: SimWorld, c: Company) {
         sx-=lat*c.hy+depth*c.hx;sy+=lat*c.hx-depth*c.hy;
     }
     lag = Math.hypot(mx-c.x-sx/c.members.length,my-c.y-sy/c.members.length);
-    const mounted=isMounted(c);
-    if(mounted && c.order==='charge' && d<250 && c.fatigue<.7 && w.tick>=c.sprintReady){
-        c.sprintUntil=w.tick+PACE.sprintTicks;c.sprintReady=c.sprintUntil+450;
-        c.fatigue=Math.min(1,c.fatigue+.12);
-    }
-    if(c.order!=='charge')c.sprintUntil=0;
-    let speed=c.sprintUntil>w.tick?PACE.horseSprint:c.assaultStage==='rush'?PACE.footRush:c.speed;
+    const batClosingSp = inBatLine && !!w.battalions[c.battalion]?.closing;
+    const isSkirm = c.formation === 'skirmish' && c.battalion >= 0;
+    let speed = cavStep ? cavStep.speed : c.assaultStage === 'rush' ? PACE.footRush : isSkirm ? PACE.footRush * 1.12 : batClosingSp ? c.speed * 1.25 : c.speed;
     if(c.formation==='square')speed*=.55;
     speed*=movementAt(c.x,c.y)*(1-PACE.maxFatiguePenalty*c.fatigue);
     if(c.limbered && w.tick<c.deployUntil)speed=0;
-    if (c.formUntil > w.tick && c.formation !== 'column') speed *= .3;
+    if (c.formUntil > w.tick && c.formation !== 'column' && !cavStep) speed *= .3;
     const gd = Math.hypot(gx - c.x, gy - c.y);
-    if (gd > 1 && lag < 95) {
-        const step = Math.min(gd, speed * Math.min(1,(95-lag)/28) * 6 / 30);
+    const maxLagAllowed = isSkirm ? 260 : 95;
+    if (gd > 1 && (cavStep || lag < maxLagAllowed)) {
+        const lagFactor = cavStep || isSkirm ? 1 : Math.min(1, (95 - lag) / 28);
+        const step = Math.min(gd, speed * lagFactor * 6 / 30);
         c.vx=(gx-c.x)/gd*step*5; c.vy=(gy-c.y)/gd*step*5;
     }
-    // 朝向：转向目标，每次最多转 0.1 弧度（整连在原地“轮转”）。
+    // 朝向：营内连统一遵循营朝向；骑兵朝移动方向或目标方向；其他连转向目标。
     const face = c.faction ? -1 : 1;
     let ax = t ? t.x - c.x : face, ay = t ? t.y - c.y : 0;
-    if (c.order === 'rally' || c.order === 'reserve' || (c.order === 'hold' && (!t || d > 1200))) { ax = face; ay = 0; }
+    let turnRate = 0.1;
+    if (cavStep && gd > 10) {
+        ax = gx - c.x; ay = gy - c.y; turnRate = 0.28;
+    } else if (inBatLine && c.order !== 'assault' && c.order !== 'rally') {
+        const b = w.battalions[c.battalion];
+        if (b) {
+            const ang = Math.atan2(b.hy, b.hx) + c.refuseAngle;
+            ax = Math.cos(ang); ay = Math.sin(ang);
+            if (Math.abs(c.refuseAngle) > 0.1) turnRate = 0.25;
+        }
+    } else if (c.order === 'rally' || c.order === 'reserve' || (c.order === 'hold' && (!t || d > 1200))) { ax = face; ay = 0; }
     const al = Math.hypot(ax, ay) || 1; ax /= al; ay /= al;
     const cur = Math.atan2(c.hy, c.hx), want = Math.atan2(ay, ax);
     let delta = want - cur; while (delta > Math.PI) delta -= 2 * Math.PI; while (delta < -Math.PI) delta += 2 * Math.PI;
-    const turn = cur + Math.max(-.1, Math.min(.1, delta));
+    const turn = cur + Math.max(-turnRate, Math.min(turnRate, delta));
     c.hx = Math.cos(turn); c.hy = Math.sin(turn);
     if(c.order!=='charge' && c.order!=='assault')c.chargeOpponent=-1;
-    if (!t) return;
+    if (!t && !isArtillery(c)) return;
     // ---- 接敌 ----
-
-    if(c.assaultStage==='rush' && d<=62){
-        c.assaultStage='melee';
-        c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;
-        w.charges.push({tick:w.tick,company:c.id,target:t.id,fresh:c.freshAtStart,outcome:'melee'});
-    }
-    if(c.assaultStage==='melee' && (t.status==='rout'||t.status==='gone'||d>150)){
-        c.assaultStage='idle';c.assaultReady=w.tick+720;
-        c.homeX=c.x;c.homeY=c.y;c.order='hold';c.forced=-1;
-    }
-    if ((c.order === 'assault' || c.order === 'charge') && d < contact && t.status !== 'rout' && c.chargeOpponent!==t.id) {
-        c.chargeOpponent=t.id;c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;c.chargeAt=w.tick;
-
-        if(isArtillery(t) && t.morale<18 && t.status!=='gone' && t.alive>0){
-            c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
+    if (t) {
+        if(c.assaultStage==='rush' && d<=62){
+            c.assaultStage='melee';
+            c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;
+            w.charges.push({tick:w.tick,company:c.id,target:t.id,fresh:c.freshAtStart,outcome:'melee'});
         }
-    }
-    const contactCompany=w.companies[c.chargeOpponent>=0?c.chargeOpponent:c.contactId];
-    const opponent=contactCompany && w.sight.canSee(w,c,contactCompany)?contactCompany:undefined;
-    if(c.engaged && opponent && (w.tick-c.chargeAt)%18<6)meleePressure(w,c,opponent);
-    if(isMounted(c) && c.order==='charge' && c.chargeOpponent>=0 && (w.tick-c.chargeAt>200 || opponent?.status==='gone' || opponent?.status==='rout' || (opponent?.formation==='square' && w.tick-c.chargeAt>=72))){
-        const retreatX=opponent?c.x-opponent.x:-c.hx, retreatY=opponent?c.y-opponent.y:-c.hy;
-        const length=Math.hypot(retreatX,retreatY)||1;
-        c.homeX=Math.max(80,Math.min(WIDTH-80,c.x+retreatX/length*760));c.homeY=Math.max(80,Math.min(HEIGHT-80,c.y+retreatY/length*760));
-        c.blownUntil=w.tick+450;c.engaged=false;c.contactId=-1;c.lastMelee=-9999;c.order='rally';c.forced=-1;
-        for(const u of c.members)u.foe=-1;
-    }
-    if (!c.engaged && (c.order === 'assault' || c.order === 'charge') && t.status === 'rout' && d < 220 && !isMounted(c)) {
-        c.order = 'hold'; c.homeX = c.x; c.homeY = c.y;
+        if(c.assaultStage==='melee' && (t.status==='rout'||t.status==='gone'||d>150)){
+            c.assaultStage='idle';c.assaultReady=w.tick+1200;
+            c.homeX=c.x;c.homeY=c.y;c.order='hold';c.forced=-1;
+        }
+        if (c.order === 'assault' && d < contact && t.status !== 'rout' && c.chargeOpponent!==t.id) {
+            c.chargeOpponent=t.id;c.contactId=t.id;c.contactAt=w.tick;t.contactId=c.id;t.contactAt=w.tick;c.chargeAt=w.tick;
+            if(isArtillery(t) && (t.morale<18 || t.members.every(g=>g.hp<=0||g.crew<=0)) && t.status!=='gone' && t.alive>0){
+                c.captures++;rout(w,t,true);w.say(c.name+'夺取了敌军炮位',c.faction,t.x,t.y,2);
+            }
+        }
+        const contactCompany=w.companies[c.chargeOpponent>=0?c.chargeOpponent:c.contactId];
+        const opponent=contactCompany && w.sight.canSee(w,c,contactCompany)?contactCompany:undefined;
+        if(c.engaged && opponent && (w.tick-c.chargeAt)%18<6)meleePressure(w,c,opponent);
+        if (!c.engaged && c.order === 'assault' && t.status === 'rout' && d < 220 && !isMounted(c)) {
+            c.order = 'hold'; c.homeX = c.x; c.homeY = c.y;
+        }
     }
     // ---- 开火 ----
     if (isArtillery(c)) {
-        if (!c.limbered && w.tick>=c.deployUntil && lag < 30 && gd < 5) for (const gun of c.members) if (gun.hp > 0 && !gun.cooldown && !gun.moving) {
-            const gt = d < CANISTER ? t : pickTarget(w, c) ?? t;
-            if (dist(gun, gt) >= gunRange(w)) continue;
-            if (gunFire(w, gun, c, gt)) continue;
-            // 射击纪律：首选目标的弹道会经过友军，就改打其它看得见的目标（离原目标近的优先）。
-            const alt = w.companies.filter(o => o !== gt && o.faction !== c.faction && o.alive > 0 && o.status !== 'gone' && o.line !== 5
-                && dist(gun, o) < gunRange(w) && w.sight.canSee(w, c, o)).sort((a, b) => dist(a, gt) - dist(b, gt)).slice(0, 3);
-            for (const o of alt) if (gunFire(w, gun, c, o)) break;
+        const MAX_ARC = (8 * Math.PI) / 180;
+        const MAX_TRAVERSE = (30 * Math.PI) / 180;
+        if (!c.limbered && w.tick >= c.deployUntil && Math.hypot(c.vx, c.vy) < 6 && gd < 20) {
+            const gRange = gunRange(w);
+            const visibleEnemies = w.companies.filter(o => o.faction !== c.faction && o.alive > 0 && o.status !== 'gone' && o.line !== 5 && w.sight.canSee(w, c, o));
+            const activeEnemies = visibleEnemies.filter(o => o.status !== 'rout');
+            const pool = activeEnemies.length ? activeEnemies : visibleEnemies;
+            for (const gun of c.members) {
+                if (gun.hp <= 0 || gun.crew <= 0 || gun.captured || gun.moving) continue;
+                // 完成正在进行的撬炮尾/挂车转向
+                if (gun.reaimKind !== 'none') {
+                    if (w.tick < gun.reaimUntil) continue;
+                    gun.aim = gun.reaimTargetAim;
+                    gun.reaimKind = 'none';
+                }
+                if (gun.cooldown > 0) continue;
+                const inRange = pool.filter(o => dist(gun, o) < gRange);
+                if (!inRange.length) continue;
+                // G5：优先选择射界（±8°）内的目标；若近距(<=1400px)出现侧翼威胁且射界内无近距目标，转向迎击近距威胁
+                const inArc = inRange.filter(o => Math.abs(angleDiffRad(gun.aim, Math.atan2(o.y - gun.y, o.x - gun.x))) <= MAX_ARC);
+                const closeThreatOutOfArc = inRange.find(o => dist(gun, o) <= 1400 && Math.abs(angleDiffRad(gun.aim, Math.atan2(o.y - gun.y, o.x - gun.x))) > MAX_ARC);
+                const hasCloseInArc = inArc.some(o => dist(gun, o) <= 1400);
+                if (inArc.length && (!closeThreatOutOfArc || hasCloseInArc)) {
+                    inArc.sort((a, b) => {
+                        const da = dist(gun, a), db = dist(gun, b);
+                        const sa = (da < CANISTER ? da * 0.35 : da) * (a.formation === 'square' || a.formation === 'column' ? 0.65 : isArtillery(a) ? 0.72 : a.status === 'rout' ? 2.5 : 1);
+                        const sb = (db < CANISTER ? db * 0.35 : db) * (b.formation === 'square' || b.formation === 'column' ? 0.65 : isArtillery(b) ? 0.72 : b.status === 'rout' ? 2.5 : 1);
+                        return sa - sb;
+                    });
+                    let fired = false;
+                    for (const o of inArc.slice(0, 4)) {
+                        if (gunFire(w, gun, c, o)) { fired = true; break; }
+                    }
+                    if (fired) continue;
+                }
+                // G3 / G4：射界内无有效目标（或近距侧翼有更紧急威胁），且炮组人数 > 2 时转向
+                if (gun.crew <= 2) continue;
+                inRange.sort((a, b) => {
+                    const da = dist(gun, a), db = dist(gun, b);
+                    const angA = Math.abs(angleDiffRad(gun.aim, Math.atan2(a.y - gun.y, a.x - gun.x)));
+                    const angB = Math.abs(angleDiffRad(gun.aim, Math.atan2(b.y - gun.y, b.x - gun.x)));
+                    return (da / 2200 + angA * 0.5) - (db / 2200 + angB * 0.5);
+                });
+                const best = inRange[0];
+                const wantAim = Math.atan2(best.y - gun.y, best.x - gun.x);
+                const absDiff = Math.abs(angleDiffRad(gun.aim, wantAim));
+                if (absDiff > MAX_ARC) {
+                    gun.shotsOnTarget = 0; gun.rangeError = 0; gun.aimTarget = -1;
+                    gun.reaimTargetAim = wantAim;
+                    if (absDiff <= MAX_TRAVERSE) {
+                        // G3：撬动炮尾重新瞄准，耗时 60～90 tick
+                        gun.reaimKind = 'traverse';
+                        gun.reaimUntil = w.tick + w.rng.int(60, 90);
+                        w.artilleryStats.reaims++;
+                    } else {
+                        // G4：偏出 ±30°，挂车转向再展开，耗时 >= 150 tick
+                        gun.reaimKind = 'limber';
+                        gun.reaimUntil = w.tick + (c.variant === 'horse_battery' ? 150 : w.rng.int(155, 185));
+                        w.artilleryStats.limberTurns++;
+                    }
+                }
+            }
         }
-    } else if (!isMounted(c) && c.assaultStage!=='rush' && c.assaultStage!=='melee' && !c.engaged && d < MUSKET && w.tick >= c.reloadAt && c.order !== 'charge' && t.status !== 'rout') {
-        volley(w, c, t);
-    } else if (!isMounted(c) && c.assaultStage!=='rush' && c.assaultStage!=='melee' && !c.engaged && t.status === 'rout' && d < MUSKET && w.tick >= c.reloadAt) {
+    } else if (t && !isMounted(c) && c.formation !== 'skirmish' && (!inBatLine || c.formation === 'square' || Math.abs(c.refuseAngle) > 0.1) && c.assaultStage!=='rush' && c.assaultStage!=='melee' && !c.engaged && d < MUSKET && w.tick >= c.reloadAt && c.order !== 'charge') {
         volley(w, c, t);
     }
 }
@@ -493,7 +596,7 @@ function meleePressure(w: SimWorld, a: Company, b: Company) {
     const power = (c: Company, o: Company) => c.alive * (isMounted(c) ? (square(o) ? .5 : 1.6) : isGuard(c) ? 1.4 : 1)
         * (.4 + c.morale / 100) * (square(c) ? 1.6 : 1) * (inRect(layout.farm, c.x, c.y, 20) ? 1.8 : 1);
     const pa = power(a, b), pb = power(b, a), loser = pa < pb ? a : b, ratio = Math.max(pa, pb) / Math.max(.1, Math.min(pa, pb));
-    shake(loser, Math.min(6, 1.2 * ratio));
+    shake(loser, Math.min(9.5, 2.4 * ratio));
 }
 function updateStaff(w: SimWorld, c: Company, threat: number) {
     const g = w.generals[c.faction], face = c.faction ? -1 : 1;

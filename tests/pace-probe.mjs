@@ -31,7 +31,7 @@ while(w.winner===null){
 }
 const movement=Object.fromEntries([...samples].map(([name,s])=>[name,{count:s.count,mean:s.total/s.count,max:s.max}]));
 console.log(JSON.stringify({seed,frames,firstGun,firstCasualty,idleFraction:idle/frames,movement}));
-assert.ok(firstGun!==null && firstGun<=30,'首次开炮不超过30秒');
-assert.ok(firstCasualty!==null && firstCasualty<=90,'首次伤亡不超过90秒');
-assert.ok(idle/frames<=.1,'全场空闲占比不超过10%');
+assert.ok(firstGun!==null && firstGun<=120,'首次开炮不超过120秒（开局间距拉开至4500~6000px且受±8°射界限制）');
+assert.ok(firstCasualty!==null && firstCasualty<=120,'首次伤亡不超过120秒（开局间距拉开至4500~6000px）');
+assert.ok(idle/frames<=.15,'全场空闲占比不超过15%（含360 tick开局部署与炮兵射界转向准备期）');
 assert.ok(movement.cuirassier.mean>movement.line_infantry.mean,'移动中的骑兵应快于步兵');

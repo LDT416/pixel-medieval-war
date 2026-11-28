@@ -5,8 +5,11 @@ export type Scale = 1200 | 2400 | 3600;
 export const scales: Scale[] = [1200,2400,3600];
 export const TICKS = 30;
 export type Action = 'stand'|'march'|'run'|'aim'|'load'|'thrust'|'recoil'|'kneel'|'kneelLoad';
-/** 连队队形：线列火力最强，纵队行军快，方阵克骑兵但怕炮。 */
-export type Formation = 'line'|'column'|'square'|'battery'|'wedge'|'staff';
+/** 连队队形：线列火力最强，纵队行军快，方阵克骑兵但怕炮，散兵适合轻步兵掩护，菱形用于骑兵冲锋。 */
+export type Formation = 'line'|'column'|'square'|'battery'|'wedge'|'staff'|'skirmish'|'diamond';
+export type BattalionFireMode = 'first'|'platoon'|'rank'|'free';
+export type ChargePhase = 'idle'|'form'|'walk'|'trot'|'gallop'|'charge'|'impact'|'pursue'|'rally';
+export type CavalryTask = 'none'|'counter'|'flank'|'pursue'|'threaten'|'battery'|'screen';
 export type Order = 'hold'|'advance'|'assault'|'charge'|'reserve'|'rally';
 export type Status = 'steady'|'shaken'|'rout'|'gone';
 export type Trait = 'aggressive'|'cautious'|'cunning'|'steadfast';
@@ -21,6 +24,8 @@ export interface Soldier {
     ammo:number; shotsFired:number; loadedAt:number; shotTarget:number; kneelUntil:number;
     stride: number; speed: number; cooldown: number; foe: number;
     aimTarget:number; aimX:number; aimY:number; rangeError:number; shotsOnTarget:number;
+    /** 火炮朝向（弧度）、炮组人数（0～6）、转向/挂车状态与缴获标记。 */
+    aim:number; crew:number; reaimUntil:number; reaimTargetAim:number; reaimKind:'none'|'traverse'|'limber'; captured:boolean;
     px:number; py:number; turnFrames:number; marchUntil:number; staff:boolean; officer:boolean; diedAt:number; escaped:boolean; general: boolean; jx: number; jy: number;
 }
 export interface Company {
@@ -40,15 +45,35 @@ export interface Company {
     engaged: boolean; checkedAt: number; chargeAt: number;
     /** 0 一线 · 1 二线 · 2 近卫预备队 · 3 骑兵 · 4 炮兵 · 5 参谋部 · 6 据点守军 · 7 援军 */
     line: number;
+    /** 所属营 id（-1 表示未编入营）与营内槽位；侧翼钩形转向角度与完成时间；最近伤亡记录。 */
+    battalion: number; battalionSlot: number; refuseAngle: number; refuseUntil: number; recentLosses: number[];
+    /** 骑兵菱形冲锋状态机、战术任务、连续平滑速度、体力计数与追击/威慑状态。 */
+    chargePhase: ChargePhase; cavTask: CavalryTask; cavSpeed: number; impactSpeed: number;
+    chargeCount: number; restUntil: number; rallyStartAt: number;
+    pursueStartX: number; pursueStartY: number; pursueStartTick: number;
+    threatenUntil: number; threatenTarget: number;
+    flankWaypoint: {x: number; y: number} | null;
     losses:number; volleys:number; routs:number; charges:number; captures:number; wooded:boolean; rallies:number; kills: number; underFire: number; speed: number; colors: number; rallied: number;
+}
+export interface Battalion {
+    id: number; faction: Faction; kind: Kind; name: string; sector: 0|1|2; line: number;
+    companies: number[]; skirmishers: number[];
+    x: number; y: number; hx: number; hy: number; gx: number; gy: number; homeX: number; homeY: number;
+    order: Order; fireMode: BattalionFireMode;
+    target: number; targetCompany: number;
+    fireSeq: number; nextFireAt: number; firingSince: number; firstVolleyCount: number;
+    stoppedAt: number; aligned: boolean; closing: boolean;
+    smoke: number; initialAmmo: number;
+    refusedLeft: boolean; refusedRight: boolean;
+    firstChargeAt: number;
 }
 export interface General { faction: Faction; name: string; title: string; trait: Trait; unit: Soldier | null; company: number; alive: boolean }
 export interface Sample {tick:number; odds:number; eff:[number,number]; morale:[number,number]}
 export interface TurningPoint {tick:number; kind:"decisive"|"swing"; delta:number; from:number; to:number; causes:News[]}
 export interface News { odds:number; tick: number; text: string; faction: Faction | -1; x: number; y: number; weight: number }
 export interface BattleEvent {
-    endX?:number; endY?:number; struck?:boolean;
-    type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash'|'drum'|'tileImpact';
+    endX?:number; endY?:number; struck?:boolean; battalion?:number; shotDist?:number; formation?:Formation;
+    type: 'fire'|'hit'|'death'|'impact'|'bounce'|'slash'|'drum'|'tileImpact'|'shell'|'burst';
     x: number; y: number; dx: number; dy: number; faction: Faction; kind: Kind;
     explosive: boolean; unitId: number;
 }
@@ -57,8 +82,9 @@ export interface Round {
     x: number; y: number; tx: number; ty: number; dx: number; dy: number;
     age: number; duration: number; roll: number; rolled: number; speed: number;
     gun: Soldier; faction: Faction; company: number;
-    /** 飞行顶点高度、剩余能量（每撞一人递减）、已命中个体、已受士气冲击的连、上一帧高度。 */
+    /** 飞行顶点高度、剩余能量（每撞一人递减）、已命中个体、已受士气冲击的连、上一帧高度；榴弹标记与引信倒计时。 */
     apex: number; energy: number; hit: Set<number>; touched: number[]; lastH: number;
+    shell?: boolean; fuse?: number; landed?: boolean;
 }
 export interface Reinforcement { faction: Faction; tick: number; arrived: boolean; count: number; name: string }
 

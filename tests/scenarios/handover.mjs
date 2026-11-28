@@ -3,7 +3,7 @@ import {build} from 'esbuild';
 
 const {outputFiles}=await build({stdin:{contents:"export {SimWorld} from './src/sim/world'; export {formUp} from './src/sim/strategy';",resolveDir:process.cwd()},platform:'node',format:'esm',bundle:true,write:false});
 const {SimWorld,formUp}=await import('data:text/javascript;base64,'+Buffer.from(outputFiles[0].text).toString('base64'));
-const w=new SimWorld(3600,42);
+const w=new SimWorld(2400,42);
 while(w.tick<w.deployEnd)w.step();
 const front=w.companies.find(c=>c.faction===0 && c.line===0 && w.companies.some(r=>r.faction===0 && r.sector===c.sector && r.line===1 && r.kind===c.kind));
 const reserve=w.companies.find(r=>r.faction===0 && r.sector===front.sector && r.line===1 && r.kind===front.kind);

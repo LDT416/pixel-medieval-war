@@ -4,4 +4,4 @@ export const PACE={
     wagon:60, courier:200, maxFatiguePenalty:.15, strideLength:32,
     deploymentTicks:360, limberTicks:75
 } as const;
-export const RANGE={musket:560,effective:320,scatter:260,round:2500} as const;
+export const RANGE={musket:1700,effective:1000,scatter:1200,round:6000} as const;

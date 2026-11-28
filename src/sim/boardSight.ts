@@ -11,7 +11,7 @@ export class BoardSight {
     canSee(w:SimWorld, observer:Company, other:Company) {
         if (observer.faction === other.faction || observer.alive <= 0 || other.alive <= 0 ||
             observer.status === 'gone' || observer.status === 'rout' || other.status === 'gone') return false;
-        const radius = w.weather === 'fog' ? 9 : w.weather === 'rain' ? 17 : 22;
+        const radius = w.weather === 'fog' ? 9 : w.weather === 'rain' ? 28 : 40;
         return Math.abs(Math.floor(observer.x/TILE) - Math.floor(other.x/TILE)) <= radius &&
             Math.abs(Math.floor(observer.y/TILE) - Math.floor(other.y/TILE)) <= radius;
     }

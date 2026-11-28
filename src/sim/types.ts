@@ -97,7 +97,7 @@ export interface Projectile extends Point {
     target: number;
     remaining: number;
 }
-export type EventKind = 'hit' | 'death' | 'fire' | 'impact' | 'collapse' | 'slash' | 'drum' | 'horn' | 'launch' | 'splash' | 'block' | 'trail' | 'wade' | 'heal' | 'arrowland';
+export type EventKind = 'hit' | 'death' | 'fire' | 'impact' | 'collapse' | 'slash' | 'drum' | 'horn' | 'launch' | 'splash' | 'block' | 'trail' | 'wade' | 'heal' | 'arrowland' | 'shell' | 'burst';
 export interface SimEvent extends Point {
     type: EventKind;
     z?: number;
