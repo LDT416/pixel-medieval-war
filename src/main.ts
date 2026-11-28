@@ -66,6 +66,7 @@ async function start(){
         if(innerWidth<=600 && innerHeight>innerWidth && !sessionStorage.getItem('1815-orientation')){
             sessionStorage.setItem('1815-orientation','1');const tip=document.createElement('div');tip.className='orientation-tip glass';tip.textContent='横屏观战效果更佳';document.body.append(tip);setTimeout(()=>tip.remove(),3200);
         }
+        sound.onBattleStart(side);
         deploymentPlayback=world.tick<world.deployEnd;paused=false;arena.focus(hotX,hotY,210);controls();
     }
     function settle(){
@@ -144,7 +145,7 @@ async function start(){
             if(world.ended)accumulator=0;
         }
         if(world.ended)settle();
-        companyFollow.tick(now);director(now);sound.update(real,paused||world.ended);
+        companyFollow.tick(now);director(now);sound.update(real,paused||hud.intelOpen||(world.ended&&world.winner===null),world);
         arena.render(world,real,world.ended?real:dt,accumulator);
         fpsTime+=elapsed;frameCount++;
         if(fpsTime>=.5){fps=frameCount/fpsTime;arena.observeFps(fps);fpsTime=frameCount=0;}

@@ -28,6 +28,7 @@
 #labels{position:fixed;inset:0;pointer-events:none}#labels span{position:absolute;transform:translate(-50%,-100%);padding:2px 4px 4px;background:#191b19c9;color:#f5eddf;font-size:10px;white-space:nowrap}#labels span:after{content:"";position:absolute;bottom:0;left:0;height:2px;width:var(--morale);background:#a3be76}
 .major{position:fixed;left:1rem;bottom:1rem;pointer-events:auto}.major[aria-pressed=true]{color:#edcf8a}
 .ticker{max-height:135px;overflow:auto;pointer-events:auto}.ticker li{cursor:pointer;pointer-events:auto}.ticker.major-only .w1{display:none}.ticker .w3.f0{background:#264562dd}.ticker .w3.f1{background:#683331dd}
+.music-row{gap:4px}.music-track{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#d6ccb0;text-align:right}.music-track.f0{color:#9cc2e6}.music-track.f1{color:#e69b8f}.music-track.off{color:#8f8978}.music-next{padding:0 5px;min-width:24px}
 .commander-down:after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 18vw #161112d9;pointer-events:none}
 
 .major{left:auto;right:64px;bottom:15px}.intel-open .major,.victory-open .major{display:none}
