@@ -55,6 +55,37 @@ function sample(page) {
     });
 }
 
+async function finishBattle(page) {
+    let {tick, ended} = await sample(page);
+    while (!ended && tick < 36210) {
+        const next = await page.evaluate(() => {
+            const d = window.__arenaDebug;
+            d.stepFrames(300);
+            return {tick: d.world.tick, ended: d.world.ended};
+        });
+        assert.ok(next.tick > tick || next.ended, 'the paused simulation can be stepped');
+        ({tick, ended} = next);
+    }
+    assert.ok(ended, 'the battle reached the victory screen');
+    return page.evaluate(async () => {
+        const w = window.__arenaDebug.world;
+        const state = [w.seed, w.scale, w.tick, w.endTick, w.winner, w.reason, w.rng.state, w.start, w.alive,
+            w.dead, w.fled, w.reinforced, w.broken, w.marchCohesion.stats, w.layout.objectives, w.news,
+            w.timeline, w.turningPoints, w.battalions, w.companies, w.units];
+        const serialized = JSON.stringify(state, (key, value) => {
+            // Each soldier is recorded in full in w.units. Companies keep ordered membership by ID.
+            if (key === 'members') return value.map(unit => unit.id);
+            if (value instanceof Map) return Array.from(value.entries());
+            if (value instanceof Set) return Array.from(value.values());
+            return value;
+        });
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(serialized));
+        return {tick: w.tick, endTick: w.endTick, winner: w.winner, reason: w.reason, alive: [...w.alive],
+            dead: [...w.dead], fled: [...w.fled], units: w.units.length,
+            sha256: Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('')};
+    });
+}
+
 async function main() {
     await fs.mkdir(shots, {recursive: true});
     let browser, server, page;
@@ -103,20 +134,9 @@ async function main() {
         report.checkpoint = await fingerprint(page);
 
         // Reach the UI's replay button without making the real-time observation depend on battle length.
-        let endTick = report.checkpoint.tick;
-        let ended = false;
-        while (!ended && endTick < 36210) {
-            const next = await page.evaluate(() => {
-                const d = window.__arenaDebug;
-                d.stepFrames(300);
-                return {tick: d.world.tick, ended: d.world.ended};
-            });
-            assert.ok(next.tick > endTick || next.ended, 'the paused simulation can be stepped');
-            endTick = next.tick;
-            ended = next.ended;
-        }
-        assert.ok(ended, 'the battle reached the victory screen');
-        report.endTick = endTick;
+        report.final = await finishBattle(page);
+        assert.ok(report.final.winner === 0 || report.final.winner === 1);
+        report.endTick = report.final.tick;
         await page.getByRole('button', {name: '重演本局'}).click();
         report.replayOpening = await fingerprint(page);
         assert.deepEqual(report.replayOpening, report.opening);
@@ -135,10 +155,12 @@ async function main() {
         }, report.checkpoint.tick);
         report.replayCheckpoint = await fingerprint(page);
         assert.deepEqual(report.replayCheckpoint, report.checkpoint);
+        report.replayFinal = await finishBattle(page);
+        assert.deepEqual(report.replayFinal, report.final, 'the repeated battle must have the same terminal state');
         assert.deepEqual(report.errors, []);
         report.passed = true;
-        console.log(JSON.stringify({shots, elapsedMs: report.elapsedMs, endTick, checkpoint: report.checkpoint,
-            errors: report.errors}));
+        console.log(JSON.stringify({shots, elapsedMs: report.elapsedMs, endTick: report.endTick,
+            checkpoint: report.checkpoint, final: report.final, errors: report.errors}));
     } catch (error) {
         report.passed = false;
         report.failure = error.message;
